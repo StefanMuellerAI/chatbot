@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
 import { getSettings } from "@/lib/settings";
 import { ADMIN_COOKIE, USER_COOKIE, verifyAdmin, verifyUser } from "./tokens";
@@ -62,45 +62,36 @@ export function errorResponse(err: unknown): Response {
   return Response.json({ error: message }, { status: 500 });
 }
 
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 10;
+const MAX_ATTEMPTS = 30;
 
-/** Brute-Force-Schutz für Logins: 10 Fehlversuche pro 10 Minuten und IP. */
-export async function checkLoginRateLimit(request: Request): Promise<void> {
+/**
+ * Brute-Force-Schutz für Logins: höchstens 30 Fehlversuche pro 10 Minuten und IP.
+ * Gezählt wird atomar VOR der Passwortprüfung (parallele Anfragen werden mitgezählt);
+ * eine erfolgreiche Anmeldung erstattet ihren Versuch zurück. Der Wert ist großzügig,
+ * weil eine ganze Schulungsgruppe oft über dieselbe IP-Adresse kommt.
+ */
+export async function consumeLoginAttempt(request: Request): Promise<() => Promise<void>> {
   const ipHash = hashId(clientIp(request));
   const db = await getDb();
-  const rows = await db
-    .select()
-    .from(schema.loginAttempts)
-    .where(eq(schema.loginAttempts.ipHash, ipHash))
-    .limit(1);
-  const row = rows[0];
-  if (row && Date.now() - row.windowStart.getTime() < WINDOW_MS && row.count >= MAX_ATTEMPTS) {
-    throw new HttpError(429, "Zu viele Anmeldeversuche. Bitte warte ein paar Minuten.");
-  }
-}
-
-export async function recordLoginFailure(request: Request): Promise<void> {
-  const ipHash = hashId(clientIp(request));
-  const db = await getDb();
-  const rows = await db
-    .select()
-    .from(schema.loginAttempts)
-    .where(eq(schema.loginAttempts.ipHash, ipHash))
-    .limit(1);
-  const row = rows[0];
-  const now = new Date();
-  if (!row || Date.now() - row.windowStart.getTime() >= WINDOW_MS) {
-    await db
-      .insert(schema.loginAttempts)
-      .values({ ipHash, windowStart: now, count: 1 })
-      .onConflictDoUpdate({ target: schema.loginAttempts.ipHash, set: { windowStart: now, count: 1 } });
-  } else {
+  const res = (await db.execute(sql`
+    INSERT INTO login_attempts (ip_hash, window_start, count) VALUES (${ipHash}, now(), 1)
+    ON CONFLICT (ip_hash) DO UPDATE SET
+      count = CASE WHEN login_attempts.window_start < now() - interval '10 minutes' THEN 1 ELSE login_attempts.count + 1 END,
+      window_start = CASE WHEN login_attempts.window_start < now() - interval '10 minutes' THEN now() ELSE login_attempts.window_start END
+    RETURNING count
+  `)) as unknown as { rows?: { count: number }[] } | { count: number }[];
+  const rows = Array.isArray(res) ? res : (res.rows ?? []);
+  const count = Number(rows[0]?.count ?? 0);
+  const refund = async () => {
     await db
       .update(schema.loginAttempts)
-      .set({ count: row.count + 1 })
+      .set({ count: sql`greatest(${schema.loginAttempts.count} - 1, 0)` })
       .where(eq(schema.loginAttempts.ipHash, ipHash));
+  };
+  if (count > MAX_ATTEMPTS) {
+    throw new HttpError(429, "Zu viele Anmeldeversuche. Bitte warte ein paar Minuten.");
   }
+  return refund;
 }
 
 function clientIp(request: Request): string {

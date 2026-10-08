@@ -3,6 +3,7 @@ import { inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
 import type { ModelRow } from "@/lib/models";
 import type { Attachment, ChatMessage, Effort, NativeTurn } from "@/lib/shared/types";
+import { sniffImageMime } from "@/lib/files/sniff";
 import { getFile } from "@/lib/storage";
 
 export type PreparedPart =
@@ -78,12 +79,13 @@ async function attachmentParts(
       return [{ type: "text", text: `[Bild "${a.name}" angehängt – dieses Modell kann keine Bilder sehen.]` }];
     }
     const file = await getFile(a.storageKey);
-    if (!file || !IMAGE_MIMES.has(file.contentType)) {
+    const mime = file ? sniffImageMime(file.data) : null;
+    if (!file || !mime) {
       return [{ type: "text", text: `[Bild "${a.name}" ist nicht mehr verfügbar.]` }];
     }
     return [
       { type: "text", text: `[Bild "${escapeAttr(a.name)}", Bild-ID: ${a.storageKey}]` },
-      { type: "image", mime: file.contentType, base64: file.data.toString("base64") },
+      { type: "image", mime, base64: file.data.toString("base64") },
     ];
   }
   if (a.kind === "document" && a.mime === "application/pdf" && a.native && opts.nativePdf && model.capabilities.pdf) {

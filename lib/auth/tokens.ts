@@ -20,7 +20,12 @@ export interface AdminClaims {
 function secretKey(): Uint8Array {
   const explicit = process.env.SESSION_SECRET;
   if (explicit && explicit.length >= 16) return new TextEncoder().encode(explicit);
-  // Fallback: aus den Passwörtern abgeleitet, damit lokale Entwicklung ohne Extra-Variable läuft.
+  // In Produktion Pflicht: Ein aus den Passwörtern abgeleiteter Schlüssel wäre für Teilnehmende,
+  // die APP_PASSWORD kennen, offline angreifbar.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET fehlt (mindestens 16 Zeichen). Bitte in Vercel setzen.");
+  }
+  // Lokale Entwicklung: aus den Passwörtern abgeleitet, damit es ohne Extra-Variable läuft.
   const material = `freebie|${devPassword("APP_PASSWORD")}|${devPassword("ADMIN_PASSWORD")}`;
   return new Uint8Array(createHash("sha256").update(material).digest());
 }

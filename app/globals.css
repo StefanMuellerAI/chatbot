@@ -324,3 +324,13 @@ dialog::backdrop {
   background: rgba(13, 10, 23, 0.55);
   backdrop-filter: blur(2px);
 }
+
+/* Druckansicht (PDF-Export): nur der Gesprächsverlauf */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    background: #fff !important;
+    color: #15131f !important;
+  }
+}

@@ -5,6 +5,7 @@ import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
 import { estimateTokens, extractText } from "@/lib/files/extract";
 import { categoryOf } from "@/lib/files/limits";
+import { sniffImageMime } from "@/lib/files/sniff";
 import { getSettings } from "@/lib/settings";
 import type { Attachment } from "@/lib/shared/types";
 import { assertSafeKey, getFile, registerFile } from "@/lib/storage";
@@ -12,13 +13,6 @@ import { assertSafeKey, getFile, registerFile } from "@/lib/storage";
 export const maxDuration = 120;
 
 const Body = z.object({ key: z.string().max(300), name: z.string().min(1).max(300) });
-
-const IMAGE_SIGNATURES: { mime: string; test: (b: Buffer) => boolean }[] = [
-  { mime: "image/png", test: (b) => b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
-  { mime: "image/jpeg", test: (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
-  { mime: "image/gif", test: (b) => b.subarray(0, 4).toString("ascii") === "GIF8" },
-  { mime: "image/webp", test: (b) => b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP" },
-];
 
 /** Verarbeitet eine hochgeladene Datei: Prüfsumme, Textextraktion (mit Hash-Cache), Metadaten. */
 export async function POST(request: Request) {
@@ -35,14 +29,14 @@ export async function POST(request: Request) {
     const sha256 = createHash("sha256").update(file.data).digest("hex");
 
     if (category === "image") {
-      const sig = IMAGE_SIGNATURES.find((s) => s.test(file.data));
-      if (!sig) throw new HttpError(400, "Das Bild konnte nicht gelesen werden (PNG, JPG, WEBP oder GIF).");
-      await registerFile(key, "image", sig.mime, file.data.length, settings.fileRetentionDays);
+      const mime = sniffImageMime(file.data);
+      if (!mime) throw new HttpError(400, "Das Bild konnte nicht gelesen werden (PNG, JPG, WEBP oder GIF).");
+      await registerFile(key, "image", mime, file.data.length, settings.fileRetentionDays);
       const attachment: Attachment = {
         id: randomUUID(),
         kind: "image",
         name,
-        mime: sig.mime,
+        mime,
         size: file.data.length,
         sha256,
         storageKey: key,

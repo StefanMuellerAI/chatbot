@@ -2,12 +2,7 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { safeEqual, verifyHashedPassword } from "@/lib/auth/password";
-import {
-  checkLoginRateLimit,
-  errorResponse,
-  HttpError,
-  recordLoginFailure,
-} from "@/lib/auth/session";
+import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/session";
 import { devPassword, signUser, USER_COOKIE, USER_MAX_AGE_S } from "@/lib/auth/tokens";
 import { getSettings } from "@/lib/settings";
 
@@ -15,8 +10,8 @@ const Body = z.object({ password: z.string().min(1).max(200) });
 
 export async function POST(request: Request) {
   try {
-    await checkLoginRateLimit(request);
     const { password } = Body.parse(await request.json());
+    const refundAttempt = await consumeLoginAttempt(request);
     const settings = await getSettings();
     let ok = false;
     if (settings.appPasswordHash) {
@@ -27,9 +22,9 @@ export async function POST(request: Request) {
       ok = safeEqual(password, expected);
     }
     if (!ok) {
-      await recordLoginFailure(request);
       throw new HttpError(401, "Das Passwort stimmt nicht.");
     }
+    await refundAttempt();
     const token = await signUser({ sid: randomUUID(), v: settings.sessionVersion });
     const jar = await cookies();
     jar.set(USER_COOKIE, token, {

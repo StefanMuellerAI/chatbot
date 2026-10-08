@@ -206,7 +206,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
         )}
         {efforts.length > 0 && <EffortMenu value={effort} options={efforts} onChange={onEffortChange} />}
         {features.imageGeneration && (
-          <ToolButton onClick={onImageMode} title="Bild-Modus: direkt ein Bild erzeugen" label="Bild">
+          <ToolButton onClick={onImageMode} disabled={streaming} title="Bild-Modus: direkt ein Bild erzeugen" label="Bild">
             <ImagePlus className="h-4.5 w-4.5" />
           </ToolButton>
         )}
@@ -239,15 +239,16 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   );
 });
 
-function ToolButton({ children, onClick, title, label, active }: { children: React.ReactNode; onClick: () => void; title: string; label?: string; active?: boolean }) {
+function ToolButton({ children, onClick, title, label, active, disabled }: { children: React.ReactNode; onClick: () => void; title: string; label?: string; active?: boolean; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={title}
       aria-pressed={active}
       className={cn(
-        "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors",
+        "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors disabled:opacity-40",
         active ? "bg-primary-soft text-primary" : "text-muted hover:bg-surface-2 hover:text-text",
       )}
     >

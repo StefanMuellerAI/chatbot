@@ -32,7 +32,7 @@ describe("buildAnthropicRequest", () => {
 
   it("setzt adaptives Thinking mit Zusammenfassung und den Effort explizit", () => {
     const { params } = buildAnthropicRequest(request(sonnet, [user("Hallo")]));
-    expect(params.thinking).toEqual({ type: "adaptive", display: "summarized" });
+    expect(params.thinking).toMatchObject({ type: "adaptive", display: "summarized" });
     expect(params.output_config).toEqual({ effort: "medium" });
     expect(params.max_tokens).toBe(32000);
   });
@@ -56,11 +56,26 @@ describe("buildAnthropicRequest", () => {
     expect(params.max_tokens).toBe(64000);
   });
 
-  it("schaltet die Websuche per System-Nachricht nach der Nutzernachricht ab", () => {
-    const { params } = buildAnthropicRequest(request(sonnet, [user("Ohne Suche", { webSearch: false })]));
-    expect(params.messages[1]).toEqual({ role: "system", content: WEB_SEARCH_OFF_NOTE });
+  it("schaltet die Websuche per Hinweis in der Nachricht ab – auch ohne folgende Antwort", () => {
+    // Abgebrochene Antworten werden nicht mitgeschickt: zwei Nutzernachrichten folgen direkt aufeinander.
+    const { params } = buildAnthropicRequest(request(sonnet, [user("Ohne Suche", { webSearch: false }), user("Weiter")]));
+    expect(params.messages).toHaveLength(2);
+    expect(params.messages[0]).toEqual({
+      role: "user",
+      content: [
+        { type: "text", text: "Ohne Suche" },
+        { type: "text", text: `(${WEB_SEARCH_OFF_NOTE})` },
+      ],
+    });
+    expect(params.messages.some((m) => m.role === "system")).toBe(false);
     // Tools bleiben trotzdem gleich (Cache-Präfix).
     expect((params.tools as { name: string }[]).map((t) => t.name)).toContain("web_search");
+  });
+
+  it("verwirft nicht passende Thinking-Blöcke statt die Anfrage abzulehnen", () => {
+    const { params, betas } = buildAnthropicRequest(request(sonnet, [user("Hallo")]));
+    expect(params.thinking).toMatchObject({ block_binding: { prefix_mismatch_behavior: "drop_block" } });
+    expect(betas).toContain("thinking-binding-controls-2026-08-01");
   });
 
   it("gibt native Blöcke beim gleichen Modell byte-genau zurück, sonst Text", () => {

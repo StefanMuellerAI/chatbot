@@ -1,12 +1,7 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { safeEqual } from "@/lib/auth/password";
-import {
-  checkLoginRateLimit,
-  errorResponse,
-  HttpError,
-  recordLoginFailure,
-} from "@/lib/auth/session";
+import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/session";
 import { ADMIN_COOKIE, ADMIN_MAX_AGE_S, devPassword, signAdmin } from "@/lib/auth/tokens";
 import { getSettings } from "@/lib/settings";
 
@@ -14,14 +9,14 @@ const Body = z.object({ password: z.string().min(1).max(200) });
 
 export async function POST(request: Request) {
   try {
-    await checkLoginRateLimit(request);
     const { password } = Body.parse(await request.json());
+    const refundAttempt = await consumeLoginAttempt(request);
     const expected = devPassword("ADMIN_PASSWORD");
     if (!expected) throw new HttpError(500, "ADMIN_PASSWORD ist nicht konfiguriert.");
     if (!safeEqual(password, expected)) {
-      await recordLoginFailure(request);
       throw new HttpError(401, "Das Admin-Passwort stimmt nicht.");
     }
+    await refundAttempt();
     const settings = await getSettings();
     const token = await signAdmin({ adm: true, v: settings.sessionVersion });
     const jar = await cookies();

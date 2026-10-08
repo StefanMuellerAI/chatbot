@@ -1,10 +1,11 @@
 "use client";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Info, Menu, MessageSquarePlus, PanelRight, TriangleAlert, Upload } from "lucide-react";
+import { FileDown, Info, Menu, MessageSquarePlus, PanelRight, Printer, TriangleAlert, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { collectArtifacts } from "@/lib/client/artifacts";
-import { db, saveConversation, type Conversation } from "@/lib/client/db";
+import { appendMessages, db, saveConversation, type Conversation } from "@/lib/client/db";
+import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/export";
 import { streamChat } from "@/lib/client/api";
 import { formatContextDate } from "@/lib/shared/date";
 import type { Attachment, ChatMessage, Effort, GeneratedImage, PublicConfig, StreamEvent } from "@/lib/shared/types";
@@ -141,7 +142,7 @@ export function ChatApp() {
       // ignorieren
     }
     if (active && active.modelId !== id) {
-      await saveConversation({ ...active, modelId: id });
+      await db.conversations.update(active.id, { modelId: id });
       if (active.messages.length) showToast("Modell gewechselt – für dieses Gespräch startet der Cache neu.");
     }
   };
@@ -182,8 +183,12 @@ export function ChatApp() {
     let done: Extract<StreamEvent, { type: "done" }> | null = null;
     let error: string | null = null;
     let scheduled = false;
+    let finished = false;
+    let rafId = 0;
     const flush = () => {
       scheduled = false;
+      // Ein verspäteter Frame (z. B. aus einem Hintergrund-Tab) darf den beendeten Stream nicht wiederbeleben.
+      if (finished) return;
       setStreaming({ conversationId: conv.id, state: { ...state, citations: [...state.citations], images: [...state.images] } });
     };
     try {
@@ -227,7 +232,7 @@ export function ChatApp() {
           }
           if (!scheduled) {
             scheduled = true;
-            requestAnimationFrame(flush);
+            rafId = requestAnimationFrame(flush);
           }
         },
         controller.signal,
@@ -235,8 +240,13 @@ export function ChatApp() {
     } catch (err) {
       if (!controller.signal.aborted) error = err instanceof Error ? err.message : "Verbindung unterbrochen.";
     }
+    finished = true;
+    cancelAnimationFrame(rafId);
     const stopped = controller.signal.aborted;
-    const finished = done as Extract<StreamEvent, { type: "done" }> | null;
+    const result = done as Extract<StreamEvent, { type: "done" }> | null;
+    if (!result && !error && !stopped) {
+      error = "Die Antwort wurde unterbrochen (Zeitlimit oder Verbindung). Bitte „Neu generieren“ verwenden.";
+    }
     const assistant: ChatMessage = {
       id: uuid(),
       role: "assistant",
@@ -246,15 +256,14 @@ export function ChatApp() {
       thinking: state.thinking || undefined,
       citations: state.citations.length ? state.citations : undefined,
       images: state.images.length ? state.images : undefined,
-      native: stopped ? undefined : finished?.native,
-      usage: finished?.usage,
-      fromCache: finished?.fromCache,
-      stopReason: stopped ? "stopped" : finished?.stopReason,
+      native: stopped || !result ? undefined : result.native,
+      usage: result?.usage,
+      fromCache: result?.fromCache,
+      stopReason: stopped ? "stopped" : (result?.stopReason ?? "incomplete"),
       error: error ?? (stopped && !state.text ? "Abgebrochen." : undefined),
       fallbackModel: state.fallbackModel,
     };
-    const latest = (await db.conversations.get(conv.id)) ?? conv;
-    await saveConversation({ ...latest, messages: [...conv.messages, assistant] });
+    await appendMessages(conv.id, [assistant]);
     setStreaming(null);
     abortRef.current = null;
   };
@@ -262,8 +271,7 @@ export function ChatApp() {
   const generateTitle = async (convId: string, firstText: string) => {
     try {
       const res = await api<{ title: string }>("/api/title", { method: "POST", json: { text: firstText.slice(0, 2000) } });
-      const conv = await db.conversations.get(convId);
-      if (conv && res.title) await db.conversations.put({ ...conv, title: res.title });
+      if (res.title) await db.conversations.update(convId, { title: res.title });
     } catch {
       // Titel ist optional
     }
@@ -303,7 +311,12 @@ export function ChatApp() {
       effort,
       messages: [...baseMessages, userMsg],
     } as Conversation;
-    await saveConversation(conv);
+    if (active && editIndex === null) {
+      // Normaler Fall: nur anhängen (ein parallel gesetzter Titel bleibt erhalten).
+      await appendMessages(active.id, [userMsg], { modelId: model.id, effort });
+    } else {
+      await saveConversation(conv);
+    }
     setActiveId(conv.id);
     setText("");
     const isFirst = baseMessages.length === 0;
@@ -353,14 +366,17 @@ export function ChatApp() {
       modelId: modelId,
       stopReason: "image-mode",
     };
-    const conv: Conversation = active
-      ? { ...active, messages: [...active.messages, user, assistant] }
-      : { id: uuid(), title: prompt.slice(0, 40), modelId, presetId, effort, createdAt: now, updatedAt: now, messages: [user, assistant] };
+    if (active) {
+      await appendMessages(active.id, [user, assistant]);
+      return;
+    }
+    const conv: Conversation = { id: uuid(), title: prompt.slice(0, 40), modelId, presetId, effort, createdAt: now, updatedAt: now, messages: [user, assistant] };
     await saveConversation(conv);
     setActiveId(conv.id);
   };
 
   const deleteConversation = async (id: string) => {
+    if (streaming?.conversationId === id) abortRef.current?.abort();
     await db.conversations.delete(id);
     if (id === activeId) newChat();
   };
@@ -384,9 +400,9 @@ export function ChatApp() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden print:block print:h-auto print:overflow-visible">
       {/* Seitenleiste */}
-      <div className={cn("fixed inset-y-0 left-0 z-50 w-72 transition-transform md:static md:translate-x-0", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
+      <div className={cn("fixed inset-y-0 left-0 z-50 w-72 transition-transform md:static md:translate-x-0 print:hidden", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <Sidebar
           conversations={conversations}
           activeId={activeId}
@@ -402,7 +418,7 @@ export function ChatApp() {
 
       {/* Hauptbereich */}
       <main
-        className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero"
+        className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:block print:bg-white"
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("Files")) {
             e.preventDefault();
@@ -418,13 +434,35 @@ export function ChatApp() {
           composerRef.current?.addFiles(Array.from(e.dataTransfer.files));
         }}
       >
-        <header className="flex h-14 shrink-0 items-center gap-1 px-2 sm:px-4">
+        <header className="flex h-14 shrink-0 items-center gap-1 px-2 sm:px-4 print:hidden">
           <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-full p-2 text-muted hover:bg-surface-2 md:hidden" aria-label="Menü öffnen">
             <Menu className="h-5 w-5" />
           </button>
           {config && <ModelPicker models={config.models} value={modelId} onChange={changeModel} />}
           {presetName && <span className="ml-1 truncate rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary">{presetName}</span>}
           <div className="flex-1" />
+          {active && active.messages.length > 0 && !streaming && (
+            <>
+              <button
+                type="button"
+                onClick={() => downloadText(conversationToMarkdown(active, modelName), `${safeName(active.title)}.md`)}
+                className="rounded-full p-2 text-muted hover:bg-surface-2 hover:text-text print:hidden"
+                title="Chat als Markdown exportieren"
+                aria-label="Chat als Markdown exportieren"
+              >
+                <FileDown className="h-4.5 w-4.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="rounded-full p-2 text-muted hover:bg-surface-2 hover:text-text max-sm:hidden print:hidden"
+                title="Drucken oder als PDF speichern"
+                aria-label="Drucken oder als PDF speichern"
+              >
+                <Printer className="h-4.5 w-4.5" />
+              </button>
+            </>
+          )}
           {artifacts.size > 0 && (
             <button
               type="button"
@@ -452,7 +490,7 @@ export function ChatApp() {
 
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="min-h-0 flex-1 overflow-y-auto print:overflow-visible"
           onScroll={(e) => {
             const el = e.currentTarget;
             stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
@@ -501,7 +539,7 @@ export function ChatApp() {
           )}
         </div>
 
-        <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 sm:px-4">
+        <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 sm:px-4 print:hidden">
           {editIndex !== null && (
             <div className="mb-2 flex items-center justify-between rounded-2xl bg-primary-soft px-4 py-2 text-sm text-primary">
               <span>Du bearbeitest eine frühere Nachricht. Beim Senden wird das Gespräch ab dort neu fortgesetzt.</span>
@@ -525,7 +563,7 @@ export function ChatApp() {
               disabled={config.paused || !model}
               onSend={send}
               onStop={() => abortRef.current?.abort()}
-              onImageMode={() => setImageMode(true)}
+              onImageMode={() => !streaming && setImageMode(true)}
             />
           )}
           {config && (
@@ -557,7 +595,7 @@ export function ChatApp() {
 
       {/* Artefakt-Panel */}
       {artifactVersions && artifactVersions.length > 0 && (
-        <section className="fixed inset-0 z-50 border-l border-border md:static md:z-auto md:w-[min(46vw,760px)] md:shrink-0">
+        <section className="fixed inset-0 z-50 border-l border-border md:static md:z-auto md:w-[min(46vw,760px)] md:shrink-0 print:hidden">
           <ArtifactPanel key={artifactId} versions={artifactVersions} dark={isDark} onClose={() => setArtifactId(null)} />
         </section>
       )}

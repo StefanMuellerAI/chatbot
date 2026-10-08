@@ -25,6 +25,7 @@ import {
 
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 const EFFORT_BETA = "mid-conversation-output-config-2026-07-01";
+const BINDING_BETA = "thinking-binding-controls-2026-08-01";
 const WEB_SEARCH_COST_USD = 0.01; // $10 pro 1.000 Suchen
 const MAX_ITERATIONS = 8;
 
@@ -114,14 +115,12 @@ export function buildAnthropicRequest(req: ProviderRequest): {
     }
     lastEffort = m.effort;
     const content = userContent(m);
-    const searchOff = req.tools.webSearch && caps.webSearch && !m.webSearch;
-    if (searchOff && !caps.systemMessages) {
+    // Als Textblock in der Nachricht selbst: unabhängig davon, ob danach eine Antwort folgt
+    // (eine System-Nachricht müsste immer von einer Assistenten-Antwort gefolgt werden).
+    if (req.tools.webSearch && caps.webSearch && !m.webSearch) {
       content.push({ type: "text", text: `(${WEB_SEARCH_OFF_NOTE})` });
     }
     messages.push({ role: "user", content });
-    if (searchOff && caps.systemMessages) {
-      messages.push({ role: "system", content: WEB_SEARCH_OFF_NOTE });
-    }
   }
 
   const effortValue = mapEffort(topEffort, model.effortMap);
@@ -134,11 +133,18 @@ export function buildAnthropicRequest(req: ProviderRequest): {
     cache_control: cacheControl,
   };
   if (tools.length) params.tools = tools;
-  if (caps.reasoning) {
-    params.thinking = { type: "adaptive", display: "summarized" };
-    params.output_config = { effort: effortValue as "low" | "medium" | "high" | "xhigh" | "max" };
-  }
   const betas: string[] = [];
+  if (caps.reasoning) {
+    // Ändert sich ein früherer Teil des Verlaufs (abgelaufenes Bild, geänderte Einstellungen),
+    // verwirft die API betroffene Thinking-Blöcke, statt die Anfrage abzulehnen.
+    params.thinking = {
+      type: "adaptive",
+      display: "summarized",
+      block_binding: { prefix_mismatch_behavior: "drop_block" },
+    };
+    params.output_config = { effort: effortValue as "low" | "medium" | "high" | "xhigh" | "max" };
+    betas.push(BINDING_BETA);
+  }
   if (caps.fallbacks) {
     params.fallbacks = "default";
     betas.push(FALLBACK_BETA);
@@ -288,12 +294,14 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
       };
     }
 
-    appended.push({ role: "assistant", content: sanitizeForEcho(final.content) });
+    const echoed = sanitizeForEcho(final.content);
+    appended.push({ role: "assistant", content: echoed });
 
     if (stopReason === "pause_turn") continue;
     if (stopReason !== "tool_use") break;
 
-    const toolUses = final.content.filter((b) => b.type === "tool_use") as {
+    // Nur Tool-Aufrufe, die auch zurückgeschickt werden (nach einem Fallback entfernte nicht).
+    const toolUses = echoed.filter((b) => b.type === "tool_use") as unknown as {
       type: "tool_use";
       id: string;
       name: string;

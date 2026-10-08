@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   try {
     await requireAdmin();
     const body = Body.parse(await request.json());
-    const settings = await getSettings();
+    const settings = await getSettings({ fresh: true });
     if (body.action === "clear-answer-cache") {
       const db = await getDb();
       await db.delete(schema.answerCache);
