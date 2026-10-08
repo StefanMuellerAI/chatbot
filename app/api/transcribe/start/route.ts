@@ -18,6 +18,7 @@ export async function POST(request: Request) {
   try {
     await requireUser();
     const settings = await getSettings();
+    if (settings.paused) throw new HttpError(503, settings.pausedMessage);
     if (!settings.features.transcription) throw new HttpError(403, "Die Transkription ist deaktiviert.");
     const { key, name } = Body.parse(await request.json());
     assertSafeKey(key);

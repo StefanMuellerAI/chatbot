@@ -13,7 +13,7 @@ die Verarbeitung erfolgt bei OpenAI und Anthropic in den USA. Darauf weist die A
 
 | Thema | Entscheidung |
 |-------|--------------|
-| Hosting | Vercel (Team „StefanAI“), Region USA ist in Ordnung |
+| Hosting | Vercel (Team „StefanAI“, Hobby-Tarif), Region USA ist in Ordnung |
 | Chatverlauf | Nur im Browser der Teilnehmenden |
 | Standardmodell | **Claude Sonnet 5.5** mit Thinking-Effort **„Mittel“** |
 | Nutzungslimits | **Keine** (keine Budgets, keine Quoten pro Person) |
@@ -125,17 +125,17 @@ type NeutralEvent =
   bekommt der Server nur noch die Blob-Referenz.
 - **Private Blobs.** Uploads und generierte Bilder liegen mit `access: "private"` in Blob und werden
   ausschließlich über eine authentifizierte Route (`/api/files/[id]`) ausgeliefert.
-- **Laufzeiten.** `maxDuration` wird für `/api/chat` und die Transkriptions-Routen auf das Maximum
-  des Pro-Tarifs gesetzt (mit Fluid Compute bis zu 800 s, beim Setup prüfen). Antworten auf Stufe
-  „Maximal“ mit Websuche können mehrere Minuten dauern.
+- **Laufzeiten.** `maxDuration` steht für `/api/chat` und die Transkriptions-Routen auf 300 s, dem
+  Maximum des Hobby-Tarifs. Antworten auf Stufe „Maximal“ mit vielen Websuchen können an diese
+  Grenze stoßen.
 - **Lange Audiodateien** laufen deshalb **in Etappen** statt in einer einzigen langen Funktion (siehe F8).
 - **ffmpeg** kommt als `ffmpeg-static`-Binary in das Funktions-Bundle (über
   `outputFileTracingIncludes` in `next.config.ts`) und arbeitet in `/tmp`. Falls das Bundle-Limit
   Probleme macht: MP3-Dateien lassen sich auch ohne Neukodierung an Frame-Grenzen teilen, oder das
   Aufteilen läuft in einer Vercel Sandbox.
 - **Umgebungsvariablen** stehen in den Vercel-Projekteinstellungen, lokal per `vercel env pull`.
-- **Tarif:** Vercel Hobby ist nur für nicht-kommerzielle Nutzung gedacht. Für Schulungen braucht es
-  den Pro-Tarif. Das Team StefanAI sollte darauf laufen, beim Anlegen des Projekts prüfen.
+- **Tarif:** Freebie startet als Hobby-Projekt. Für einen späteren kommerziellen Einsatz in
+  Schulungen ist der Pro-Tarif nötig (Vercel Hobby ist nur für nicht-kommerzielle Nutzung gedacht).
 
 ---
 
@@ -481,8 +481,7 @@ Freebie soll sich visuell am Internetauftritt von StefanAI (stefanai.de) orienti
   der Website auf.
 - Umsetzung in Phase 0 als kleines Design-System (`app/globals.css`, `tailwind`-Theme,
   shadcn-Komponenten), damit alle späteren Seiten automatisch passen.
-- **Offen:** Die konkreten Werte (Hex-Farben, Schrift, Logo-Datei) werden beim Setup von stefanai.de
-  übernommen.
+- **Umgesetzt:** Farben, Schriften und Logo wurden von stefanai.de übernommen (siehe Abschnitt 10).
 
 ---
 
@@ -581,8 +580,8 @@ Jede Phase endet mit einem Deployment auf Vercel. Jeder Branch bekommt automatis
 
 ---
 
-## 10. Noch offen
+## 10. Umsetzungsstand
 
-1. **Branding-Werte:** Logo-Datei, Hex-Farben und Schrift von stefanai.de (siehe Abschnitt 5).
-2. **Vercel-Tarif:** Bestätigen, dass das Team StefanAI auf Pro läuft (kommerzielle Nutzung, längere
-   Funktionslaufzeiten).
+Alle Phasen 0 bis 8 sind umgesetzt (siehe [README.md](README.md)). Das Branding übernimmt die Farben
+(#4a2ee6, #e41c68, #ff6900, #040026), die Schriften (Space Grotesk, Hanken Grotesk, Bree Serif für die
+Wortmarke) und das Logo von stefanai.de.

@@ -42,3 +42,4 @@ next-env.d.ts
 
 # lokale Daten (PGlite, Uploads)
 /.data
+!.env.example

@@ -72,6 +72,7 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
     const attachmentCount = last?.role === "user" ? last.parts.filter((p) => p.type !== "text").length : 0;
     await say(
       `**Testmodus:** Ich bin der Mock-Provider von Freebie.\n\nDu hast geschrieben:\n\n> ${lastText
+        .slice(0, 300)
         .split("\n")
         .slice(-3)
         .join("\n> ")}\n\n| Eigenschaft | Wert |\n|---|---|\n| Nachrichten im Verlauf | ${req.messages.length} |\n| Zusätzliche Anhänge | ${attachmentCount} |\n| Effort | ${last?.role === "user" ? last.effort : "-"} |\n\nFormel-Test: $E = mc^2$`,

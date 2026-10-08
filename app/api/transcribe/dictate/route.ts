@@ -11,6 +11,7 @@ export async function POST(request: Request) {
   try {
     const session = await requireUser();
     const settings = await getSettings();
+    if (settings.paused) throw new HttpError(503, settings.pausedMessage);
     if (!settings.features.dictation) throw new HttpError(403, "Die Spracheingabe ist deaktiviert.");
     const form = await request.formData();
     const file = form.get("file");

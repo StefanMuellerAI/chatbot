@@ -43,10 +43,18 @@ export async function streamChat(
   onEvent: (event: StreamEvent) => void,
   signal: AbortSignal,
 ): Promise<void> {
+  const json = JSON.stringify(body);
+  // Lange Verläufe komprimieren – Vercel nimmt höchstens 4,5 MB pro Anfrage an.
+  const compress = json.length > 256 * 1024 && typeof CompressionStream !== "undefined";
+  const payload = compress
+    ? await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer()
+    : json;
   const res = await fetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: compress
+      ? { "Content-Type": "application/octet-stream", "X-Freebie-Encoding": "gzip" }
+      : { "Content-Type": "application/json" },
+    body: payload,
     signal,
   });
   if (!res.ok || !res.body) {

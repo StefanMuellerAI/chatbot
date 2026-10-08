@@ -77,6 +77,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
         (async () => {
           try {
             const file = kind === "image" ? await prepareImage(original) : original;
+            // Die Modelle akzeptieren Bilder bis 5 MB (nach dem Verkleinern).
+            if (kind === "image" && file.size > 5 * 1024 * 1024) throw new Error("Bild zu groß (max. 5 MB).");
             const key = await uploadFile(file, config.storage, (f, label) => update(localId, { progress: f * (kind === "audio" ? 0.3 : 0.8), label }));
             let attachment: Attachment;
             if (kind === "audio") {

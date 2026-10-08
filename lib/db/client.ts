@@ -9,17 +9,18 @@ import { SEED_MODELS, SEED_PRESETS } from "./seed";
 
 export type DB = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-let dbPromise: Promise<DB> | null = null;
+// Global abgelegt, damit Hot Reload in der Entwicklung keine zweite PGlite-Instanz öffnet.
+const globalForDb = globalThis as unknown as { freebieDb?: Promise<DB> | null };
 
 /** Neon Postgres, wenn DATABASE_URL gesetzt ist, sonst eingebettetes PGlite (lokal/Tests). */
 export function getDb(): Promise<DB> {
-  if (!dbPromise) {
-    dbPromise = init().catch((err) => {
-      dbPromise = null;
+  if (!globalForDb.freebieDb) {
+    globalForDb.freebieDb = init().catch((err) => {
+      globalForDb.freebieDb = null;
       throw err;
     });
   }
-  return dbPromise;
+  return globalForDb.freebieDb;
 }
 
 export function databaseMode(): "postgres" | "embedded" {

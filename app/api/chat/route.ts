@@ -10,7 +10,7 @@ export const maxDuration = 300;
 export async function POST(request: Request) {
   try {
     const session = await requireUser();
-    const body = ChatRequestSchema.parse(await request.json()) as ChatRequestBody;
+    const body = ChatRequestSchema.parse(await readJson(request)) as ChatRequestBody;
     const stream = chatStream(body, session, request.signal);
     return new Response(stream, {
       headers: {
@@ -26,4 +26,13 @@ export async function POST(request: Request) {
     }
     return errorResponse(err);
   }
+}
+
+/** Liest JSON, optional gzip-komprimiert (große Verläufe). */
+async function readJson(request: Request): Promise<unknown> {
+  if (request.headers.get("x-freebie-encoding") === "gzip" && request.body) {
+    const text = await new Response(request.body.pipeThrough(new DecompressionStream("gzip"))).text();
+    return JSON.parse(text);
+  }
+  return request.json();
 }
