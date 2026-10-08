@@ -1,0 +1,326 @@
+@import "tailwindcss";
+
+/* Dark Mode folgt dem System, lässt sich aber per data-theme am <html> erzwingen. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/*
+ * Design-Tokens im Look von stefanai.de:
+ * Blau-Violett #4a2ee6, Pink #e41c68, Orange #ff6900, Dunkelblau #040026.
+ */
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f7f5fd;
+  --surface: #ffffff;
+  --surface-2: #f3f0fb;
+  --surface-3: #ebe6f8;
+  --border: #e6e1f3;
+  --border-strong: #d4ccef;
+  --text: #15131f;
+  --text-muted: #6b6680;
+  --text-subtle: #8f89a6;
+  --primary: #4a2ee6;
+  --primary-hover: #3a20c8;
+  --primary-soft: #f0ecfd;
+  --primary-contrast: #ffffff;
+  --accent: #e41c68;
+  --accent-2: #ff6900;
+  --warning: #b77900;
+  --warning-soft: #fdf3d4;
+  --danger: #d0254f;
+  --danger-soft: #fce7f0;
+  --success: #1c8a5c;
+  --success-soft: #def7ec;
+  --code-bg: #f5f3fb;
+  --chart-1: #4a2ee6;
+  --chart-grid: #ece9f4;
+  --shadow: 0 1px 2px rgba(21, 19, 31, 0.06), 0 8px 24px rgba(74, 46, 230, 0.06);
+  --brand-gradient: linear-gradient(135deg, #ff6900 0%, #e41c68 100%);
+  --hero-gradient: radial-gradient(1200px 600px at 10% -10%, rgba(190, 155, 255, 0.18), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(255, 105, 0, 0.08), transparent 60%);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d0a17;
+    --bg-soft: #120e1d;
+    --surface: #17141f;
+    --surface-2: #1f1a2b;
+    --surface-3: #2a2338;
+    --border: #2c2640;
+    --border-strong: #3b3354;
+    --text: #f2effa;
+    --text-muted: #a99cbb;
+    --text-subtle: #7d7194;
+    --primary: #9b7bff;
+    --primary-hover: #b49bff;
+    --primary-soft: rgba(155, 123, 255, 0.14);
+    --primary-contrast: #0d0a17;
+    --accent: #ff5a92;
+    --accent-2: #ff8a3d;
+    --warning: #fcb900;
+    --warning-soft: rgba(252, 185, 0, 0.12);
+    --danger: #ff6b8e;
+    --danger-soft: rgba(255, 107, 142, 0.12);
+    --success: #5fd9a0;
+    --success-soft: rgba(95, 217, 160, 0.12);
+    --code-bg: #120e1d;
+    --chart-1: #8a6cf5;
+    --chart-grid: #2a2438;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+    --hero-gradient: radial-gradient(1200px 600px at 10% -10%, rgba(120, 71, 214, 0.22), transparent 60%),
+      radial-gradient(900px 500px at 110% 10%, rgba(228, 28, 104, 0.1), transparent 60%);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d0a17;
+  --bg-soft: #120e1d;
+  --surface: #17141f;
+  --surface-2: #1f1a2b;
+  --surface-3: #2a2338;
+  --border: #2c2640;
+  --border-strong: #3b3354;
+  --text: #f2effa;
+  --text-muted: #a99cbb;
+  --text-subtle: #7d7194;
+  --primary: #9b7bff;
+  --primary-hover: #b49bff;
+  --primary-soft: rgba(155, 123, 255, 0.14);
+  --primary-contrast: #0d0a17;
+  --accent: #ff5a92;
+  --accent-2: #ff8a3d;
+  --warning: #fcb900;
+  --warning-soft: rgba(252, 185, 0, 0.12);
+  --danger: #ff6b8e;
+  --danger-soft: rgba(255, 107, 142, 0.12);
+  --success: #5fd9a0;
+  --success-soft: rgba(95, 217, 160, 0.12);
+  --code-bg: #120e1d;
+  --chart-1: #8a6cf5;
+  --chart-grid: #2a2438;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --hero-gradient: radial-gradient(1200px 600px at 10% -10%, rgba(120, 71, 214, 0.22), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(228, 28, 104, 0.1), transparent 60%);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-soft: var(--bg-soft);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-contrast: var(--primary-contrast);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-code: var(--code-bg);
+  --color-chart-1: var(--chart-1);
+  --color-chart-grid: var(--chart-grid);
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space), var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-brand: var(--font-bree), Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --shadow-soft: var(--shadow);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+.text-gradient {
+  background: var(--brand-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.bg-brand-gradient {
+  background: var(--brand-gradient);
+}
+
+.bg-hero {
+  background-image: var(--hero-gradient);
+}
+
+/* Scrollbars dezent */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* Markdown-Darstellung in Chat-Antworten */
+.prose-chat {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.prose-chat > * + * {
+  margin-top: 0.75em;
+}
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3,
+.prose-chat h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-top: 1.2em;
+}
+.prose-chat h1 {
+  font-size: 1.45rem;
+}
+.prose-chat h2 {
+  font-size: 1.25rem;
+}
+.prose-chat h3 {
+  font-size: 1.1rem;
+}
+.prose-chat ul {
+  list-style: disc;
+  padding-left: 1.4em;
+}
+.prose-chat ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+}
+.prose-chat li + li {
+  margin-top: 0.25em;
+}
+.prose-chat a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-chat blockquote {
+  border-left: 3px solid var(--border-strong);
+  padding-left: 0.9em;
+  color: var(--text-muted);
+}
+.prose-chat :not(pre) > code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+  font-family: var(--font-mono);
+}
+.prose-chat table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  font-size: 0.92em;
+}
+.prose-chat th,
+.prose-chat td {
+  border: 1px solid var(--border);
+  padding: 0.4em 0.7em;
+  text-align: left;
+  vertical-align: top;
+}
+.prose-chat th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.prose-chat hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.prose-chat .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25em 0;
+}
+
+/* Shiki: Hell/Dunkel über CSS-Variablen umschalten */
+.shiki,
+.shiki span {
+  background-color: transparent !important;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .shiki,
+  :root:not([data-theme="light"]) .shiki span {
+    color: var(--shiki-dark) !important;
+  }
+}
+:root[data-theme="dark"] .shiki,
+:root[data-theme="dark"] .shiki span {
+  color: var(--shiki-dark) !important;
+}
+
+/* Blinkender Cursor beim Streaming */
+.streaming-cursor::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--primary);
+  border-radius: 2px;
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.dot-pulse span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+.dot-pulse span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dot-pulse span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+dialog::backdrop {
+  background: rgba(13, 10, 23, 0.55);
+  backdrop-filter: blur(2px);
+}
