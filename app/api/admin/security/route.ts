@@ -5,6 +5,7 @@ import { errorResponse, requireAdmin } from "@/lib/auth/session";
 import { ADMIN_COOKIE, ADMIN_MAX_AGE_S, signAdmin } from "@/lib/auth/tokens";
 import { getDb, schema } from "@/lib/db/client";
 import { getSettings, updateSettings } from "@/lib/settings";
+import { germanZodMessage } from "@/lib/validation";
 
 const Body = z.discriminatedUnion("action", [
   z.object({ action: z.literal("set-password"), password: z.string().min(4).max(200) }),
@@ -43,7 +44,7 @@ export async function POST(request: Request) {
     });
     return Response.json({ ok: true });
   } catch (err) {
-    if (err instanceof z.ZodError) return Response.json({ error: "Ungültige Eingabe (Passwort mind. 4 Zeichen)." }, { status: 400 });
+    if (err instanceof z.ZodError) return Response.json({ error: germanZodMessage(err, { password: "Passwort", action: "Aktion" }) }, { status: 400 });
     return errorResponse(err);
   }
 }

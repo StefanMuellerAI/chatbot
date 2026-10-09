@@ -3,6 +3,7 @@ import { errorResponse, HttpError, requireAdmin } from "@/lib/auth/session";
 import { getModel } from "@/lib/models";
 import { testAnthropic } from "@/lib/providers/anthropic";
 import { testOpenAI } from "@/lib/providers/openai";
+import { providerErrorMessage } from "@/lib/errors";
 import { ProviderError } from "@/lib/providers/types";
 
 export const maxDuration = 60;
@@ -17,12 +18,14 @@ export async function POST(request: Request) {
     const model = await getModel(id);
     if (!model) throw new HttpError(404, "Modell nicht gefunden.");
     const started = Date.now();
+    if (process.env.FREEBIE_MOCK === "1") {
+      return Response.json({ ok: true, answer: "OK (Testmodus – keine echte Verbindung geprüft)", ms: 0 });
+    }
     try {
       const answer = model.provider === "anthropic" ? await testAnthropic(model.modelId) : await testOpenAI(model.modelId);
       return Response.json({ ok: true, answer: answer.slice(0, 200), ms: Date.now() - started });
     } catch (err) {
-      const message =
-        err instanceof ProviderError ? err.userMessage : err instanceof Error ? err.message : "Unbekannter Fehler";
+      const message = err instanceof ProviderError ? err.userMessage : providerErrorMessage(err);
       return Response.json({ ok: false, error: message.slice(0, 400), ms: Date.now() - started });
     }
   } catch (err) {

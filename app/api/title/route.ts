@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     if (process.env.FREEBIE_MOCK === "1") return Response.json({ title: fallback });
     const settings = await getSettings();
     const model = await getModel(settings.titleModelId);
-    if (!model || !providerConfigured(model.provider)) return Response.json({ title: fallback });
+    if (!model || !model.enabled || !providerConfigured(model.provider)) return Response.json({ title: fallback });
     const prompt = `Formuliere einen sehr kurzen deutschen Titel (maximal 5 Wörter, ohne Anführungszeichen, ohne Punkt) für ein Gespräch, das mit dieser Nachricht beginnt:\n\n${text.slice(0, 1500)}`;
     try {
       const res =

@@ -17,6 +17,8 @@ export function providerErrorMessage(err: unknown): string {
   if (e?.status === 401) return "Der API-Schlüssel wurde abgelehnt. Bitte im Admin-Bereich prüfen.";
   if (e?.status === 429) return "Der Anbieter ist gerade überlastet oder das Kontingent ist erschöpft. Bitte gleich nochmal versuchen.";
   if (e?.status === 413) return "Die Anfrage ist zu groß. Bitte kürzere Dateien verwenden oder einen neuen Chat starten.";
+  if (e?.status === 404) return "Das Modell ist beim Anbieter nicht verfügbar. Bitte die API-Modell-ID prüfen.";
+  if (e?.status === 403) return "Der API-Schlüssel hat keinen Zugriff auf dieses Modell.";
   if (e?.status === 400) {
     const detail = e.error?.error?.message ?? e.message ?? "";
     return `Die Anfrage wurde abgelehnt: ${detail.slice(0, 300)}`;

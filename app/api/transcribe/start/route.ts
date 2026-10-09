@@ -43,7 +43,12 @@ export async function POST(request: Request) {
           extractedText: cached[0].text,
           tokenEstimate: Math.ceil(cached[0].text.length / 3.5),
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({ target: schema.fileCache.sha256, set: { createdAt: new Date() } });
+      // Erneut genutzt: Aufbewahrungsfrist beginnt von vorn.
+      await db
+        .update(schema.transcriptCache)
+        .set({ createdAt: new Date() })
+        .where(and(eq(schema.transcriptCache.sha256, sha256), eq(schema.transcriptCache.model, model)));
       return Response.json({ done: true, cached: true, attachment: transcriptAttachment(sha256, key, name, cached[0].text) });
     }
 

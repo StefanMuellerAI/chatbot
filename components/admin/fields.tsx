@@ -1,13 +1,24 @@
 "use client";
+import { cloneElement, isValidElement, useId } from "react";
 import { cn } from "@/components/ui/cn";
 
+/** Beschriftetes Feld; der Hinweis ist Beschreibung (aria-describedby), nicht Teil des Namens. */
 export function Field({ label, hint, children, className }: { label: string; hint?: string; children: React.ReactNode; className?: string }) {
+  const hintId = useId();
+  const control =
+    hint && isValidElement<{ "aria-describedby"?: string }>(children) ? cloneElement(children, { "aria-describedby": hintId }) : children;
   return (
-    <label className={cn("block text-sm", className)}>
-      <span className="mb-1 block font-medium">{label}</span>
-      {children}
-      {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
-    </label>
+    <div className={cn("block text-sm", className)}>
+      <label className="block">
+        <span className="mb-1 block font-medium">{label}</span>
+        {control}
+      </label>
+      {hint && (
+        <span id={hintId} className="mt-1 block text-xs text-muted">
+          {hint}
+        </span>
+      )}
+    </div>
   );
 }
 

@@ -58,6 +58,10 @@ export function AdminApp() {
   const load = useCallback(() => {
     fetchAll().then(apply).catch(fail);
   }, [apply, fail]);
+  // Nach der Anmeldung: Fehler beim Laden landen im Anmeldeformular statt in einem ewigen Spinner.
+  const loadAfterLogin = useCallback(async () => {
+    apply(await fetchAll());
+  }, [apply]);
 
   useEffect(() => {
     fetchAll().then(apply).catch(fail);
@@ -66,14 +70,25 @@ export function AdminApp() {
   if (state === "loading") {
     return (
       <div className="grid h-full place-items-center">
-        {error ? <p className="text-danger">{error}</p> : <Loader2 className="h-6 w-6 animate-spin text-primary" />}
+        {error ? (
+          <div className="text-center">
+            <p role="alert" className="text-danger">
+              {error}
+            </p>
+            <Button className="mt-3" onClick={() => window.location.reload()}>
+              Neu laden
+            </Button>
+          </div>
+        ) : (
+          <Loader2 className="h-6 w-6 animate-spin text-primary" aria-label="Lädt …" />
+        )}
       </div>
     );
   }
-  if (state === "login") return <AdminLogin onSuccess={load} />;
+  if (state === "login") return <AdminLogin onSuccess={loadAfterLogin} />;
   if (!data) return null;
 
-  const modelOptions = data.models.map((m) => ({ id: m.id, name: m.displayName }));
+  const modelOptions = data.models.map((m) => ({ id: m.id, name: m.displayName, enabled: m.enabled }));
   const modelNames = Object.fromEntries(data.models.map((m) => [m.id, m.displayName]));
 
   return (
@@ -83,26 +98,42 @@ export function AdminApp() {
           <Logo />
           <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold tracking-wide uppercase">Admin</span>
           <div className="flex-1" />
-          <Link href="/" className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-white/75 hover:bg-white/10 hover:text-white">
+          <Link
+            href="/"
+            aria-label="Zum Chat"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-white/75 hover:bg-white/10 hover:text-white"
+          >
             <ArrowLeft className="h-4 w-4" /> <span className="max-sm:hidden">Zum Chat</span>
           </Link>
           <button
             type="button"
+            aria-label="Abmelden"
             onClick={async () => {
-              await fetch("/api/admin/logout", { method: "POST" });
-              setState("login");
+              try {
+                await api("/api/admin/logout", { method: "POST", admin: true });
+                setState("login");
+              } catch (err) {
+                alert(err instanceof Error ? err.message : "Abmelden hat nicht geklappt.");
+              }
             }}
             className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-white/75 hover:bg-white/10 hover:text-white"
           >
             <LogOut className="h-4 w-4" /> <span className="max-sm:hidden">Abmelden</span>
           </button>
         </div>
-        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2" aria-label="Admin-Bereiche">
+        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-4 pb-2" aria-label="Admin-Bereiche" role="tablist">
           {TABS.map((t) => (
             <button
               key={t.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              role="tab"
+              aria-selected={tab === t.id}
+              aria-controls="admin-bereich"
+              onClick={() => {
+                setTab(t.id);
+                // Beim Wechsel frische Zahlen und Daten holen (z. B. neue Nutzung seit dem Öffnen).
+                load();
+              }}
               className={cn(
                 "inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm",
                 tab === t.id ? "bg-white text-[#120e1d] font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white",
@@ -113,7 +144,7 @@ export function AdminApp() {
           ))}
         </nav>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+      <main id="admin-bereich" role="tabpanel" aria-label={TABS.find((t) => t.id === tab)?.label} className="mx-auto max-w-6xl px-4 py-6">
         {tab === "overview" && <OverviewTab data={data.overview} modelNames={modelNames} />}
         {tab === "models" && <ModelsTab models={data.models} reload={load} />}
         {tab === "settings" && <SettingsTab initial={data.settings} modelOptions={modelOptions} reload={load} />}
@@ -124,7 +155,7 @@ export function AdminApp() {
   );
 }
 
-function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
+function AdminLogin({ onSuccess }: { onSuccess: () => Promise<void> }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +169,7 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
           setError(null);
           try {
             await api("/api/admin/login", { method: "POST", json: { password }, admin: true });
-            onSuccess();
+            await onSuccess();
           } catch (err) {
             setError(err instanceof Error ? err.message : "Anmeldung fehlgeschlagen");
             setBusy(false);
@@ -161,11 +192,15 @@ function AdminLogin({ onSuccess }: { onSuccess: () => void }) {
             aria-label="Admin-Passwort"
           />
         </label>
-        {error && <p className="mt-3 rounded-xl bg-[#e41c68]/15 px-3 py-2 text-sm text-[#ff8fb5]">{error}</p>}
+        {error && (
+          <p role="alert" className="mt-3 rounded-xl bg-[#e41c68]/15 px-3 py-2 text-sm text-[#ff8fb5]">
+            {error}
+          </p>
+        )}
         <Button type="submit" variant="brand" size="lg" className="mt-4 w-full justify-center" disabled={busy || !password}>
-          {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : "Anmelden"}
+          {busy ? <Loader2 className="h-5 w-5 animate-spin" aria-label="Anmeldung läuft …" /> : "Anmelden"}
         </Button>
-        <Link href="/" className="mt-4 block text-center text-sm text-white/50 hover:text-white">
+        <Link href="/" className="mt-4 block text-center text-sm text-white/65 hover:text-white">
           Zurück zum Chat
         </Link>
       </form>

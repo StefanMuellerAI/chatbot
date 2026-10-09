@@ -53,8 +53,17 @@ export async function POST(request: Request) {
     if (cached[0]) {
       text = cached[0].extractedText;
       tokens = cached[0].tokenEstimate;
+      // Erneut genutzt: Aufbewahrungsfrist beginnt von vorn.
+      await db.update(schema.fileCache).set({ createdAt: new Date() }).where(eq(schema.fileCache.sha256, sha256));
     } else {
-      text = await extractText(file.data, name, mime);
+      const isPdf = name.toLowerCase().endsWith(".pdf");
+      try {
+        text = await extractText(file.data, name, mime);
+      } catch (err) {
+        // Eingescannte PDFs ohne Textebene: mit „PDF nativ“ kann das Modell sie trotzdem lesen.
+        if (!(isPdf && settings.nativePdf && err instanceof HttpError && err.message.startsWith("In der Datei wurde kein lesbarer Text"))) throw err;
+        text = "[Eingescanntes PDF ohne Textebene – nur für Modelle mit nativer PDF-Verarbeitung lesbar.]";
+      }
       tokens = estimateTokens(text);
       await db
         .insert(schema.fileCache)
@@ -73,6 +82,8 @@ export async function POST(request: Request) {
       storageKey: key,
       tokenEstimate: tokens,
       preview: text.slice(0, 600),
+      // PDFs dürfen nativ ans Modell, wenn „PDF nativ“ an ist und das Modell es kann (entscheidet prepare.ts).
+      native: name.toLowerCase().endsWith(".pdf") || undefined,
     };
     return Response.json(attachment, { headers });
   } catch (err) {

@@ -83,6 +83,21 @@ test.describe("D · Modelle und Denktiefe", () => {
     void chat;
   });
 
+  test("D08 ohne verfügbare Modelle: Hinweisleiste und gesperrte Eingabe", async ({ chat, page }) => {
+    await page.route("**/api/config", async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, models: [], defaultModelId: null } });
+    });
+    await page.reload();
+    await expect(page.getByText("Es sind noch keine Modelle verfügbar. Bitte im Admin-Bereich die API-Schlüssel prüfen.")).toBeVisible();
+    const input = page.getByRole("textbox", { name: "Nachricht", exact: true });
+    await expect(input).toBeDisabled();
+    await expect(input).toHaveAttribute("placeholder", "Gerade ist kein Modell verfügbar.");
+    await expect(page.getByRole("button", { name: "Senden" })).toBeDisabled();
+    void chat;
+  });
+
   test("D09 Modell und Denktiefe lassen sich nur mit der Tastatur wählen", async ({ chat, page }) => {
     await picker(page).focus();
     await page.keyboard.press("Enter");

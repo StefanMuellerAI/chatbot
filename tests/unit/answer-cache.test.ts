@@ -42,3 +42,22 @@ describe("Antwort-Cache", () => {
     expect(answerCacheKey({ ...base, presetVersion: "p1", messages: [msg()] })).not.toBe(k);
   });
 });
+
+describe("answerCacheKey – Admin-Änderungen am Modell", () => {
+  const base = {
+    modelRowId: "m",
+    apiModelId: "api-m",
+    systemVersion: "s",
+    presetVersion: null,
+    tools: { webSearch: true, generateImage: true },
+    messages: [{ id: "1", role: "user" as const, text: "Hallo", createdAt: 1 }],
+  };
+  it("ändert sich, wenn Fähigkeiten, Effort-Werte oder „PDF nativ“ geändert werden", () => {
+    const config = { capabilities: { vision: true }, effortMap: { medium: "medium" }, maxOutputTokens: 1000, nativePdf: false };
+    const k = answerCacheKey({ ...base, modelConfig: config });
+    expect(answerCacheKey({ ...base, modelConfig: { ...config, capabilities: { vision: false } } })).not.toBe(k);
+    expect(answerCacheKey({ ...base, modelConfig: { ...config, effortMap: { medium: "high" } } })).not.toBe(k);
+    expect(answerCacheKey({ ...base, modelConfig: { ...config, nativePdf: true } })).not.toBe(k);
+    expect(answerCacheKey({ ...base, modelConfig: { ...config } })).toBe(k);
+  });
+});

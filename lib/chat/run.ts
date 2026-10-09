@@ -104,6 +104,12 @@ async function runChat(
   const cacheKey = answerCacheKey({
     modelRowId: model.id,
     apiModelId: model.modelId,
+    modelConfig: {
+      capabilities: model.capabilities,
+      effortMap: model.effortMap,
+      maxOutputTokens: model.maxOutputTokens,
+      nativePdf: settings.nativePdf,
+    },
     systemVersion: promptVersion(systemPrompt),
     presetVersion: presetPrompt ? promptVersion(presetPrompt) : null,
     tools,

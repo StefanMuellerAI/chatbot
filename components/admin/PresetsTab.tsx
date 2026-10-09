@@ -19,8 +19,22 @@ const ICONS = [
 
 const blank: PresetRow = { id: "", name: "", icon: "sparkles", description: "", promptAddendum: "", defaultModelId: null, enabled: true, sortOrder: 100 };
 
-export function PresetsTab({ presets, models, reload }: { presets: PresetRow[]; models: { id: string; name: string }[]; reload: () => void }) {
+/** ID aus dem Namen ableiten (Umlaute ausgeschrieben, nur a–z, 0–9 und Bindestriche). */
+function idFromName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
+}
+
+export function PresetsTab({ presets, models, reload }: { presets: PresetRow[]; models: { id: string; name: string; enabled: boolean }[]; reload: () => void }) {
   const [editing, setEditing] = useState<{ preset: PresetRow; isNew: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   return (
     <Card
       title="Assistenten-Vorlagen"
@@ -31,6 +45,11 @@ export function PresetsTab({ presets, models, reload }: { presets: PresetRow[]; 
         </Button>
       }
     >
+      {error && (
+        <div className="mb-3">
+          <Notice tone="danger">{error}</Notice>
+        </div>
+      )}
       <div className="divide-y divide-border">
         {presets.map((p) => (
           <div key={p.id} className="flex items-center gap-3 py-3">
@@ -40,17 +59,23 @@ export function PresetsTab({ presets, models, reload }: { presets: PresetRow[]; 
               </div>
               <div className="truncate text-xs text-muted">{p.description}</div>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => setEditing({ preset: p, isNew: false })} aria-label="Bearbeiten">
+            <Button size="sm" variant="ghost" onClick={() => setEditing({ preset: p, isNew: false })} aria-label={`Vorlage „${p.name}“ bearbeiten`} title="Bearbeiten">
               <Pencil className="h-4 w-4" />
             </Button>
             <Button
               size="sm"
               variant="ghost"
-              aria-label="Löschen"
+              aria-label={`Vorlage „${p.name}“ löschen`}
+              title="Löschen"
               onClick={async () => {
                 if (!confirm(`Vorlage „${p.name}“ löschen?`)) return;
-                await api(`/api/admin/presets?id=${encodeURIComponent(p.id)}`, { method: "DELETE", admin: true });
-                reload();
+                setError(null);
+                try {
+                  await api(`/api/admin/presets?id=${encodeURIComponent(p.id)}`, { method: "DELETE", admin: true });
+                  reload();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+                }
               }}
             >
               <Trash2 className="h-4 w-4" />
@@ -76,8 +101,21 @@ export function PresetsTab({ presets, models, reload }: { presets: PresetRow[]; 
   );
 }
 
-function PresetDialog({ initial, isNew, models, onClose, onSave }: { initial: PresetRow; isNew: boolean; models: { id: string; name: string }[]; onClose: () => void; onSave: (p: PresetRow) => Promise<void> }) {
+function PresetDialog({
+  initial,
+  isNew,
+  models,
+  onClose,
+  onSave,
+}: {
+  initial: PresetRow;
+  isNew: boolean;
+  models: { id: string; name: string; enabled: boolean }[];
+  onClose: () => void;
+  onSave: (p: PresetRow) => Promise<void>;
+}) {
   const [p, setP] = useState(initial);
+  const [order, setOrder] = useState(String(initial.sortOrder));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof PresetRow>(k: K, v: PresetRow[K]) => setP((x) => ({ ...x, [k]: v }));
@@ -90,11 +128,11 @@ function PresetDialog({ initial, isNew, models, onClose, onSave }: { initial: Pr
             value={p.name}
             onChange={(e) => {
               set("name", e.target.value);
-              if (isNew) set("id", e.target.value.toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60));
+              if (isNew) set("id", idFromName(e.target.value));
             }}
           />
         </Field>
-        <Field label="ID">
+        <Field label="ID" hint="Kleinbuchstaben, Ziffern, Bindestriche (2–60 Zeichen)">
           <input className={inputClass} value={p.id} onChange={(e) => set("id", e.target.value)} disabled={!isNew} />
         </Field>
         <Field label="Symbol">
@@ -107,7 +145,7 @@ function PresetDialog({ initial, isNew, models, onClose, onSave }: { initial: Pr
           </select>
         </Field>
         <Field label="Reihenfolge">
-          <input className={inputClass} type="number" value={p.sortOrder} onChange={(e) => set("sortOrder", Number(e.target.value) || 0)} />
+          <input className={inputClass} inputMode="numeric" value={order} onChange={(e) => setOrder(e.target.value)} />
         </Field>
         <Field label="Kurzbeschreibung" className="sm:col-span-2">
           <input className={inputClass} value={p.description} onChange={(e) => set("description", e.target.value)} />
@@ -118,11 +156,13 @@ function PresetDialog({ initial, isNew, models, onClose, onSave }: { initial: Pr
         <Field label="Empfohlenes Modell (optional)">
           <select className={inputClass} value={p.defaultModelId ?? ""} onChange={(e) => set("defaultModelId", e.target.value || null)}>
             <option value="">– keins –</option>
-            {models.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
+            {models
+              .filter((m) => m.enabled || m.id === p.defaultModelId)
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
           </select>
         </Field>
         <div className="pt-6">
@@ -141,7 +181,7 @@ function PresetDialog({ initial, isNew, models, onClose, onSave }: { initial: Pr
             setBusy(true);
             setError(null);
             try {
-              await onSave(p);
+              await onSave({ ...p, sortOrder: order.trim() === "" ? Number.NaN : Number(order) });
             } catch (err) {
               setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
             } finally {

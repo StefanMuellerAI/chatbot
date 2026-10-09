@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { test as base, expect, request as playwrightRequest, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { test as base, expect, request as playwrightRequest, type APIRequestContext, type Browser, type Locator, type Page } from "@playwright/test";
 import { PASSWORDS, SERVERS } from "./servers.mjs";
 
 export { expect };
@@ -92,6 +92,32 @@ export async function loginUser(page: Page, opts: { acknowledgeNotice?: boolean 
   }
 }
 
+/** Zweiter Browser-Kontext als Teilnehmerin bzw. Teilnehmer – z. B. um Admin-Änderungen im Chat zu prüfen. */
+export async function openChat(browser: Browser, baseURL: string, ip: string, opts: { acknowledgeNotice?: boolean } = {}): Promise<ChatPage> {
+  const context = await browser.newContext({
+    baseURL,
+    viewport: { width: 1280, height: 860 },
+    locale: "de-DE",
+    timezoneId: "Europe/Berlin",
+    extraHTTPHeaders: { "x-forwarded-for": ip },
+  });
+  const page = await context.newPage();
+  await loginUser(page, opts);
+  const chat = new ChatPage(page);
+  if (opts.acknowledgeNotice === false) await page.goto("/");
+  else await chat.open();
+  return chat;
+}
+
+/** Öffnet den Admin-Bereich angemeldet (Anmeldung über die API, Ansicht im Browser). */
+export async function openAdmin(page: Page, tab?: string) {
+  const res = await page.request.post("/api/admin/login", { data: { password: PASSWORDS.admin } });
+  expect(res.status(), await res.text()).toBe(200);
+  await page.goto("/admin");
+  await expect(page.getByRole("tablist", { name: "Admin-Bereiche" })).toBeVisible();
+  if (tab) await page.getByRole("tab", { name: tab }).click();
+}
+
 /** Admin-Zugang über die API (für Vorbereitung und Rücksetzen). */
 export class AdminApi {
   constructor(public readonly api: APIRequestContext) {}
@@ -138,20 +164,20 @@ export class AdminApi {
     return snap;
   }
 
-  /** Setzt Einstellungen, Modelle, Vorlagen, Passwort und Antwort-Cache zurück. */
+  /** Setzt Modelle, Vorlagen, Einstellungen, Passwort und Antwort-Cache zurück (Modelle zuerst: Einstellungen verweisen darauf). */
   async restore(snap: Snapshot) {
+    const models = await this.models();
+    // Das Standardmodell zuerst: es nimmt den anderen die Markierung ab.
+    for (const m of [...snap.models].sort((a, b) => Number(b.isDefault) - Number(a.isDefault))) {
+      const exists = models.some((x) => x.id === m.id);
+      await this.json(exists ? "PUT" : "POST", "/api/admin/models", m);
+    }
     const settings = { ...snap.settings };
     delete settings.appPasswordSet;
     delete settings.sessionVersion;
     await this.updateSettings(settings);
-    if ((await this.settings()).appPasswordSet) await this.security("reset-password");
-
-    const models = await this.models();
     for (const m of models) if (!snap.models.some((s) => s.id === m.id)) await this.json("DELETE", `/api/admin/models?id=${m.id}`);
-    for (const m of [...snap.models].sort((a, b) => Number(a.isDefault) - Number(b.isDefault))) {
-      const exists = models.some((x) => x.id === m.id);
-      await this.json(exists ? "PUT" : "POST", "/api/admin/models", m);
-    }
+    if ((await this.settings()).appPasswordSet) await this.security("reset-password");
 
     const presets = await this.presets();
     for (const p of presets) if (!snap.presets.some((s) => s.id === p.id)) await this.json("DELETE", `/api/admin/presets?id=${p.id}`);
