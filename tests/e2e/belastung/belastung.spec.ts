@@ -4,7 +4,6 @@ import { rmSync } from "node:fs";
 import path from "node:path";
 import { request as playwrightRequest, type APIRequestContext, type Browser } from "@playwright/test";
 import { AdminApi, ChatPage, expect, loginUser, openChat, test, trackErrors, uniq } from "../support/fixtures";
-import { PASSWORDS } from "../support/servers.mjs";
 
 // W: Ausfälle und Last. Zeitbudgets sind großzügig gewählt (CI-Rechner sind langsamer),
 // fangen aber echte Einbrüche wie Sekunden-Hänger oder Sperren ab.
@@ -208,15 +207,23 @@ async function participants(baseURL: string, ip: string, count: number): Promise
   return Promise.all(Array.from({ length: count }, () => playwrightRequest.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ip } })));
 }
 
-test("W04 25 Teilnehmende über eine IP: keine Sperre, keine Fehler, gemeinsamer Antwort-Cache", async ({ baseURL, ip, browser }) => {
+test("W04 25 Teilnehmende über eine IP: keine Sperre, keine Fehler, gemeinsamer Antwort-Cache", async ({ baseURL, ip, browser, admin }) => {
+  // Eine echte Schulungsgruppe: ein Termin, eine Gruppe, 25 Gäste.
+  const { id: eventId } = await admin.json<{ id: string }>("POST", "/api/admin/events", {
+    name: `Schulung ${uniq()}`,
+    startsAt: new Date(Date.now() - 60_000).toISOString(),
+    endsAt: new Date(Date.now() + 3 * 3_600_000).toISOString(),
+  });
+  const { guests } = await admin.json<{ guests: { username: string; password: string }[] }>("POST", "/api/admin/events/groups", { eventId, name: "Gruppe A", count: 25 });
+  expect(guests).toHaveLength(25);
   const group = await participants(baseURL!, ip, 25);
   try {
     // Ein paar Tippfehler gehören dazu …
     for (let i = 0; i < 5; i++) {
-      expect((await group[i].post("/api/auth/login", { data: { password: `tippfehler-${i}` } })).status()).toBe(401);
+      expect((await group[i].post("/api/auth/login", { data: { username: guests[i].username, password: `tippfehler${i}` } })).status()).toBe(401);
     }
     // … und dann melden sich alle gleichzeitig an.
-    const logins = await Promise.all(group.map((api) => api.post("/api/auth/login", { data: { password: PASSWORDS.app } })));
+    const logins = await Promise.all(group.map((api, i) => api.post("/api/auth/login", { data: guests[i] })));
     expect(logins.map((r) => r.status())).toEqual(Array(25).fill(200));
 
     // Alle stellen gleichzeitig eine eigene Frage.
@@ -231,7 +238,7 @@ test("W04 25 Teilnehmende über eine IP: keine Sperre, keine Fehler, gemeinsamer
 
     // Auch im Browser: eine Person fragt zuerst, vier gleichzeitig hinterher.
     // (Exakt gleichzeitig gestellte Fragen verfehlen den Cache – es gibt noch keine Antwort.)
-    const pages = await Promise.all(Array.from({ length: 5 }, () => browserChat(browser, baseURL!, ip)));
+    const pages = await Promise.all(Array.from({ length: 5 }, (_, i) => browserChat(browser, baseURL!, ip, guests[i])));
     const browserTask = `Aufgabe im Browser ${uniq()}`;
     await pages[0].ask(browserTask);
     const answers = await Promise.all(pages.slice(1).map((c) => c.ask(browserTask)));
@@ -242,11 +249,11 @@ test("W04 25 Teilnehmende über eine IP: keine Sperre, keine Fehler, gemeinsamer
   }
 });
 
-async function browserChat(browser: Browser, baseURL: string, ip: string): Promise<ChatPage> {
+async function browserChat(browser: Browser, baseURL: string, ip: string, guest: { username: string; password: string }): Promise<ChatPage> {
   const context = await browser.newContext({ baseURL, locale: "de-DE", timezoneId: "Europe/Berlin", extraHTTPHeaders: { "x-forwarded-for": ip } });
   trackErrors(context);
   const page = await context.newPage();
-  await loginUser(page);
+  await loginUser(page, { guest });
   const chat = new ChatPage(page);
   await chat.open();
   return chat;

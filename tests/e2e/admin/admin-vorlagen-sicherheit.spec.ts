@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
-import { expect, loginUser, openAdmin, openChat, test, uniq } from "../support/fixtures";
-import { PASSWORDS } from "../support/servers.mjs";
+import { expect, openAdmin, openChat, test, uniq } from "../support/fixtures";
+import { ADMIN } from "../support/servers.mjs";
 
 const dialog = (page: Page) => page.getByRole("dialog");
 
@@ -71,40 +71,39 @@ test.describe("R · Admin: Vorlagen", () => {
 });
 
 test.describe("S · Admin: Sicherheit", () => {
-  test("S01/S02/A11/A12 Neues Passwort: Teilnehmende werden abgemeldet, nur das neue gilt – bis zum Zurücksetzen", async ({ page, browser, baseURL, ip }) => {
+  test("S01/A11 Alle abmelden, während jemand chattet: sauber zum Login, Chats bleiben beim Konto", async ({ page, browser, baseURL, ip }) => {
     const chat = await openChat(browser, baseURL!, ip);
+    const guest = chat.guest!;
+    const question = `Vorher gefragt ${uniq()}`;
+    await chat.ask(question);
     await openAdmin(page, "Sicherheit");
-    const field = page.getByLabel("Neues Passwort (z. B. pro Schulung)");
-    const set = page.getByRole("button", { name: "Passwort setzen" });
-    await field.fill("abc");
-    await expect(set).toBeDisabled();
-    await field.fill("x".repeat(201));
-    await set.click();
-    await expect(page.getByText("Passwort: höchstens 200 Zeichen")).toBeVisible();
-    const password = `schulung-${uniq()}`;
-    await field.fill(password);
-    await set.click();
-    await expect(page.getByText("Neues Passwort gesetzt. Alle Teilnehmenden müssen sich neu anmelden.")).toBeVisible();
-    await expect(page.getByText("Aktuell gilt ein im Admin-Bereich gesetztes Passwort.")).toBeVisible();
+    await expect(page.getByText(`Admin-Zugang: Benutzername „${ADMIN.username}“`)).toBeVisible();
+    page.once("dialog", (d) => void d.accept());
+    await page.getByRole("button", { name: "Alle abmelden" }).click();
+    await expect(page.getByText("Alle Sitzungen wurden abgemeldet.")).toBeVisible();
 
-    // Die laufende Sitzung endet bei der nächsten Aktion – ohne Datenverlust im Browser.
+    // Die nächste Aktion führt zum Login – ohne „abgelaufen“, denn der Termin läuft ja noch.
     await chat.send(`Noch angemeldet? ${uniq()}`);
     await expect(chat.page).toHaveURL(/\/login$/);
-    const login = chat.page.getByLabel("Passwort");
-    await login.fill(PASSWORDS.app);
-    await login.press("Enter");
-    await expect(chat.page.locator("form").getByRole("alert")).toHaveText("Das Passwort stimmt nicht.");
-    await login.fill(password);
-    await login.press("Enter");
+    await chat.page.getByLabel("Benutzername").fill(guest.username);
+    await chat.page.getByLabel("Passwort").fill(guest.password);
+    await chat.page.getByLabel("Passwort").press("Enter");
     await expect(chat.page).toHaveURL(/\/$/);
-    await expect(chat.page.getByRole("navigation", { name: "Chatverlauf" }).getByRole("button", { name: /^Noch angemeldet\?/ })).toBeVisible();
+    // Dasselbe Konto findet seine Chats wieder.
+    await expect(chat.page.getByRole("navigation", { name: "Chatverlauf" }).getByRole("button", { name: new RegExp(`^${question}`) })).toBeVisible();
+  });
 
-    // S02: zurück zum Passwort aus der Umgebung.
-    await page.getByRole("button", { name: "Zurück zum Passwort aus der Umgebung" }).click();
-    await expect(page.getByText("Es gilt wieder APP_PASSWORD.")).toBeVisible();
-    const fresh = await browser.newPage({ baseURL, extraHTTPHeaders: { "x-forwarded-for": `${ip}-neu` } });
-    await loginUser(fresh);
-    await fresh.close();
+  test("A12 Alle abmelden beendet auch andere Admin-Sitzungen, nicht die eigene", async ({ page, browser, baseURL, ip }) => {
+    const other = await browser.newPage({ baseURL, extraHTTPHeaders: { "x-forwarded-for": `${ip}-zweit` } });
+    expect((await other.request.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
+    expect((await other.request.get("/api/admin/overview")).status()).toBe(200);
+    await openAdmin(page, "Sicherheit");
+    page.once("dialog", (d) => void d.accept());
+    await page.getByRole("button", { name: "Alle abmelden" }).click();
+    await expect(page.getByText("Alle Sitzungen wurden abgemeldet.")).toBeVisible();
+    expect((await other.request.get("/api/admin/overview")).status()).toBe(401);
+    expect((await page.request.get("/api/admin/overview")).status()).toBe(200);
+    await other.close();
   });
 
   test("S03 Alle abmelden: Teilnehmende raus, der eigene Admin-Zugang bleibt", async ({ page, browser, baseURL, ip }) => {
@@ -123,6 +122,7 @@ test.describe("S · Admin: Sicherheit", () => {
     expect((await chat.page.request.get("/api/config")).status()).toBe(401);
     await chat.page.reload();
     await expect(chat.page).toHaveURL(/\/login$/);
+    await expect(chat.page.getByText("Dein Zugang ist abgelaufen.")).toHaveCount(0);
     // Der eigene Admin-Zugang bleibt bestehen.
     await page.getByRole("tab", { name: "Übersicht" }).click();
     await expect(page.getByRole("heading", { name: "Systemstatus" })).toBeVisible();

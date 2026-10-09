@@ -20,7 +20,6 @@ export interface AppSettings {
   pausedMessage: string;
   systemPromptAddendum: string;
   /** Hash des im Admin gesetzten App-Passworts; null = Umgebungsvariable APP_PASSWORD. */
-  appPasswordHash: string | null;
   /** Wird beim Passwortwechsel erhöht und meldet damit alle Sitzungen ab. */
   sessionVersion: number;
 }
@@ -55,6 +54,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   paused: false,
   pausedMessage: "Freebie macht gerade eine kurze Pause. Bitte wende dich an die Kursleitung.",
   systemPromptAddendum: "",
-  appPasswordHash: null,
   sessionVersion: 1,
 };

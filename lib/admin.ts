@@ -1,6 +1,8 @@
 import "server-only";
 import { sql } from "drizzle-orm";
 import { databaseMode, getDb } from "@/lib/db/client";
+import { adminCredentials } from "@/lib/auth/tokens";
+import { runningEventCount } from "@/lib/events/store";
 import { getSettings } from "@/lib/settings";
 import { blobAuth, storageMode } from "@/lib/storage";
 
@@ -24,7 +26,11 @@ export interface OverviewData {
     mock: boolean;
     cronSecret: boolean;
     sessionSecret: boolean;
-    appPassword: "admin" | "env" | "missing";
+    /** Admin-Zugang aus ADMIN_USERNAME/ADMIN_PASSWORD. */
+    adminUsername: string;
+    adminPassword: boolean;
+    /** Termine, die gerade laufen. */
+    runningEvents: number;
     paused: boolean;
   };
 }
@@ -120,7 +126,9 @@ export async function getOverview(): Promise<OverviewData> {
       mock: process.env.FREEBIE_MOCK === "1",
       cronSecret: Boolean(process.env.CRON_SECRET),
       sessionSecret: Boolean(process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16),
-      appPassword: settings.appPasswordHash ? "admin" : process.env.APP_PASSWORD ? "env" : "missing",
+      adminUsername: adminCredentials().username,
+      adminPassword: Boolean(process.env.ADMIN_PASSWORD),
+      runningEvents: await runningEventCount(),
       paused: settings.paused,
     },
   };

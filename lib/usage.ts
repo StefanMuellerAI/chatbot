@@ -35,6 +35,10 @@ export async function logUsage(entry: {
   costUsd: number;
   savedUsd?: number;
   answerCacheHit?: boolean;
+  /** Wer die Kosten verursacht hat (für die Auswertung nach Termin und Gruppe). */
+  role?: "admin" | "guest";
+  eventId?: string | null;
+  groupId?: string | null;
 }): Promise<void> {
   try {
     const db = await getDb();
@@ -50,6 +54,9 @@ export async function logUsage(entry: {
       costUsd: entry.costUsd,
       savedUsd: entry.savedUsd ?? 0,
       answerCacheHit: entry.answerCacheHit ?? false,
+      role: entry.role ?? null,
+      eventId: entry.eventId ?? null,
+      groupId: entry.groupId ?? null,
     });
   } catch (err) {
     // Statistik darf den Chat nie blockieren.

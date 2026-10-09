@@ -102,4 +102,36 @@ export const BOOTSTRAP_STATEMENTS: string[] = [
     window_start timestamptz NOT NULL DEFAULT now(),
     count integer NOT NULL DEFAULT 0
   )`,
+  // Rolle, Termin und Gruppe für die Statistik (nachträglich ergänzt).
+  `ALTER TABLE usage_log ADD COLUMN IF NOT EXISTS role text`,
+  `ALTER TABLE usage_log ADD COLUMN IF NOT EXISTS event_id text`,
+  `ALTER TABLE usage_log ADD COLUMN IF NOT EXISTS group_id text`,
+  `CREATE INDEX IF NOT EXISTS usage_log_event_idx ON usage_log (event_id)`,
+  `CREATE TABLE IF NOT EXISTS events (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    starts_at timestamptz NOT NULL,
+    ends_at timestamptz NOT NULL,
+    ended_early_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS event_groups (
+    id text PRIMARY KEY,
+    event_id text NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    name text NOT NULL,
+    sort_order integer NOT NULL DEFAULT 0,
+    guest_total integer NOT NULL DEFAULT 0,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS guests (
+    id text PRIMARY KEY,
+    event_id text NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    group_id text NOT NULL REFERENCES event_groups(id) ON DELETE CASCADE,
+    username text NOT NULL UNIQUE,
+    password_hash text NOT NULL,
+    password_enc text NOT NULL,
+    last_login_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS guests_event_idx ON guests (event_id)`,
 ];

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { errorResponse, requireUser } from "@/lib/auth/session";
+import { errorResponse, requireUser, usageTag } from "@/lib/auth/session";
 import { getModel, providerConfigured } from "@/lib/models";
 import { anthropicTitle } from "@/lib/providers/anthropic";
 import { openAITitle } from "@/lib/providers/openai";
@@ -26,6 +26,7 @@ export async function POST(request: Request) {
       const usage = { inputTokens: res.usage.input, outputTokens: res.usage.output, cacheReadTokens: 0, cacheWriteTokens: 0 };
       await logUsage({
         sessionHash: session.sessionHash,
+        ...usageTag(session),
         modelId: model.id,
         feature: "title",
         usage,

@@ -13,78 +13,83 @@ export function secureCookie(request: Request): boolean {
   return (forwarded || new URL(request.url).protocol.slice(0, -1)) === "https";
 }
 
-export const USER_COOKIE = "freebie_session";
-export const ADMIN_COOKIE = "freebie_admin";
-export const USER_MAX_AGE_S = 12 * 60 * 60;
-export const ADMIN_MAX_AGE_S = 2 * 60 * 60;
+/** Ein Cookie für alle: Admin und Gäste unterscheiden sich nur in der Rolle im Token. */
+export const SESSION_COOKIE = "freebie_session";
+/** Längste Sitzung in Sekunden (Gäste zusätzlich bis zum Termin-Ende). */
+export const SESSION_MAX_AGE_S = 12 * 60 * 60;
 
-export interface UserClaims {
+export type Role = "admin" | "guest";
+
+export interface SessionClaims {
   sid: string;
+  /** Sitzungsversion – „Alle abmelden“ erhöht sie. */
   v: number;
+  role: Role;
+  /** Angezeigter Benutzername. */
+  name: string;
+  /** Nur bei Gästen: Gast, Termin, Gruppe. */
+  gid?: string;
+  eid?: string;
+  grp?: string;
 }
 
-export interface AdminClaims {
-  adm: true;
-  v: number;
+export interface VerifiedSession extends SessionClaims {
+  /** Ablauf in Sekunden seit 1970. */
+  exp: number;
 }
 
-function secretKey(): Uint8Array {
+/** Schlüsselmaterial für Tokens und die verschlüsselte Druckkopie der Gast-Passwörter. */
+export function secretMaterial(): Uint8Array {
   const explicit = process.env.SESSION_SECRET;
   if (explicit && explicit.length >= 16) return new TextEncoder().encode(explicit);
-  // In Produktion Pflicht: Ein aus den Passwörtern abgeleiteter Schlüssel wäre für Teilnehmende,
-  // die APP_PASSWORD kennen, offline angreifbar.
+  // In Produktion Pflicht: ein aus dem Admin-Passwort abgeleiteter Schlüssel wäre zu schwach.
   if (process.env.NODE_ENV === "production") {
     throw new HttpError(500, "SESSION_SECRET fehlt (mindestens 16 Zeichen). Bitte in Vercel setzen.");
   }
-  // Lokale Entwicklung: aus den Passwörtern abgeleitet, damit es ohne Extra-Variable läuft.
-  const material = `freebie|${devPassword("APP_PASSWORD")}|${devPassword("ADMIN_PASSWORD")}`;
+  // Lokale Entwicklung: abgeleitet, damit es ohne Extra-Variable läuft.
+  const material = `freebie|${adminCredentials().password}`;
   return new Uint8Array(createHash("sha256").update(material).digest());
 }
 
-/** Passwort aus der Umgebung; lokal (nicht Produktion) gibt es Standardwerte. */
-export function devPassword(name: "APP_PASSWORD" | "ADMIN_PASSWORD"): string | null {
-  const value = process.env[name];
-  if (value) return value;
-  if (process.env.NODE_ENV !== "production") return name === "APP_PASSWORD" ? "freebie" : "admin";
-  return null;
+/** Admin-Zugang aus der Umgebung; lokal (nicht Produktion) gibt es ein Standard-Passwort. */
+export function adminCredentials(): { username: string; password: string | null } {
+  const username = (process.env.ADMIN_USERNAME || "admin").trim().toLowerCase();
+  const password = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV !== "production" ? "admin" : null);
+  return { username, password };
 }
 
-export async function signUser(claims: UserClaims): Promise<string> {
+export async function signSession(claims: SessionClaims, expiresAt: Date): Promise<string> {
   return new SignJWT({ ...claims })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(`${USER_MAX_AGE_S}s`)
-    .setAudience("freebie-user")
-    .sign(secretKey());
+    .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
+    .setAudience("freebie-session")
+    .sign(secretMaterial());
 }
 
-export async function signAdmin(claims: AdminClaims): Promise<string> {
-  return new SignJWT({ ...claims })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(`${ADMIN_MAX_AGE_S}s`)
-    .setAudience("freebie-admin")
-    .sign(secretKey());
-}
-
-export async function verifyUser(token: string | undefined): Promise<UserClaims | null> {
+export async function verifySession(token: string | undefined): Promise<VerifiedSession | null> {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secretKey(), { audience: "freebie-user" });
-    if (typeof payload.sid !== "string" || typeof payload.v !== "number") return null;
-    return { sid: payload.sid, v: payload.v };
+    const { payload } = await jwtVerify(token, secretMaterial(), { audience: "freebie-session" });
+    const { sid, v, role, name, gid, eid, grp, exp } = payload as Record<string, unknown>;
+    if (typeof sid !== "string" || typeof v !== "number" || typeof name !== "string" || typeof exp !== "number") return null;
+    if (role === "admin") return { sid, v, role, name, exp };
+    if (role === "guest" && typeof gid === "string" && typeof eid === "string" && typeof grp === "string") {
+      return { sid, v, role, name, gid, eid, grp, exp };
+    }
+    return null;
   } catch {
     return null;
   }
 }
 
-export async function verifyAdmin(token: string | undefined): Promise<AdminClaims | null> {
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, secretKey(), { audience: "freebie-admin" });
-    if (payload.adm !== true || typeof payload.v !== "number") return null;
-    return { adm: true, v: payload.v };
-  } catch {
-    return null;
-  }
+/** Cookie-Optionen passend zum Ablauf des Tokens. */
+export function sessionCookie(request: Request, expiresAt: Date) {
+  return {
+    httpOnly: true,
+    secure: secureCookie(request),
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000)),
+  };
 }

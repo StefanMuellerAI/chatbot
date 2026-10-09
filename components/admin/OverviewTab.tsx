@@ -39,7 +39,17 @@ export function OverviewTab({ data, modelNames }: { data: OverviewData; modelNam
     { ok: s.storage === "blob", warn: true, label: "Dateispeicher", hint: storageHint(s) },
     { ok: s.sessionSecret, warn: true, label: "SESSION_SECRET", hint: s.sessionSecret ? "Gesetzt" : "Fehlt oder zu kurz – zufälligen Wert mit mindestens 16 (besser 32) Zeichen setzen" },
     { ok: s.cronSecret, warn: true, label: "Aufräumjob (CRON_SECRET)", hint: s.cronSecret ? "Täglicher Cron aktiv" : "Ohne CRON_SECRET werden alte Dateien nicht gelöscht" },
-    { ok: s.appPassword !== "missing", label: "Teilnehmer-Passwort", hint: s.appPassword === "admin" ? "Im Admin-Bereich gesetzt" : s.appPassword === "env" ? "Aus APP_PASSWORD" : "Kein Passwort gesetzt" },
+    {
+      ok: s.adminPassword,
+      label: "Admin-Zugang",
+      hint: s.adminPassword ? `Benutzername „${s.adminUsername}“ (ADMIN_USERNAME/ADMIN_PASSWORD)` : "ADMIN_PASSWORD in Vercel setzen",
+    },
+    {
+      ok: s.runningEvents > 0,
+      warn: true,
+      label: "Termine",
+      hint: s.runningEvents === 1 ? "1 Termin läuft gerade" : s.runningEvents > 1 ? `${s.runningEvents} Termine laufen gerade` : "Gerade läuft kein Termin – Gäste können sich nicht anmelden",
+    },
   ];
 
   return (

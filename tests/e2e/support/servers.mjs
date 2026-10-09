@@ -1,5 +1,8 @@
 // Gemeinsame Konstanten der Test-Server (von serve.mjs und den Tests genutzt).
-export const PASSWORDS = { app: "e2e-teilnehmer", admin: "e2e-admin-passwort" };
+export const PASSWORDS = { admin: "e2e-admin-passwort" };
+export const ADMIN = { username: "admin", password: PASSWORDS.admin };
+/** Ein Termin pro Testserver, in dem jeder Test seinen eigenen Gast bekommt. */
+export const TEST_EVENT = "E2E-Testtermin";
 export const SESSION_SECRET = "e2e-session-secret-0123456789abcdef";
 export const CRON_SECRET = "e2e-cron-secret";
 export const FAKE_API_PORT = 3300;
@@ -16,7 +19,6 @@ export const SERVERS = {
 
 export const SERVER_ENV = {
   common: {
-    APP_PASSWORD: PASSWORDS.app,
     ADMIN_PASSWORD: PASSWORDS.admin,
     SESSION_SECRET,
     CRON_SECRET,

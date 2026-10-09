@@ -4,11 +4,11 @@ import { FileDown, Info, Menu, MessageSquarePlus, PanelRight, Printer, TriangleA
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { collectArtifacts, type ArtifactVersion } from "@/lib/client/artifacts";
-import { appendMessages, db, saveConversation, type Conversation } from "@/lib/client/db";
+import { appendMessages, db, saveConversation, selectAccount, type Conversation } from "@/lib/client/db";
 import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/export";
 import { streamChat } from "@/lib/client/api";
 import { formatContextDate } from "@/lib/shared/date";
-import type { Attachment, ChatMessage, Effort, GeneratedImage, PublicConfig, StreamEvent } from "@/lib/shared/types";
+import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, PublicConfig, StreamEvent } from "@/lib/shared/types";
 import { ArtifactPanel } from "@/components/artifacts/ArtifactPanel";
 import { cn } from "@/components/ui/cn";
 import { useTheme } from "@/components/ui/theme";
@@ -57,7 +57,9 @@ function payloadMessages(messages: ChatMessage[]): ChatMessage[] {
 /** Zeitpunkt des Seitenaufrufs – ältere Antworten öffnen ihre Artefakte nicht von selbst. */
 const PAGE_LOADED_AT = Date.now();
 
-export function ChatApp() {
+export function ChatApp({ account }: { account: AccountInfo }) {
+  // Vor dem ersten Datenbankzugriff: lokale Chats gehören zu genau diesem Konto.
+  selectAccount(account.key, account.role);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const conversations = useLiveQuery(() => db.conversations.orderBy("updatedAt").reverse().toArray(), [], [] as Conversation[]);
@@ -482,6 +484,7 @@ export function ChatApp() {
       {/* Seitenleiste */}
       <div className={cn("fixed inset-y-0 left-0 z-50 w-72 transition-transform md:static md:translate-x-0 print:hidden", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <Sidebar
+          account={account}
           conversations={conversations}
           activeId={activeId}
           onSelect={selectConversation}

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
+import { errorResponse, HttpError, requireUser, usageTag } from "@/lib/auth/session";
 import { requireFeature } from "@/lib/guards";
 import { generateImage } from "@/lib/tools/images";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const body = Body.parse(await request.json());
     const result = await generateImage(
       { prompt: body.prompt, size: body.size, quality: body.quality, reference_image_ids: body.referenceIds },
-      { sessionHash: session.sessionHash, settings },
+      { sessionHash: session.sessionHash, tag: usageTag(session), settings },
     );
     if (!result.ok) throw new HttpError(502, result.error);
     return Response.json({ image: result.image });

@@ -17,13 +17,57 @@ export interface Conversation {
 
 class FreebieDB extends Dexie {
   conversations!: EntityTable<Conversation, "id">;
-  constructor() {
-    super("freebie");
+  constructor(name: string) {
+    super(name);
     this.version(1).stores({ conversations: "id, updatedAt" });
   }
 }
 
-export const db = new FreebieDB();
+// Jedes Konto hat eine eigene Browser-Datenbank: Am selben Schulungsrechner sieht ein Gast nie
+// die Chats eines anderen. Der Admin behält die bisherige Datenbank „freebie“.
+const GUEST_PREFIX = "freebie-g-";
+let active: { key: string; role: "admin" | "guest"; db: FreebieDB } | null = null;
+
+export function databaseName(key: string, role: "admin" | "guest"): string {
+  return role === "admin" ? "freebie" : `${GUEST_PREFIX}${key}`;
+}
+
+/** Wählt die Datenbank des angemeldeten Kontos (idempotent, vor dem ersten Zugriff aufrufen). */
+export function selectAccount(key: string, role: "admin" | "guest") {
+  if (active?.key === key && active.role === role) return;
+  active?.db.close();
+  active = { key, role, db: new FreebieDB(databaseName(key, role)) };
+}
+
+function current(): FreebieDB {
+  if (!active) throw new Error("Kein Konto gewählt.");
+  return active.db;
+}
+
+/** Zugriff auf die Datenbank des aktuellen Kontos (Methoden an die echte Instanz gebunden). */
+export const db = new Proxy({} as FreebieDB, {
+  get(_target, prop) {
+    const target = current();
+    const value = Reflect.get(target, prop, target) as unknown;
+    return typeof value === "function" ? (value as (...a: unknown[]) => unknown).bind(target) : value;
+  },
+});
+
+/** Gast-Chats vom Gerät löschen (Abmelden, Ablauf). Admin-Chats bleiben. */
+export async function forgetCurrentGuest(): Promise<void> {
+  if (!active || active.role !== "guest") return;
+  const name = active.db.name;
+  active.db.close();
+  active = null;
+  await Dexie.delete(name);
+}
+
+/** Nach der Anmeldung: Chats früherer Gäste auf diesem Gerät entfernen (außer dem eigenen Konto). */
+export async function forgetOtherGuests(exceptKey?: string): Promise<void> {
+  const names = await Dexie.getDatabaseNames();
+  const keep = exceptKey ? `${GUEST_PREFIX}${exceptKey}` : null;
+  await Promise.all(names.filter((n) => n.startsWith(GUEST_PREFIX) && n !== keep).map((n) => Dexie.delete(n)));
+}
 
 export async function saveConversation(c: Conversation): Promise<void> {
   await db.conversations.put({ ...c, updatedAt: Date.now() });
@@ -44,6 +88,17 @@ export async function appendMessages(id: string, messages: ChatMessage[], patch:
 export async function exportAll(): Promise<string> {
   const all = await db.conversations.toArray();
   return JSON.stringify({ app: "freebie", version: 1, exportedAt: new Date().toISOString(), conversations: all }, null, 2);
+}
+
+/** Alle Chats des Kontos als JSON-Datei herunterladen. */
+export async function downloadExport(): Promise<void> {
+  const json = await exportAll();
+  const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `freebie-chats-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 /** Liest eine Export-Datei ein. Unvollständige Einträge werden ergänzt, unbrauchbare übersprungen. */

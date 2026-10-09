@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
+import { errorResponse, HttpError, requireUser, usageTag } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
 import { requireFeature } from "@/lib/guards";
 import { deleteFiles } from "@/lib/storage";
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     const minutes = job.durationSec / 60;
     await logUsage({
       sessionHash: session.sessionHash,
+      ...usageTag(session),
       modelId: job.model,
       feature: "transcription",
       units: minutes,

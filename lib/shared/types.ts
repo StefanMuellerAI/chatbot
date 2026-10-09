@@ -50,6 +50,16 @@ export interface PublicPreset {
   defaultModelId: string | null;
 }
 
+/** Das angemeldete Konto, wie es der Chat kennt. */
+export interface AccountInfo {
+  role: "admin" | "guest";
+  /** Name der lokalen Chat-Datenbank (Gäste: Gast-ID, Admin: „admin“). */
+  key: string;
+  username: string;
+  /** Ende des Zugangs (ISO) – bei Gästen das Termin-Ende. */
+  validUntil: string | null;
+}
+
 export interface PublicConfig {
   models: PublicModel[];
   presets: PublicPreset[];
