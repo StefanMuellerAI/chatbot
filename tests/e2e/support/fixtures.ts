@@ -31,6 +31,8 @@ export function trackErrors(context: BrowserContext) {
     page.on("pageerror", (err) => {
       // Von der Sandbox blockierte Zugriffe aus Artefakten sind gewollt (K02), kein Fehler der App.
       if (/sandboxed/i.test(err.message)) return;
+      // WebKit meldet Anfragen, die eine Navigation (z. B. zum Login) abbricht, als „access control checks“.
+      if (/due to access control checks/i.test(err.message)) return;
       browserErrors.push(`${page.url()}: ${err.message}`);
     });
   context.pages().forEach(watch);
