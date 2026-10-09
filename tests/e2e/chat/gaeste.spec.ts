@@ -11,16 +11,17 @@ const hhmm = (iso: string) => new Intl.DateTimeFormat("de-DE", { timeZone: "Euro
 const databases = (page: Page) => page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name ?? ""));
 const warning = (page: Page) => page.getByRole("status").filter({ hasText: "Dein Zugang endet um" });
 
-/** Anmeldung über das Formular; der Hinweis kommt nur beim ersten Konto (er gilt pro Gerät). */
-async function loginViaForm(page: Page, user: { username: string; password: string }, firstOnDevice = false) {
+/** Anmeldung über das Formular; der Hinweis kommt beim ersten Mal je Konto (auch am selben Gerät). */
+async function loginViaForm(page: Page, user: { username: string; password: string }, expectNotice: boolean) {
   await page.goto("/login");
   await page.getByLabel("Benutzername").fill(user.username);
   await page.getByLabel("Passwort").fill(user.password);
   await page.getByLabel("Passwort").press("Enter");
   await expect(page).toHaveURL(/\/$/);
-  if (firstOnDevice) await page.getByRole("dialog", { name: "Wichtiger Hinweis" }).getByRole("button", { name: "Verstanden" }).click();
+  const notice = page.getByRole("dialog", { name: "Wichtiger Hinweis" });
+  if (expectNotice) await notice.getByRole("button", { name: "Verstanden" }).click();
   await expect(page.getByRole("textbox", { name: "Nachricht" })).toBeEditable();
-  await expect(page.getByRole("dialog", { name: "Wichtiger Hinweis" })).toHaveCount(0);
+  await expect(notice).toHaveCount(0);
 }
 
 test.describe("T · Gäste im Chat", () => {
@@ -62,6 +63,8 @@ test.describe("T · Gäste im Chat", () => {
     await expect(account).toHaveText(`Angemeldet als ${guests[0].username} · gültig bis ${hhmm(endsAt)} Uhr`);
     await expect(chat.page.getByRole("link", { name: "Admin" })).toHaveCount(0);
     await expect(warning(chat.page)).toHaveCount(0);
+    // Den Stand der Sitzung fragt der Chat hier ab.
+    expect(await (await chat.page.request.get("/api/auth/session")).json()).toEqual({ role: "guest", username: guests[0].username, validUntil: endsAt });
     const question = `Zum Mitnehmen ${uniq()}`;
     await chat.ask(question);
 
@@ -102,7 +105,8 @@ test.describe("T · Gäste im Chat", () => {
 
     // A geht, ohne sich abzumelden (Browser zu); B meldet sich am selben Gerät an.
     await context.clearCookies();
-    await loginViaForm(page, b);
+    // Auch B bestätigt den Hinweis selbst – er gilt pro Konto, nicht pro Gerät.
+    await loginViaForm(page, b, true);
     await expect(history).toContainText("Noch keine Chats.");
     await expect(page.getByText(fromA)).toHaveCount(0);
     expect(await databases(page)).not.toContain(`freebie-g-${a.id}`);
@@ -119,7 +123,7 @@ test.describe("T · Gäste im Chat", () => {
     await expect.poll(() => databases(page)).not.toContain(`freebie-g-${b.id}`);
 
     // Die Kursleitung am selben Gerät: eigene Chats, die bleiben auch nach dem Abmelden.
-    await loginViaForm(page, ADMIN);
+    await loginViaForm(page, ADMIN, true);
     const fromAdmin = `Frage der Kursleitung ${uniq()}`;
     await chat.ask(fromAdmin);
     await page.getByRole("button", { name: "Abmelden" }).click();
@@ -127,7 +131,7 @@ test.describe("T · Gäste im Chat", () => {
     expect(await databases(page)).toContain("freebie");
 
     // A kommt zurück: nichts von B, nichts von der Kursleitung – und die eigenen Chats sind vom Gerät gelöscht.
-    await loginViaForm(page, a);
+    await loginViaForm(page, a, false);
     await expect(history).toContainText("Noch keine Chats.");
     await expect(page.getByText(fromAdmin)).toHaveCount(0);
   });

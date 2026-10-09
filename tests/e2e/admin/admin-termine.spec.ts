@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import type { Locator, Page } from "@playwright/test";
 import { AdminApi, expect, inMinutes, loginUser, openAdmin, openChat, test, uniq } from "../support/fixtures";
+import { CRON_SECRET } from "../support/servers.mjs";
 
 // T01–T08: Termine, Gruppen und Gäste im Admin-Bereich.
 
@@ -133,6 +134,8 @@ test.describe("T · Termine im Admin", () => {
     page.once("dialog", (d) => void d.accept());
     await g.getByRole("button", { name: `${first} löschen` }).click();
     await expect(rows(g)).toHaveCount(4);
+    await g.getByRole("button", { name: "Passwörter in „Gruppe A“ verbergen" }).click();
+    await expect(rows(g).first().locator("td").nth(1)).toHaveText("••••••••");
 
     // Umbenennen
     page.once("dialog", (d) => void d.accept("Vormittag"));
@@ -327,5 +330,73 @@ test.describe("T · Termine im Admin", () => {
     await expect(planned.first()).toHaveAccessibleName(`Termin „Morgen ${id}“`);
     await page.getByRole("button", { name: "Vorbei (1)" }).click();
     await expect(card(page, `Beendet ${id}`)).toContainText("vorbei");
+  });
+
+  test("T16 Übersicht „Nach Termin“: Gast-Anfragen je Termin und Gruppe – auch nach dem Löschen", async ({ page, admin, browser, baseURL, ip }) => {
+    interface Overview {
+      byRole: { role: string; requests: number }[];
+      byEvent: { id: string; name: string | null; requests: number; sessions: number; groups: { name: string | null; requests: number }[] }[];
+    }
+    const name = `Statistik ${uniq()}`;
+    const eventId = await apiEvent(admin, name);
+    const morning = await apiGroup(admin, eventId, "Vormittag", 1);
+    const afternoon = await apiGroup(admin, eventId, "Nachmittag", 1);
+    const before = await admin.json<Overview>("GET", "/api/admin/overview");
+    const guestRequests = (o: Overview) => o.byRole.find((r) => r.role === "guest")?.requests ?? 0;
+
+    const a = await openChat(browser, baseURL!, ip, { guest: morning.guests[0] });
+    await a.ask(`Erste Frage ${uniq()}`);
+    await a.ask(`Zweite Frage ${uniq()}`);
+    const b = await openChat(browser, baseURL!, ip, { guest: afternoon.guests[0] });
+    await b.ask(`Frage am Nachmittag ${uniq()}`);
+
+    await openAdmin(page);
+    const card = page.getByRole("heading", { name: "Nach Termin" }).locator("xpath=ancestor::section[1]");
+    const cells = (row: Locator) => row.getByRole("cell");
+    const eventRow = card.getByRole("row").filter({ hasText: name });
+    await expect(cells(eventRow).nth(1)).toHaveText("3");
+    await expect(cells(eventRow).nth(4)).toHaveText("2");
+    await expect(card.getByText("Gäste (30 Tage)").locator("xpath=following-sibling::dd[1]")).toHaveText(new RegExp(`^${guestRequests(before) + 3} Anfragen · `));
+
+    // Aufklappen: je Gruppe
+    await card.getByRole("button", { name: `Gruppen von „${name}“ anzeigen` }).click();
+    await expect(card.getByRole("button", { name: `Gruppen von „${name}“ ausblenden` })).toHaveAttribute("aria-expanded", "true");
+    await expect(cells(card.getByRole("row").filter({ hasText: "Gruppe „Vormittag“" })).nth(1)).toHaveText("2");
+    await expect(cells(card.getByRole("row").filter({ hasText: "Gruppe „Nachmittag“" })).nth(1)).toHaveText("1");
+    await card.getByRole("button", { name: `Gruppen von „${name}“ ausblenden` }).click();
+    await expect(card.getByRole("row").filter({ hasText: "Gruppe „Vormittag“" })).toHaveCount(0);
+
+    // Gelöschte Gruppen und Termine bleiben in der Statistik.
+    await admin.json("DELETE", `/api/admin/events/groups?id=${afternoon.id}`);
+    await page.reload();
+    await card.getByRole("button", { name: `Gruppen von „${name}“ anzeigen` }).click();
+    await expect(cells(card.getByRole("row").filter({ hasText: "Gelöschte Gruppe" })).nth(1)).toHaveText("1");
+    await admin.json("DELETE", `/api/admin/events?id=${eventId}`);
+    const after = await admin.json<Overview>("GET", "/api/admin/overview");
+    const gone = after.byEvent.find((e) => e.id === eventId)!;
+    expect(gone).toMatchObject({ name: null, requests: 3, sessions: 2 });
+    expect(guestRequests(after)).toBe(guestRequests(before) + 3);
+  });
+
+  test("T17 Aufräumjob löscht die Zugänge beendeter Termine; der Termin bleibt in der Statistik", async ({ admin, playwright, baseURL, ip }) => {
+    const name = `Aufräumen ${uniq()}`;
+    const { id } = await admin.json<{ id: string }>("POST", "/api/admin/events", { name, startsAt: inMinutes(-30), endsAt: new Date(Date.now() + 3_000).toISOString() });
+    const { guests } = await apiGroup(admin, id, "A", 2);
+    await new Promise((r) => setTimeout(r, 3_500));
+
+    const api = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ip } });
+    const res = await api.get("/api/cron/cleanup", { headers: { authorization: `Bearer ${CRON_SECRET}` } });
+    expect(res.status(), await res.text()).toBe(200);
+    const body = (await res.json()) as { deletedGuests: number; deletedEvents: number };
+    expect(body.deletedGuests).toBeGreaterThanOrEqual(2);
+    expect(typeof body.deletedEvents).toBe("number");
+
+    const { events } = await admin.json<{ events: { id: string; status: string; groups: { guests: unknown[] }[] }[] }>("GET", "/api/admin/events");
+    const event = events.find((e) => e.id === id)!;
+    expect(event.status).toBe("vorbei");
+    expect(event.groups[0].guests).toEqual([]);
+    const login = await api.post("/api/auth/login", { data: { username: guests[0].username, password: guests[0].password } });
+    expect(login.status()).toBe(401);
+    await api.dispose();
   });
 });

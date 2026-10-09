@@ -15,11 +15,11 @@ import { ADMIN, SERVERS, TEST_EVENT } from "./servers.mjs";
 
 export { expect };
 
-/** Gleicher Hash wie in NoticeDialog.tsx – damit der Hinweis vorab als gelesen gilt. */
-export function noticeKey(text: string): string {
+/** Gleicher Schlüssel wie in NoticeDialog.tsx (pro Konto) – damit der Hinweis vorab als gelesen gilt. */
+export function noticeKey(text: string, accountKey: string): string {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
-  return `freebie-notice-${h}`;
+  return `freebie-notice-${h}-${accountKey}`;
 }
 
 /** Unbehandelte Fehler im Browser während des laufenden Tests (Kriterium „sauber“). */
@@ -196,8 +196,9 @@ export async function loginUser(
   const res = await page.request.post("/api/auth/login", { data: { username: guest.username, password: guest.password } });
   expect(res.status(), await res.text()).toBe(200);
   if (opts.acknowledgeNotice !== false) {
+    const { key: account } = (await res.json()) as { key: string };
     const config = await (await page.request.get("/api/config")).json();
-    const key = noticeKey(config.notice.full);
+    const key = noticeKey(config.notice.full, account);
     await page.addInitScript((k) => {
       // Nur im Hauptfenster: in den abgeschotteten Artefakt-iframes ist localStorage gesperrt.
       if (window === window.top) localStorage.setItem(k, "1");

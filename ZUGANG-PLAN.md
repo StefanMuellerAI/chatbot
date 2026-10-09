@@ -237,14 +237,24 @@ Prüfregeln:
 
 ## 10. Umsetzung in Phasen
 
-| Phase | Inhalt |
-|---|---|
-| 1 · Grundlage | Tabellen, Generator, Zeitfenster-Logik, Verschlüsselung – mit Unit-Tests |
-| 2 · Anmeldung | gemeinsame Login-Seite, Rollen-Token, Ablauf zur Endzeit, Serverprüfung, Bremse pro Name, Admin ohne Extra-Login; Fixtures umstellen, A/O/S/U-Tests anpassen |
-| 3 · Termine im Admin | API und Oberfläche (Liste, Dialoge, Gruppen, Gäste, Druck, CSV, „Jetzt beenden“); T01–T08, T18 |
-| 4 · Chat | Gast-Hinweise, Warnung vor Ende, Verlauf pro Konto, Admin-Link nur für Admins; T09–T15 |
-| 5 · Statistik und Aufräumen | Kosten nach Termin/Gruppe, Aufräumjob; T16–T17 |
-| 6 · Abschluss | Live-Smoke, Doku (README, TESTPLAN), Stabilitätslauf, CI in drei Browsern |
+| Phase | Inhalt | Stand |
+|---|---|---|
+| 1 · Grundlage | Tabellen, Generator, Zeitfenster-Logik, Verschlüsselung – mit Unit-Tests | erledigt |
+| 2 · Anmeldung | gemeinsame Login-Seite, Rollen-Token, Serverprüfung, Bremse pro Name, Admin ohne Extra-Login; Fixtures umstellen, A/O/S/U-Tests anpassen | erledigt |
+| 3 · Termine im Admin | API und Oberfläche (Liste, Dialoge, Gruppen, Gäste, Druck, CSV, „Jetzt beenden“); T01–T08, T18 | erledigt |
+| 4 · Chat | Gast-Hinweise, Warnung vor Ende, Verlauf pro Konto, Admin-Link nur für Admins; T09–T15 | erledigt |
+| 5 · Statistik und Aufräumen | Kosten nach Termin/Gruppe, Aufräumjob; T16–T17 | erledigt |
+| 6 · Abschluss | Live-Smoke, Doku (README, TESTPLAN), Stabilitätslauf, CI in drei Browsern | erledigt |
+
+**Abweichungen bei der Umsetzung**
+
+- **Sitzungsdauer:** Auch Gast-Sitzungen gelten 12 Stunden; das Termin-Ende prüft der Server bei jeder Anfrage
+  (Chat-Seite und jede API). So bleiben Gäste angemeldet, wenn die Kursleitung einen laufenden Termin verlängert.
+  Ein Token, das genau zum ursprünglichen Ende abläuft, hätte sie sonst trotzdem abgemeldet.
+- **Ablauf im Chat:** Der Chat fragt alle 5 Minuten, in den letzten 10 Minuten bei jeder Prüfung, beim Server nach.
+  Zum Ende führt er ohne Zutun zur Anmeldung („Dein Zugang ist abgelaufen.“); die Login-Seite löscht dann die
+  Gast-Chats vom Gerät. Wird ein Termin nur verschoben, heißt es „Deine Sitzung ist beendet …“ und die Chats bleiben.
+- **Kurztermin-Test:** T11 nutzt einen echten Termin von 25 Sekunden statt 70.
 
 ## 11. Bewusst nicht enthalten
 

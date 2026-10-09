@@ -262,6 +262,8 @@ test.describe("E · Verlauf und Seitenleiste", () => {
     await page.context().clearCookies();
     expect((await page.request.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
     await page.goto("/");
+    // Der Hinweis gilt pro Konto – die Kursleitung bestätigt ihn am selben Gerät selbst.
+    await page.getByRole("dialog", { name: "Wichtiger Hinweis" }).getByRole("button", { name: "Verstanden" }).click();
     await expect(nav.getByText(/^Angemeldet als/)).toHaveCount(0);
     await nav.getByRole("link", { name: "Admin" }).click();
     await expect(page).toHaveURL(/\/admin$/);

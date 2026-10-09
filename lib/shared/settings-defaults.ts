@@ -19,8 +19,7 @@ export interface AppSettings {
   paused: boolean;
   pausedMessage: string;
   systemPromptAddendum: string;
-  /** Hash des im Admin gesetzten App-Passworts; null = Umgebungsvariable APP_PASSWORD. */
-  /** Wird beim Passwortwechsel erhöht und meldet damit alle Sitzungen ab. */
+  /** Wird bei „Alle abmelden“ erhöht und meldet damit alle Sitzungen ab. */
   sessionVersion: number;
 }
 

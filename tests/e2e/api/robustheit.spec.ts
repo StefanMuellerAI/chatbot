@@ -21,6 +21,7 @@ const USER_ROUTES: [Method, string][] = [
   ["POST", "/api/upload/local"],
   ["POST", "/api/upload/token"],
   ["POST", "/api/auth/logout"],
+  ["GET", "/api/auth/session"],
 ];
 const ADMIN_ROUTES: [Method, string][] = [
   ["GET", "/api/admin/events"],

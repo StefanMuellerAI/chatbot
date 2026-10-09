@@ -748,7 +748,7 @@ export function ChatApp({ account }: { account: AccountInfo }) {
 
       {config && (
         <>
-          <NoticeDialog text={config.notice.full} forceOpen={noticeOpen} onClose={() => setNoticeOpen(false)} />
+          <NoticeDialog text={config.notice.full} accountKey={account.key} forceOpen={noticeOpen} onClose={() => setNoticeOpen(false)} />
           <ImageModeDialog open={imageMode} onClose={() => setImageMode(false)} defaults={config.imageDefaults} onResult={addImageModeResult} />
         </>
       )}

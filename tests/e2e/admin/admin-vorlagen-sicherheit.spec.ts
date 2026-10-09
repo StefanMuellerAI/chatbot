@@ -71,13 +71,16 @@ test.describe("R · Admin: Vorlagen", () => {
 });
 
 test.describe("S · Admin: Sicherheit", () => {
-  test("S01/A11 Alle abmelden, während jemand chattet: sauber zum Login, Chats bleiben beim Konto", async ({ page, browser, baseURL, ip }) => {
+  test("S01/S02/A11 Alle abmelden, während jemand chattet: sauber zum Login, Chats bleiben beim Konto", async ({ page, browser, baseURL, ip }) => {
     const chat = await openChat(browser, baseURL!, ip);
     const guest = chat.guest!;
     const question = `Vorher gefragt ${uniq()}`;
     await chat.ask(question);
     await openAdmin(page, "Sicherheit");
-    await expect(page.getByText(`Admin-Zugang: Benutzername „${ADMIN.username}“`)).toBeVisible();
+    // S02: Der Reiter erklärt den Admin-Zugang; ein gemeinsames Teilnehmer-Passwort gibt es nicht mehr.
+    await expect(page.getByText(`Admin-Zugang: Benutzername „${ADMIN.username}“, Passwort aus der Umgebungsvariable ADMIN_PASSWORD (in Vercel gesetzt).`)).toBeVisible();
+    await expect(page.getByRole("tabpanel").getByLabel(/Passwort/)).toHaveCount(0);
+    await expect(page.getByText(/Teilnehmer-Passwort/)).toHaveCount(0);
     page.once("dialog", (d) => void d.accept());
     await page.getByRole("button", { name: "Alle abmelden" }).click();
     await expect(page.getByText("Alle Sitzungen wurden abgemeldet.")).toBeVisible();
