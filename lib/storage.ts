@@ -7,8 +7,42 @@ import { getDb, schema } from "@/lib/db/client";
 
 export type StorageMode = "blob" | "local";
 
+/**
+ * Zugang zu Vercel Blob. Ältere Stores liefern einen Token (BLOB_READ_WRITE_TOKEN), neuere melden
+ * sich per OIDC an (BLOB_STORE_ID + das Vercel-OIDC-Token der Anfrage). Beim Verbinden eines Stores
+ * lässt sich in Vercel ein eigenes Präfix wählen – daher wird auch nach solchen Variablen gesucht.
+ */
+export type BlobAuth = { kind: "token"; token: string; source: string } | { kind: "oidc"; storeId: string; source: string };
+
+export function blobAuth(env: Record<string, string | undefined> = process.env): BlobAuth | null {
+  const value = (name: string) => env[name]?.trim() || undefined;
+  const token = value("BLOB_READ_WRITE_TOKEN");
+  if (token) return { kind: "token", token, source: "BLOB_READ_WRITE_TOKEN" };
+  const storeId = value("BLOB_STORE_ID");
+  if (storeId) return { kind: "oidc", storeId, source: "BLOB_STORE_ID" };
+  const names = Object.keys(env).sort();
+  const tokenVar = names.find((n) => n.endsWith("_READ_WRITE_TOKEN") && value(n)?.startsWith("vercel_blob_rw_"));
+  if (tokenVar) return { kind: "token", token: value(tokenVar)!, source: tokenVar };
+  const storeVars = names.filter((n) => n.endsWith("_STORE_ID") && value(n)?.startsWith("store_"));
+  if (storeVars.length === 1) return { kind: "oidc", storeId: value(storeVars[0])!, source: storeVars[0] };
+  return null;
+}
+
+/** Zugangsdaten explizit an das SDK geben (wichtig bei Variablen mit eigenem Präfix). */
+function blobOptions(): { token?: string; storeId?: string } {
+  const auth = blobAuth();
+  if (!auth) return {};
+  return auth.kind === "token" ? { token: auth.token } : { storeId: auth.storeId };
+}
+
 export function storageMode(): StorageMode {
-  return process.env.BLOB_READ_WRITE_TOKEN ? "blob" : "local";
+  return blobAuth() ? "blob" : "local";
+}
+
+/** Wie der Browser in Blob hochlädt: mit Client-Token (Token-Stores) oder vorsignierter URL (OIDC-Stores). */
+export function blobUploadMode(): "token" | "presigned" | null {
+  const auth = blobAuth();
+  return auth ? (auth.kind === "token" ? "token" : "presigned") : null;
 }
 
 function localRoot(): string {
@@ -37,6 +71,7 @@ export async function putFile(
   assertSafeKey(key);
   if (storageMode() === "blob") {
     await put(key, data, {
+      ...blobOptions(),
       access: "private",
       contentType,
       addRandomSuffix: false,
@@ -68,7 +103,7 @@ export async function registerFile(
 export async function getFile(key: string): Promise<{ data: Buffer; contentType: string } | null> {
   assertSafeKey(key);
   if (storageMode() === "blob") {
-    const result = await get(key, { access: "private" });
+    const result = await get(key, { ...blobOptions(), access: "private" });
     if (!result || result.statusCode !== 200) return null;
     const data = Buffer.from(await new Response(result.stream).arrayBuffer());
     return { data, contentType: result.blob.contentType };
@@ -90,7 +125,7 @@ export async function getFile(key: string): Promise<{ data: Buffer; contentType:
 export async function deleteFiles(keys: string[]): Promise<void> {
   if (keys.length === 0) return;
   if (storageMode() === "blob") {
-    await del(keys);
+    await del(keys, blobOptions());
   } else {
     await Promise.all(keys.map((k) => rm(path.join(localRoot(), k), { force: true })));
   }

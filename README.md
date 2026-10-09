@@ -22,7 +22,9 @@ Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
 1. **Projekt importieren:** In Vercel ein Projekt aus diesem Repository anlegen (Framework: Next.js, Region `iad1`).
 2. **Speicher verbinden** (Projekt → *Storage*):
    - **Neon Postgres** anlegen und verbinden → setzt `DATABASE_URL`.
-   - **Blob-Store** mit Zugriff **privat** anlegen und verbinden → setzt `BLOB_READ_WRITE_TOKEN`.
+   - **Blob-Store** mit Zugriff **privat** anlegen und verbinden → setzt `BLOB_STORE_ID` (OIDC-Anmeldung) oder bei
+     älteren Stores `BLOB_READ_WRITE_TOKEN`. Danach neu deployen; der Admin-Bereich zeigt unter „Systemstatus“, welche
+     Variable erkannt wurde.
 3. **Umgebungsvariablen** (Projekt → *Settings → Environment Variables*), siehe [.env.example](.env.example):
 
    | Variable | Zweck |
@@ -50,7 +52,7 @@ npm run dev                  # http://localhost:3000
 ```
 
 Ohne `DATABASE_URL` nutzt Freebie eine eingebettete Datenbank (PGlite) unter `./.data/pglite`, ohne
-`BLOB_READ_WRITE_TOKEN` einen lokalen Dateispeicher unter `./.data/files`. Mit `FREEBIE_MOCK=1` antwortet ein
+Blob-Store (`BLOB_STORE_ID` bzw. `BLOB_READ_WRITE_TOKEN`) einen lokalen Dateispeicher unter `./.data/files`. Mit `FREEBIE_MOCK=1` antwortet ein
 Mock-Provider – damit lässt sich die komplette Oberfläche ohne API-Kosten ausprobieren.
 
 | Befehl | Zweck |

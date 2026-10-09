@@ -59,6 +59,8 @@ export interface PublicConfig {
   pausedMessage: string;
   imageDefaults: { size: string; quality: string };
   storage: "blob" | "local";
+  /** Blob-Upload per Client-Token oder vorsignierter URL (OIDC-Stores). */
+  blobUpload: "token" | "presigned" | null;
 }
 
 export interface FeatureFlags {

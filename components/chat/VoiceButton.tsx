@@ -8,7 +8,7 @@ import { cn } from "@/components/ui/cn";
 const MAX_SECONDS = 10 * 60;
 
 /** Spracheingabe: Aufnahme im Browser, Transkription auf dem Server, Text ins Eingabefeld. */
-export function VoiceButton({ onText }: { storage: "blob" | "local"; onText: (text: string) => void }) {
+export function VoiceButton({ onText }: { onText: (text: string) => void }) {
   const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
   const [seconds, setSeconds] = useState(0);
   const [level, setLevel] = useState(0);

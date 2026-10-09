@@ -1,7 +1,7 @@
 "use client";
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { categoryOf, safeFileName, type UploadCategory } from "@/lib/files/limits";
-import type { Attachment } from "@/lib/shared/types";
+import type { Attachment, PublicConfig } from "@/lib/shared/types";
 import { api, ApiError } from "./api";
 
 export type Progress = (fraction: number, label: string) => void;
@@ -35,10 +35,15 @@ export function uploadKeyFor(name: string): string {
 }
 
 /** Lädt eine Datei hoch: auf Vercel direkt in Blob, lokal über den Server. */
-export async function uploadFile(file: File, storage: "blob" | "local", onProgress?: Progress): Promise<string> {
+export async function uploadFile(
+  file: File,
+  target: Pick<PublicConfig, "storage" | "blobUpload">,
+  onProgress?: Progress,
+): Promise<string> {
   const key = uploadKeyFor(file.name);
-  if (storage === "blob") {
-    await upload(key, file, {
+  if (target.storage === "blob") {
+    const put = target.blobUpload === "presigned" ? uploadPresigned : upload;
+    await put(key, file, {
       access: "private",
       handleUploadUrl: "/api/upload/token",
       contentType: file.type || undefined,

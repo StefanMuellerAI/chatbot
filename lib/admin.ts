@@ -2,7 +2,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { databaseMode, getDb } from "@/lib/db/client";
 import { getSettings } from "@/lib/settings";
-import { storageMode } from "@/lib/storage";
+import { blobAuth, storageMode } from "@/lib/storage";
 
 export interface OverviewData {
   periods: { label: string; requests: number; costUsd: number; savedUsd: number; cacheHits: number; cacheRatio: number }[];
@@ -15,6 +15,12 @@ export interface OverviewData {
     openai: boolean;
     database: "postgres" | "embedded";
     storage: "blob" | "local";
+    /** Woher der Blob-Zugang kommt (Variablenname) und wie er sich anmeldet. */
+    storageSource: string | null;
+    storageAuth: "token" | "oidc" | null;
+    /** Namen (nie Werte) aller Umgebungsvariablen mit "BLOB" – zur Fehlersuche. */
+    blobVars: string[];
+    onVercel: boolean;
     mock: boolean;
     cronSecret: boolean;
     sessionSecret: boolean;
@@ -93,6 +99,7 @@ export async function getOverview(): Promise<OverviewData> {
   ).map((r) => ({ feature: String(r.feature), count: num(r.count), costUsd: num(r.cost), units: num(r.units) }));
   const active = (await rows(sql`SELECT count(DISTINCT session_hash) AS n FROM usage_log WHERE ts > now() - interval '1 day'`))[0];
   const settings = await getSettings();
+  const blob = blobAuth();
   return {
     periods,
     byModel,
@@ -104,6 +111,10 @@ export async function getOverview(): Promise<OverviewData> {
       openai: Boolean(process.env.OPENAI_API_KEY),
       database: databaseMode(),
       storage: storageMode(),
+      storageSource: blob?.source ?? null,
+      storageAuth: blob?.kind ?? null,
+      blobVars: Object.keys(process.env).filter((n) => n.includes("BLOB")).sort(),
+      onVercel: Boolean(process.env.VERCEL),
       mock: process.env.FREEBIE_MOCK === "1",
       cronSecret: Boolean(process.env.CRON_SECRET),
       sessionSecret: Boolean(process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16),

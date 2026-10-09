@@ -79,7 +79,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             const file = kind === "image" ? await prepareImage(original) : original;
             // Die Modelle akzeptieren Bilder bis 5 MB (nach dem Verkleinern).
             if (kind === "image" && file.size > 5 * 1024 * 1024) throw new Error("Bild zu groß (max. 5 MB).");
-            const key = await uploadFile(file, config.storage, (f, label) => update(localId, { progress: f * (kind === "audio" ? 0.3 : 0.8), label }));
+            const key = await uploadFile(file, config, (f, label) => update(localId, { progress: f * (kind === "audio" ? 0.3 : 0.8), label }));
             let attachment: Attachment;
             if (kind === "audio") {
               attachment = await transcribeUpload(key, file.name, (f, label) => update(localId, { progress: 0.3 + f * 0.7, label }));
@@ -94,7 +94,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
         })();
       }
     },
-    [config.storage, features.transcription, features.uploads],
+    [config, features.transcription, features.uploads],
   );
 
   useImperativeHandle(ref, () => ({ addFiles, focus: () => textareaRef.current?.focus() }), [addFiles]);
@@ -198,7 +198,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             </ToolButton>
           </>
         )}
-        {features.dictation && <VoiceButton storage={config.storage} onText={(t) => onTextChange(text ? `${text} ${t}` : t)} />}
+        {features.dictation && <VoiceButton onText={(t) => onTextChange(text ? `${text} ${t}` : t)} />}
         {features.webSearch && model?.capabilities.webSearch && (
           <ToolButton active={webSearch} onClick={() => onWebSearchChange(!webSearch)} title={webSearch ? "Websuche ist an" : "Websuche ist aus"} label="Websuche">
             <Globe className="h-4.5 w-4.5" />

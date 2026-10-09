@@ -2,7 +2,7 @@ import { errorResponse, requireUser } from "@/lib/auth/session";
 import { listModels, listPresets, providerConfigured, toPublicModel, toPublicPreset } from "@/lib/models";
 import { getSettings } from "@/lib/settings";
 import type { PublicConfig } from "@/lib/shared/types";
-import { storageMode } from "@/lib/storage";
+import { blobUploadMode, storageMode } from "@/lib/storage";
 
 export async function GET() {
   try {
@@ -28,6 +28,7 @@ export async function GET() {
       pausedMessage: settings.pausedMessage,
       imageDefaults: { size: settings.imageDefaultSize, quality: settings.imageDefaultQuality },
       storage: storageMode(),
+      blobUpload: blobUploadMode(),
     };
     return Response.json(config, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
