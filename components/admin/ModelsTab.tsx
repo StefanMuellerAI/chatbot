@@ -17,7 +17,6 @@ const CAP_LABELS: { key: keyof ModelCapabilities; label: string; hint: string }[
   { key: "tools", label: "Werkzeuge", hint: "Bildgenerierung per Tool" },
   { key: "reasoning", label: "Denkt nach (Effort)", hint: "Thinking/Reasoning mit Effort-Stufen" },
   { key: "perMessageEffort", label: "Effort-Wechsel ohne Cache-Verlust", hint: "Claude: Mid-Conversation-Effort · GPT-6: configuration_update" },
-  { key: "systemMessages", label: "System-Nachrichten im Verlauf", hint: "Für Hinweise wie „Websuche aus“" },
   { key: "fallbacks", label: "Refusal-Fallback", hint: "Claude: fallbacks „default“ (nicht für Haiku)" },
 ];
 
@@ -42,7 +41,6 @@ function blankModel(provider: "anthropic" | "openai", modelId = "", name = ""): 
       tools: true,
       reasoning: true,
       perMessageEffort: isClaude || /^gpt-6/.test(modelId),
-      systemMessages: true,
       fallbacks: isClaude && !/haiku/.test(modelId),
       anthropicWebTools: isClaude ? (/haiku/.test(modelId) ? "basic" : "dynamic") : undefined,
     },

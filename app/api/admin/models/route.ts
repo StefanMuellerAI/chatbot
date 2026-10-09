@@ -40,7 +40,8 @@ const ModelSchema = z.object({
     tools: z.boolean(),
     reasoning: z.boolean(),
     perMessageEffort: z.boolean(),
-    systemMessages: z.boolean(),
+    // Früher ein Schalter ohne Wirkung; ältere Einträge dürfen das Feld noch enthalten.
+    systemMessages: z.boolean().optional(),
     fallbacks: z.boolean(),
     anthropicWebTools: z.enum(["dynamic", "basic"]).optional(),
   }),

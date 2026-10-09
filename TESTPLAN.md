@@ -368,58 +368,62 @@ Geschätzte Kosten: unter 0,10 $ pro Lauf.
 
 ## 5. Abdeckungsmatrix
 
-Eine Datei `tests/e2e/coverage.json` listet jedes Element aus der Inventur mit seinen Test-IDs. Ein CI-Schritt
-prüft in beide Richtungen: jedes Element hat einen Test, und jede genannte Test-ID existiert. Neue Elemente
-müssen dort eingetragen werden – sonst wird die CI rot.
+`tests/e2e/coverage.json` ordnet jeder Einstellung (aus `lib/shared/settings-defaults.ts`), jeder API-Route (aus
+`app/api`) und jedem Bedienelement Test-IDs zu. `npm run test:coverage` prüft in der CI in beide Richtungen:
+jede Katalog-ID aus Abschnitt 4 hat einen Test, jede neue Einstellung und Route steht in der Matrix, und jede dort
+genannte ID gibt es als Test. Neue Einstellungen oder Routen ohne Test machen die CI rot.
+`node tests/e2e/coverage.mjs --markdown` gibt die Matrix ID → Tests als Tabelle aus.
 
 ## 6. Bei der Inventur gefundene Fehler
 
-Werden im Zuge der Tests behoben, jeweils mit Regressionstest.
+Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam erst nach dem Merge nach `main`.
 
-**Hoch** – falsches Verhalten, Datenverlust oder Sicherheit
+| # | Fehler | Status | Abgesichert durch |
+|---|---|---|---|
+| 1 | Blob-Speicher wurde nicht erkannt (neue Stores melden sich per OIDC an) | behoben, nach Deploy live zu bestätigen | Unit `storage.test.ts`, O04, X01 |
+| 2 | Effort-Stufe im Admin entfernen: Speichern scheitert immer | behoben | P04 |
+| 3 | Funktionsschalter und Not-Aus serverseitig nur teilweise durchgesetzt | behoben (`lib/guards.ts`) | Q01–Q06 |
+| 4 | Lokaler Upload nimmt Pfade unter `images/` und `audio/` an | behoben | U04 |
+| 5 | Schalter „Artefakte“ wirkt nur auf das automatische Öffnen | behoben | Q07/K07 |
+| 6 | Import einer unvollständigen Datei bringt die Chat-Suche zum Absturz | behoben | E08 |
+| 7 | Antwort-Cache berücksichtigt geänderte Modell-Fähigkeiten nicht | behoben | Unit `answer-cache.test.ts` |
+| 8 | „PDFs nativ“ im Code nie erreichbar | eingebaut, standardmäßig aus | Q17 (Mock und Fake-API) |
+| 9 | Ausgelesene Texte und Transkripte werden nie gelöscht | behoben | U05, Q13 |
+| 10 | 500 statt 400, englische Validierung, „Failed to fetch“ | behoben | U03, P02, Q12, C11, W02 |
+| 11 | Interne Meldungen („OPENAI_API_KEY fehlt“) in der Oberfläche | behoben | P07, V04 |
+| 12 | Standardmodell deaktivier-/löschbar, Titelmodell kann deaktiviert sein | behoben | P06, Q16 |
+| 13 | Unsichtbare alte Anhänge beim Bearbeiten, „Neu generieren“ mit falschem Modell, Websuche pro Chat, Artefakt-Karte öffnet neueste Version | behoben | C07, C06, E05, K04 |
+| 14 | Während einer Antwort: Modellwechsel möglich, „Neuer Chat“/Chatwechsel stumm, Löschen hinterlässt Zustand | gesperrt bzw. behoben | D10, E01, E06 |
+| 15 | Bei Pause oder ohne Modell bleiben Anhänge, Diktat, Websuche, Bild aktiv | behoben | Q01, D08 |
+| 16 | Anhang entfernen bricht Upload nicht ab; Limits nur als „Ungültige Anfrage.“ | behoben | F05, C13, I05, U03 |
+| 17 | Drag-Overlay bleibt hängen; Fehler im Bild-Dialog bleibt stehen | behoben | F06, I02 |
+| 18 | Abmelden, Löschen von Modellen/Vorlagen, Admin-Login ohne Fehlerbehandlung | behoben | A10, P06, R01, O01 |
+| 19 | Login-Bremse: gemeinsamer Zähler; IP aus fälschbarem Header | getrennte Zähler; auf Vercel setzt die Plattform den Header | A07, W04 |
+| 20 | Fehlende Namen und Zustände für Screenreader, Menüs nicht per Tastatur | behoben | N02–N04, D09 |
+| 21 | Übersicht: falscher Hinweis zur Secret-Länge, zwei Formeln für die Cache-Quote, Tage in UTC | behoben | O03, O04 |
+| 22 | Schalter „System-Nachrichten im Verlauf“ ohne Wirkung | aus der Oberfläche entfernt | P03 |
 
-1. Blob-Speicher wurde nicht erkannt (neue Stores melden sich per OIDC an) – **bereits behoben**, wird nach dem
-   Deploy live bestätigt
-2. Effort-Stufe im Admin entfernen: Speichern scheitert immer
-3. Funktionsschalter und Not-Aus werden serverseitig nur teilweise durchgesetzt (Upload, Verarbeitung,
-   Transkriptions-Abschnitte, Bilder, Diktat)
-4. Der lokale Upload nimmt auch Pfade unter `images/` und `audio/` an und kann so erzeugte Dateien überschreiben
-5. Schalter „Artefakte“ wirkt nur auf das automatische Öffnen
-6. Import einer unvollständigen Datei bringt die Chat-Suche zum Absturz
-7. Antwort-Cache berücksichtigt geänderte Modell-Fähigkeiten nicht → nach Admin-Änderungen alte Antworten
-8. „PDFs nativ“ ist im Code nie erreichbar
-9. Ausgelesene Dokumenttexte und Transkripte werden nie gelöscht – widerspricht der Aufbewahrungsfrist
+**Beim Testen zusätzlich gefunden und behoben**
 
-**Mittel** – Bedienung und Fehlermeldungen
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 23 | Abgebrochene Verbindung zum Anbieter zeigte „Es ist ein Fehler aufgetreten: terminated“ | V04 |
+| 24 | OpenAI-400er zeigten „400 …“ statt der eigentlichen Ursache | V04, Unit `errors.test.ts` |
+| 25 | Überlanges Passwort (> 4.000 Zeichen) meldete „Bitte ein Passwort eingeben.“ | U03 |
+| 26 | Admin-Einstellungen ignorierten unbekannte Felder still (Tippfehler blieben unbemerkt) | U03 |
+| 27 | Seite während einer Antwort neu geladen: Chat endete stumm mit der Frage | W02 |
+| 28 | Login-Bremse (30) konnte eine Schulungsgruppe hinter einer IP aussperren → 50 | A07, W04 |
+| 29 | Abgelaufener Eintrag im Antwort-Cache blockierte neue Einträge bis zum nächtlichen Aufräumen | Unit `db.test.ts` |
+| 30 | Admin-Bereich: Kontrast von Erfolgs- und Gefahrenfarbe, Diagramm-Balken ohne Rolle | N02/N03 |
+| 31 | Tabs im Admin zeigten veraltete Zahlen (kein Neuladen beim Wechsel) | O02 |
 
-10. Fehlerhafte Eingaben ergeben 500 statt 400; Admin-Validierung meldet auf Englisch; Netzwerkfehler erscheinen
-    auf Englisch („Failed to fetch“)
-11. Interne Meldungen wie „OPENAI_API_KEY fehlt“ dringen bis zur Oberfläche durch
-12. Standardmodell lässt sich deaktivieren oder löschen; Titelmodell kann ein deaktiviertes Modell sein
-13. Bearbeiten schickt unsichtbare alte Anhänge mit; „Neu generieren“ nimmt das aktuell gewählte statt des
-    ursprünglichen Modells; Chatwechsel stellt die Websuche nicht wieder her; Artefakt-Karte öffnet immer die
-    neueste Version
-14. Während einer Antwort: Modellwechsel möglich, „Neuer Chat“ und Chatwechsel tun stillschweigend nichts;
-    Löschen eines laufenden Chats hinterlässt alten Zustand
-15. Bei Pause oder ohne Modell bleiben Anhängen, Diktat, Websuche, Bild weiter aktiv
-16. Anhang entfernen bricht den Upload nicht ab; Limits (20 Dateien, Textlänge, Bildbeschreibung) erst als
-    „Ungültige Anfrage.“
-17. Drag-Overlay kann hängen bleiben; Fehler im Bild-Dialog bleibt stehen
-18. Abmelden, Löschen von Modellen/Vorlagen und Admin-Login ohne Fehlerbehandlung
-19. Login-Bremse: Teilnehmer und Admin teilen einen Zähler; die IP wird aus einem Header gelesen, den man fälschen
-    kann (auf Vercel prüfen und die Plattform-IP nutzen)
+**Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
+weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
-**Niedrig** – Barrierefreiheit und Feinschliff
+## 7. Entscheidungen
 
-20. Fehlende Namen für Screenreader (Büroklammer, Mikrofon, neuer Tab, Suche, Bildbeschreibung, Dialoge),
-    fehlende Zustände (gedrückt, aktiv, aufgeklappt), Menüs nicht per Tastatur bedienbar
-21. Übersicht: Hinweis „mind. 32 Zeichen“ passt nicht zur Prüfung (16), zwei verschiedene Formeln für die
-    Cache-Quote, Tagesgrenzen in UTC
-22. Toter Code: Fähigkeit „System-Nachrichten im Verlauf“ wird nie gelesen
-
-## 7. Entscheidungen, die ich von dir brauche
-
-Jeweils mit meiner Empfehlung:
+Alle Empfehlungen wurden übernommen (9. Oktober 2026) und umgesetzt. Punkt 5 ist eine Einstellung in Vercel und
+liegt bei dir.
 
 1. **Live-Tests mit echten Schlüsseln** gegen `freebie.stefanai.de`, nach jedem Deploy und auf Abruf
    (< 0,10 $ pro Lauf) – *Empfehlung: ja*
@@ -440,18 +444,18 @@ Jeweils mit meiner Empfehlung:
 
 ## 8. Umsetzung in Phasen
 
-| Phase | Inhalt | Ergebnis |
+| Phase | Inhalt | Stand |
 |---|---|---|
-| 1 · Fundament | Playwright-Konfiguration, Anmelde-/Reset-Helfer, Datei-Generator, Mock-Szenarien, CI-Job mit Report; Smoke-Test portieren | Suite läuft in der CI |
-| 2 · Chat | Bereiche A–N | Teilnehmerseite vollständig |
-| 3 · Admin | Bereiche O–S inkl. jeder Einstellung | Admin vollständig |
-| 4 · Schnittstellen | Fake-API, Bereiche U und V | echte Adapter und Caching abgesichert |
-| 5 · Fehler beheben | Abschnitt 6, laufend während Phase 2–4 | jeder Fehler mit Regressionstest |
-| 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | Abnahmekriterien 2–4 erfüllt |
-| 7 · Live | Live-Smoke X, automatisch nach Deploy | Abnahmekriterium 6 erfüllt |
+| 1 · Fundament | Playwright-Konfiguration, Anmelde-/Reset-Helfer, Datei-Generator, Mock-Szenarien, CI-Job mit Report | erledigt; altes Smoke-Skript ersetzt |
+| 2 · Chat | Bereiche A–N | erledigt |
+| 3 · Admin | Bereiche O–S inkl. jeder Einstellung | erledigt |
+| 4 · Schnittstellen | Fake-API, Bereiche U und V | erledigt |
+| 5 · Fehler beheben | Abschnitt 6 | erledigt (31 Fehler, je mit Test) |
+| 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | erledigt; WebKit/Firefox laufen nur in der CI (lokal nicht installierbar) |
+| 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
 
-Umfang: rund 350–400 Testfälle in etwa 25 Testdateien. Ziel-Laufzeit in der CI: unter 10 Minuten (Mock und
-Fake-API, 4 parallele Worker, Admin seriell).
+Ergebnis: 206 E2E-Tests in 19 Dateien (plus 6 Live-Smoke-Tests) und 46 Unit-Tests; die komplette Suite läuft lokal in gut 5 Minuten
+(3 Worker) und dreimal hintereinander ohne Wiederholungen grün.
 
 ## 9. Was automatisiert nicht geht – kurze manuelle Abnahme
 

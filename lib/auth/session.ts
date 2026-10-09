@@ -93,6 +93,7 @@ export async function consumeLoginAttempt(request: Request, scope: "user" | "adm
   return refund;
 }
 
+/** Auf Vercel setzt die Plattform x-forwarded-for selbst (von außen nicht fälschbar). */
 function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";
