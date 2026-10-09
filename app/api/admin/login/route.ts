@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { safeEqual } from "@/lib/auth/password";
 import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/session";
-import { ADMIN_COOKIE, ADMIN_MAX_AGE_S, devPassword, signAdmin } from "@/lib/auth/tokens";
+import { ADMIN_COOKIE, ADMIN_MAX_AGE_S, devPassword, secureCookie, signAdmin } from "@/lib/auth/tokens";
 import { getSettings } from "@/lib/settings";
 
 const Body = z.object({ password: z.string().min(1) });
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const jar = await cookies();
     jar.set(ADMIN_COOKIE, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: secureCookie(request),
       sameSite: "strict",
       path: "/",
       maxAge: ADMIN_MAX_AGE_S,

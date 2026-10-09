@@ -3,6 +3,16 @@ import { createHash } from "node:crypto";
 import { jwtVerify, SignJWT } from "jose";
 import { HttpError } from "@/lib/errors";
 
+/**
+ * Secure-Cookies über HTTPS – auf Vercel immer. Lokal (http://localhost) lehnen manche Browser
+ * (Safari/WebKit) Secure-Cookies ab, dort wird das Flag daher weggelassen.
+ */
+export function secureCookie(request: Request): boolean {
+  if (process.env.VERCEL) return true;
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return (forwarded || new URL(request.url).protocol.slice(0, -1)) === "https";
+}
+
 export const USER_COOKIE = "freebie_session";
 export const ADMIN_COOKIE = "freebie_admin";
 export const USER_MAX_AGE_S = 12 * 60 * 60;

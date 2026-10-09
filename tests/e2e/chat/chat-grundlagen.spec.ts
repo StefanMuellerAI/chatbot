@@ -162,8 +162,13 @@ test.describe("C · Chat-Grundfunktionen", () => {
     await chat.send(`#lang #langsam ${uniq()}`);
     await expect(chat.lastAnswer).toContainText("Absatz 3", { timeout: 15_000 });
     await region.hover();
-    await page.mouse.wheel(0, -100_000);
-    await expect.poll(() => region.evaluate((el) => el.scrollTop)).toBeLessThan(50);
+    // In kleinen Schritten wie ein echtes Mausrad (große Einzelsprünge verarbeitet nicht jeder Browser gleich).
+    await expect
+      .poll(async () => {
+        await page.mouse.wheel(0, -2000);
+        return region.evaluate((el) => el.scrollTop);
+      })
+      .toBeLessThan(50);
     await page.waitForTimeout(1500);
     expect(await region.evaluate((el) => el.scrollTop)).toBeLessThan(50);
     await chat.stopButton.click();

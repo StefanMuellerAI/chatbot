@@ -47,7 +47,7 @@ test.describe("F · Dateien", () => {
       await expectReady(page, name, "Bild");
       const thumb = chip(page, name).locator("img");
       await expect(thumb).toHaveAttribute("src", /^\/api\/files\/uploads\//);
-      expect(await thumb.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+      await expect.poll(() => thumb.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
       const answer = await chat.ask(`Was siehst du? ${uniq()}`);
       expect(await chat.diagnosis(answer, "Zusätzliche Anhänge")).toBe("1");
       expect(await chat.diagnosis(answer, "Dateien")).toBe(name);
@@ -157,7 +157,10 @@ test.describe("F · Dateien", () => {
     await chat.composer.evaluate((el) => {
       const dt = new DataTransfer();
       dt.items.add(new File([new Uint8Array([137, 80, 78, 71])], "eingefuegt.png", { type: "image/png" }));
-      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+      // Firefox übernimmt clipboardData nicht aus dem Konstruktor – daher nachträglich setzen.
+      const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(event, "clipboardData", { value: dt });
+      el.dispatchEvent(event);
     });
     await expect(chip(page, "eingefuegt.png")).toBeVisible();
   });

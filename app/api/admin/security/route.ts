@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { hashPassword } from "@/lib/auth/password";
 import { errorResponse, requireAdmin } from "@/lib/auth/session";
-import { ADMIN_COOKIE, ADMIN_MAX_AGE_S, signAdmin } from "@/lib/auth/tokens";
+import { ADMIN_COOKIE, ADMIN_MAX_AGE_S, secureCookie, signAdmin } from "@/lib/auth/tokens";
 import { getDb, schema } from "@/lib/db/client";
 import { getSettings, updateSettings } from "@/lib/settings";
 import { germanZodMessage } from "@/lib/validation";
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const jar = await cookies();
     jar.set(ADMIN_COOKIE, await signAdmin({ adm: true, v: sessionVersion }), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: secureCookie(request),
       sameSite: "strict",
       path: "/",
       maxAge: ADMIN_MAX_AGE_S,

@@ -90,7 +90,7 @@ test.describe("U · API-Robustheit", () => {
     await Promise.all([forged.dispose(), user.dispose()]);
   });
 
-  test("U01 Cookies: httpOnly, SameSite und begrenzte Laufzeit", async ({ baseURL, ip }) => {
+  test("U01 Cookies: httpOnly, SameSite, Secure hinter HTTPS und begrenzte Laufzeit", async ({ baseURL, ip }) => {
     const api = await client(baseURL!, ip);
     const res = await api.post("/api/auth/login", { data: { password: PASSWORDS.app } });
     const setCookie = res.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value).join("\n");
@@ -99,6 +99,16 @@ test.describe("U · API-Robustheit", () => {
     expect(setCookie).toMatch(/SameSite=Lax/i);
     expect(setCookie).toMatch(/Path=\//);
     expect(setCookie).toMatch(/Max-Age=\d+|Expires=/i);
+    expect(setCookie).not.toMatch(/;\s*Secure/i);
+    // Hinter HTTPS (wie auf Vercel) ist das Cookie immer Secure.
+    const https = await api.post("/api/auth/login", { data: { password: PASSWORDS.app }, headers: { "x-forwarded-proto": "https" } });
+    const secure = https.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value).join("\n");
+    expect(secure).toMatch(/freebie_session=[^;]+;.*Secure/i);
+    const admin = await api.post("/api/admin/login", { data: { password: PASSWORDS.admin }, headers: { "x-forwarded-proto": "https" } });
+    const adminCookie = admin.headersArray().find((h) => h.name.toLowerCase() === "set-cookie")?.value ?? "";
+    expect(adminCookie).toMatch(/^freebie_admin=[^;]+;/);
+    expect(adminCookie).toMatch(/;\s*Secure/i);
+    expect(adminCookie).toMatch(/SameSite=Strict/i);
     const logout = await api.post("/api/auth/logout");
     expect(logout.status()).toBe(200);
     expect((await api.get("/api/config")).status()).toBe(401);

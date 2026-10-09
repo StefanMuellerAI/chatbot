@@ -136,6 +136,6 @@ export function hardenHtml(html: string): string {
 
 export function svgDocument(svg: string): string {
   return hardenHtml(
-    `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;display:grid;place-items:center;background:#fff}svg{max-width:100%;max-height:100vh;height:auto}</style></head><body>${svg}</body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;display:grid;place-items:center;background:#fff}svg{max-width:100%;max-height:100vh;height:auto}svg:not([width]){width:100%}</style></head><body>${svg}</body></html>`,
   ).replace("script-src 'unsafe-inline' 'unsafe-eval'", "script-src 'none'");
 }

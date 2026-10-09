@@ -56,7 +56,8 @@ if (process.env.E2E_BROWSERS) {
     projects.push({
       name: `chat-${browser}`,
       testDir: "tests/e2e/chat",
-      grepInvert: /@nur-chromium/,
+      // Handy und Tablet laufen in eigenen Projekten (Chromium mit Touch); Mikrofon und Zwischenablage nur in Chromium.
+      grepInvert: /@nur-chromium|@mobil|@tablet/,
       use: { ...device, viewport: { width: 1280, height: 860 }, baseURL: baseUrl("mock") },
     });
   }

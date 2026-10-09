@@ -62,7 +62,8 @@ test.describe("A · Zugang und Sitzung", () => {
     const cookie = (await context.cookies()).find((c) => c.name === "freebie_session");
     expect(cookie).toBeDefined();
     expect(cookie!.httpOnly).toBe(true);
-    expect(cookie!.secure).toBe(true);
+    // Über http://localhost ohne Secure (sonst lehnt Safari das Cookie ab); über HTTPS mit Secure (U01).
+    expect(cookie!.secure).toBe(false);
     expect(cookie!.sameSite).toBe("Lax");
     const hours = (cookie!.expires * 1000 - Date.now()) / 3_600_000;
     expect(hours).toBeGreaterThan(11.9);
