@@ -106,7 +106,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | A02 | Login-Seite | Titel, Spielumgebungs-Hinweis aus den Einstellungen, Link zu stefanai.de in neuem Tab |
 | A03 | Leeres Passwort | Button gesperrt, Enter tut nichts |
 | A04 | Falsches Passwort | „Das Passwort stimmt nicht.“, Feld bleibt nutzbar |
-| A05 | Richtiges Passwort per Button und per Enter | Chat öffnet; Cookie HttpOnly, Secure, SameSite=Lax, 12 Stunden |
+| A05 | Richtiges Passwort per Button und per Enter | Chat öffnet; Cookie HttpOnly, SameSite=Lax, 12 Stunden; Secure hinter HTTPS (U01) |
 | A06 | Passwort mit über 200 Zeichen | verständliche Meldung (heute irreführend) |
 | A07 | 50 Fehlversuche, dann der 51. | Sperre mit Meldung, auch das richtige Passwort wird abgewiesen; andere IP nicht betroffen; Erfolg zählt einen Versuch zurück |
 | A08 | Abgelaufene, manipulierte oder Admin-Tokens als Teilnehmer-Cookie | abgewiesen, Weiterleitung auf Login |
@@ -416,6 +416,8 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 | 29 | Abgelaufener Eintrag im Antwort-Cache blockierte neue Einträge bis zum nächtlichen Aufräumen | Unit `db.test.ts` |
 | 30 | Admin-Bereich: Kontrast von Erfolgs- und Gefahrenfarbe, Diagramm-Balken ohne Rolle | N02/N03 |
 | 31 | Tabs im Admin zeigten veraltete Zahlen (kein Neuladen beim Wechsel) | O02 |
+| 32 | Safari/WebKit lehnte das Secure-Cookie über http ab (nur lokal, nicht auf Vercel) – Secure richtet sich jetzt nach dem Protokoll, auf Vercel immer an | A05, U01, `chat-webkit` |
+| 33 | Firefox: SVG-Artefakte ohne Größenangabe blieben in der Vorschau unsichtbar | K03 in `chat-firefox` |
 
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
@@ -450,7 +452,7 @@ liegt bei dir.
 | 2 · Chat | Bereiche A–N | erledigt |
 | 3 · Admin | Bereiche O–S inkl. jeder Einstellung | erledigt |
 | 4 · Schnittstellen | Fake-API, Bereiche U und V | erledigt |
-| 5 · Fehler beheben | Abschnitt 6 | erledigt (31 Fehler, je mit Test) |
+| 5 · Fehler beheben | Abschnitt 6 | erledigt (33 Fehler, je mit Test) |
 | 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | erledigt; WebKit/Firefox laufen nur in der CI (lokal nicht installierbar) |
 | 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
 
