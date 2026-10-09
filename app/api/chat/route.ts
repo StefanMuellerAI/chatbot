@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { errorResponse, requireUser } from "@/lib/auth/session";
 import { chatStream } from "@/lib/chat/run";
+import { MAX_ATTACHMENTS, MAX_MESSAGE_CHARS } from "@/lib/files/limits";
 import { ChatRequestSchema } from "@/lib/shared/schemas";
 import type { ChatRequestBody } from "@/lib/shared/types";
 
@@ -22,10 +23,22 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });
+      return Response.json({ error: limitMessage(err) }, { status: 400 });
     }
     return errorResponse(err);
   }
+}
+
+/** Verständliche Meldung für überschrittene Grenzen, sonst eine allgemeine. */
+function limitMessage(err: z.ZodError): string {
+  for (const issue of err.issues) {
+    if (issue.code !== "too_big") continue;
+    const field = issue.path.at(-1);
+    if (field === "text") return `Die Nachricht ist zu lang (höchstens ${MAX_MESSAGE_CHARS.toLocaleString("de-DE")} Zeichen).`;
+    if (field === "attachments") return `Zu viele Anhänge (höchstens ${MAX_ATTACHMENTS} pro Nachricht).`;
+    if (field === "messages") return "Der Chat ist zu lang. Bitte einen neuen Chat starten.";
+  }
+  return "Ungültige Anfrage.";
 }
 
 /** Liest JSON, optional gzip-komprimiert (große Verläufe). */

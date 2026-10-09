@@ -16,34 +16,67 @@ export function ProviderDot({ provider, className }: { provider: string; classNa
   );
 }
 
-export function ModelPicker({ models, value, onChange }: { models: PublicModel[]; value: string; onChange: (id: string) => void }) {
+export function ModelPicker({
+  models,
+  value,
+  onChange,
+  disabled,
+}: {
+  models: PublicModel[];
+  value: string;
+  onChange: (id: string) => void;
+  /** Während einer Antwort ist der Wechsel gesperrt. */
+  disabled?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const current = models.find((m) => m.id === value);
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
     document.addEventListener("mousedown", close);
+    // Beim Öffnen das gewählte Modell fokussieren (Tastaturbedienung).
+    (ref.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]') ?? ref.current?.querySelector<HTMLElement>('[role="option"]'))?.focus();
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
+  const onListKey = (e: React.KeyboardEvent) => {
+    const items = Array.from(ref.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? []);
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      items[(index + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      items[e.key === "Home" ? 0 : items.length - 1]?.focus();
+    }
+  };
   const groups = ["anthropic", "openai", "mock"]
     .map((p) => [p, models.filter((m) => m.provider === p)] as const)
     .filter(([, list]) => list.length);
   return (
     <div ref={ref} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-10 items-center gap-2 rounded-full px-3 font-display text-[0.97rem] font-semibold hover:bg-surface-2"
+        disabled={disabled}
+        title={disabled ? "Während einer Antwort nicht möglich" : "Modell wählen"}
+        className="inline-flex h-10 items-center gap-2 rounded-full px-3 font-display text-[0.97rem] font-semibold hover:bg-surface-2 disabled:opacity-60"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-label={`Modell: ${current?.displayName ?? "keins gewählt"}`}
       >
         {current && <ProviderDot provider={current.provider} />}
         {current?.displayName ?? "Modell wählen"}
         <ChevronDown className={cn("h-4 w-4 text-muted transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div role="listbox" className="absolute top-12 left-0 z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-border bg-surface p-1.5 shadow-2xl">
+        <div role="listbox" aria-label="Modell wählen" onKeyDown={onListKey} className="absolute top-12 left-0 z-40 w-[min(360px,calc(100vw-2rem))] rounded-2xl border border-border bg-surface p-1.5 shadow-2xl">
           {groups.map(([provider, list]) => (
             <div key={provider} className="py-1">
               <div className="px-3 pt-1 pb-1 text-xs font-semibold tracking-wide text-muted uppercase">{PROVIDER_LABEL[provider]}</div>
@@ -56,8 +89,9 @@ export function ModelPicker({ models, value, onChange }: { models: PublicModel[]
                   onClick={() => {
                     onChange(m.id);
                     setOpen(false);
+                    triggerRef.current?.focus();
                   }}
-                  className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left hover:bg-surface-2"
+                  className="flex w-full items-start gap-3 rounded-xl px-3 py-2 text-left outline-none hover:bg-surface-2 focus-visible:bg-surface-2"
                 >
                   <ProviderDot provider={m.provider} className="mt-1.5" />
                   <span className="min-w-0 flex-1">

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { transcribeBuffer } from "@/lib/audio/transcribe";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
+import { requireFeature } from "@/lib/guards";
 import { getFile } from "@/lib/storage";
 
 export const maxDuration = 300;
@@ -13,6 +14,7 @@ const Body = z.object({ jobId: z.string().uuid(), index: z.number().int().min(0)
 export async function POST(request: Request) {
   try {
     await requireUser();
+    await requireFeature("transcription");
     const { jobId, index } = Body.parse(await request.json());
     const db = await getDb();
     const rows = await db.select().from(schema.transcriptionJobs).where(eq(schema.transcriptionJobs.id, jobId)).limit(1);

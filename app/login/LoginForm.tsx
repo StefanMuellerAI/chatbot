@@ -1,13 +1,18 @@
 "use client";
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 export function LoginForm() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Vor dem Laden getippte oder vom Browser automatisch ausgefüllte Passwörter übernehmen –
+  // sonst bliebe der Button gesperrt, obwohl im Feld etwas steht.
+  const adoptPrefilled = useCallback((el: HTMLInputElement | null) => {
+    if (el?.value) setPassword(el.value);
+  }, []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +42,7 @@ export function LoginForm() {
       <label className="flex items-center gap-3 rounded-full border border-white/15 bg-black/20 px-4 focus-within:border-[#9b7bff]">
         <Lock className="h-4 w-4 text-white/50" />
         <input
+          ref={adoptPrefilled}
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

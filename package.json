@@ -9,7 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/smoke.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:live": "LIVE=1 playwright test",
+    "test:coverage": "node tests/e2e/coverage.mjs",
     "check": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
@@ -48,6 +50,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.64.0",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^22.20.5",

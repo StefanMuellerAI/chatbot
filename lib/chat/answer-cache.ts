@@ -25,12 +25,15 @@ export function canonicalJson(value: unknown): string {
 }
 
 /**
- * Schlüssel aus allem, was die Antwort beeinflusst: Modell, System-Prompt-Version, Vorlage,
- * Tool-Set und der komplette bisherige Verlauf (inkl. Datum, Effort, Websuche, Datei-Hashes).
+ * Schlüssel aus allem, was die Antwort beeinflusst: Modell (inkl. Einstellungen aus dem Admin),
+ * System-Prompt-Version, Vorlage, Tool-Set und der komplette bisherige Verlauf (inkl. Datum, Effort,
+ * Websuche, Datei-Hashes). Ändert der Admin etwa Bildverständnis oder Effort-Werte, gibt es neue Antworten.
  */
 export function answerCacheKey(input: {
   modelRowId: string;
   apiModelId: string;
+  /** Fähigkeiten, Effort-Zuordnung und Ausgabegrenze des Modells sowie „PDF nativ“. */
+  modelConfig?: unknown;
   systemVersion: string;
   presetVersion: string | null;
   tools: { webSearch: boolean; generateImage: boolean };
@@ -51,6 +54,7 @@ export function answerCacheKey(input: {
   const payload = canonicalJson({
     v: ANSWER_CACHE_VERSION,
     model: [input.modelRowId, input.apiModelId],
+    config: input.modelConfig ?? null,
     system: input.systemVersion,
     preset: input.presetVersion,
     tools: input.tools,
@@ -87,11 +91,16 @@ export async function storeAnswer(
 ): Promise<void> {
   const db = await getDb();
   const expiresAt = new Date(Date.now() + hours * 3_600_000);
-  // Die erste Antwort bleibt die gemeinsame – vorhandene Einträge werden nicht überschrieben.
+  // Die erste Antwort bleibt die gemeinsame – nur abgelaufene Einträge (vom Aufräumjob noch
+  // nicht gelöscht) werden ersetzt, sonst ließe sich der Cache bis dahin nicht neu füllen.
   await db
     .insert(schema.answerCache)
     .values({ keyHash: key, modelId, answer, usage, costUsd, expiresAt })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: schema.answerCache.keyHash,
+      set: { modelId, answer, usage, costUsd, expiresAt, hits: 0, createdAt: new Date() },
+      setWhere: lt(schema.answerCache.expiresAt, new Date()),
+    });
 }
 
 export async function deleteExpiredAnswers(): Promise<void> {

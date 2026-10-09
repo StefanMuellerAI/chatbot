@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { HttpError } from "@/lib/errors";
 import os from "node:os";
 import path from "node:path";
 
@@ -65,11 +66,14 @@ export async function splitAudio(input: Buffer, fileName: string): Promise<{ chu
       path.join(dir, "teil-%03d.mp3"),
     ]);
     if (code !== 0) {
-      throw new Error(`Die Audiodatei konnte nicht gelesen werden. ${stderr.split("\n").slice(-3).join(" ").slice(0, 300)}`);
+      console.warn("ffmpeg:", stderr.slice(-500));
+      // Videos ohne Tonspur: ffmpeg findet nach „-vn“ keinen Datenstrom mehr.
+      if (/does not contain any stream|matches no streams/i.test(stderr)) throw new HttpError(422, "Die Audiodatei enthält keine Tonspur.");
+      throw new HttpError(422, "Die Audiodatei konnte nicht gelesen werden. Ist sie beschädigt?");
     }
     const names = (await readdir(dir)).filter((n) => n.startsWith("teil-")).sort();
     const chunks = await Promise.all(names.map((n) => readFile(path.join(dir, n))));
-    if (chunks.length === 0) throw new Error("Die Audiodatei enthält keine Tonspur.");
+    if (chunks.length === 0) throw new HttpError(422, "Die Audiodatei enthält keine Tonspur.");
     return { chunks, durationSec: parseDuration(stderr) };
   } finally {
     await rm(dir, { recursive: true, force: true });

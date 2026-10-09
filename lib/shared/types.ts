@@ -20,8 +20,8 @@ export interface ModelCapabilities {
   reasoning: boolean;
   /** Claude: Effort-Wechsel per Mid-Conversation-System-Nachricht ohne Cache-Verlust */
   perMessageEffort: boolean;
-  /** Claude: role "system" mitten im Gespräch */
-  systemMessages: boolean;
+  /** Veraltet und ohne Wirkung – nur noch in älteren gespeicherten Modellen vorhanden. */
+  systemMessages?: boolean;
   /** Claude: serverseitiger Refusal-Fallback (fallbacks: "default") */
   fallbacks: boolean;
   /** Claude: "dynamic" = web_search_20260209 (Standard), "basic" = web_search_20250305 */
@@ -59,6 +59,8 @@ export interface PublicConfig {
   pausedMessage: string;
   imageDefaults: { size: string; quality: string };
   storage: "blob" | "local";
+  /** Blob-Upload per Client-Token oder vorsignierter URL (OIDC-Stores). */
+  blobUpload: "token" | "presigned" | null;
 }
 
 export interface FeatureFlags {

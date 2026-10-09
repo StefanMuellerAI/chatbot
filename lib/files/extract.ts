@@ -1,5 +1,6 @@
 import "server-only";
 import { strFromU8, unzipSync } from "fflate";
+import { HttpError } from "@/lib/errors";
 
 export type ExtractKind = "pdf" | "docx" | "sheet" | "pptx" | "text";
 
@@ -38,14 +39,29 @@ export function assertZipSafe(data: Uint8Array): void {
       total += file.originalSize;
       entries++;
       if (total > MAX_UNZIPPED_BYTES || entries > 20_000) {
-        throw new Error("Die Datei ist zu groß oder beschädigt (entpackt über 200 MB).");
+        throw new HttpError(422, "Die Datei ist zu groß oder beschädigt (entpackt über 200 MB).");
       }
       return false; // nur prüfen, nicht entpacken
     },
   });
 }
 
+/** Liest den Text einer Datei aus; Fehler kommen als verständliche deutsche Meldung (HTTP 422). */
 export async function extractText(data: Buffer, name: string, mime: string): Promise<string> {
+  if (data.length === 0) throw new HttpError(422, "Die Datei ist leer.");
+  let text: string;
+  try {
+    text = await extractByKind(data, name, mime);
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    console.warn("extract failed", name, err);
+    throw new HttpError(422, "Die Datei konnte nicht gelesen werden. Ist sie beschädigt oder passwortgeschützt?");
+  }
+  if (!text.trim()) throw new HttpError(422, "In der Datei wurde kein lesbarer Text gefunden (z. B. ein eingescanntes PDF).");
+  return text;
+}
+
+async function extractByKind(data: Buffer, name: string, mime: string): Promise<string> {
   const kind = detectKind(name, mime);
   switch (kind) {
     case "pdf":
@@ -62,7 +78,7 @@ export async function extractText(data: Buffer, name: string, mime: string): Pro
     case "text":
       return decodeText(data);
     default:
-      throw new Error("Dieses Dateiformat wird nicht unterstützt.");
+      throw new HttpError(422, "Dieses Dateiformat wird nicht unterstützt.");
   }
 }
 

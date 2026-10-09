@@ -38,18 +38,48 @@ const FEATURES: { key: keyof FeatureFlags; label: string; hint: string }[] = [
   { key: "showCost", label: "Kosten pro Antwort anzeigen", hint: "Zeigt Teilnehmenden die geschätzten Kosten" },
 ];
 
-export function SettingsTab({ initial, modelOptions, reload }: { initial: AdminSettings; modelOptions: { id: string; name: string }[]; reload: () => void }) {
+/** Nur geänderte Felder (bei Funktionen: nur geänderte Schalter) – so überschreiben sich zwei Admins nicht. */
+function changes(initial: AdminSettings, current: AdminSettings): Partial<AdminSettings> {
+  const patch: Record<string, unknown> = {};
+  for (const key of Object.keys(current) as (keyof AdminSettings)[]) {
+    if (key === "features") {
+      const changed = (Object.keys(current.features) as (keyof FeatureFlags)[]).filter((f) => current.features[f] !== initial.features[f]);
+      if (changed.length) patch.features = Object.fromEntries(changed.map((f) => [f, current.features[f]]));
+    } else if (current[key] !== initial[key]) {
+      patch[key] = current[key];
+    }
+  }
+  return patch as Partial<AdminSettings>;
+}
+
+const toNumber = (v: string) => (v.trim() === "" ? Number.NaN : Number(v.replace(",", ".")));
+
+export function SettingsTab({
+  initial,
+  modelOptions,
+  reload,
+}: {
+  initial: AdminSettings;
+  modelOptions: { id: string; name: string; enabled: boolean }[];
+  reload: () => void;
+}) {
   const [s, setS] = useState<AdminSettings>(initial);
+  // Zahlenfelder als Text, damit Eingaben wie „1,5“ oder ein leeres Feld nicht still ersetzt werden.
+  const [hours, setHours] = useState(String(initial.answerCacheHours));
+  const [days, setDays] = useState(String(initial.fileRetentionDays));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const set = <K extends keyof AdminSettings>(k: K, v: AdminSettings[K]) => setS((x) => ({ ...x, [k]: v }));
+  const current = { ...s, answerCacheHours: toNumber(hours), fileRetentionDays: toNumber(days) };
+  const patch = changes(initial, current);
+  const dirty = Object.keys(patch).length > 0;
 
-  const save = async () => {
+  const send = async (body: Partial<AdminSettings>, success: string) => {
     setBusy(true);
     setMessage(null);
     try {
-      await api("/api/admin/settings", { method: "PUT", json: s, admin: true });
-      setMessage({ tone: "success", text: "Gespeichert." });
+      await api("/api/admin/settings", { method: "PUT", json: body, admin: true });
+      setMessage({ tone: "success", text: success });
       reload();
     } catch (err) {
       setMessage({ tone: "danger", text: err instanceof Error ? err.message : "Speichern fehlgeschlagen" });
@@ -57,11 +87,18 @@ export function SettingsTab({ initial, modelOptions, reload }: { initial: AdminS
       setBusy(false);
     }
   };
+  const save = () => send(patch, "Gespeichert.");
+  // Der Not-Aus wirkt sofort – ohne Umweg über „Speichern“.
+  const togglePause = (paused: boolean) => {
+    set("paused", paused);
+    void send({ paused, pausedMessage: s.pausedMessage }, paused ? "Freebie ist pausiert." : "Freebie läuft wieder.");
+  };
+  const titleOptions = modelOptions.filter((m) => m.enabled || m.id === s.titleModelId);
 
   return (
     <div className="space-y-6">
       <Card title="Not-Aus" description="Pausiert Freebie sofort für alle Teilnehmenden.">
-        <Switch label="Freebie pausieren" checked={s.paused} onChange={(v) => set("paused", v)} />
+        <Switch label="Freebie pausieren" description="Wirkt sofort." checked={s.paused} onChange={togglePause} disabled={busy} />
         <Field label="Meldung während der Pause" className="mt-2">
           <input className={inputClass} value={s.pausedMessage} onChange={(e) => set("pausedMessage", e.target.value)} />
         </Field>
@@ -84,10 +121,10 @@ export function SettingsTab({ initial, modelOptions, reload }: { initial: AdminS
             </select>
           </Field>
           <Field label="Antwort-Cache gültig (Stunden)" hint="Identische Anfragen innerhalb dieser Zeit kosten nichts.">
-            <input className={inputClass} type="number" min={1} value={s.answerCacheHours} onChange={(e) => set("answerCacheHours", Number(e.target.value) || 24)} />
+            <input className={inputClass} inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} />
           </Field>
           <Field label="Dateien aufbewahren (Tage)" hint="Danach löscht der tägliche Aufräumjob Uploads und Bilder.">
-            <input className={inputClass} type="number" min={1} max={90} value={s.fileRetentionDays} onChange={(e) => set("fileRetentionDays", Number(e.target.value) || 7)} />
+            <input className={inputClass} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} />
           </Field>
         </div>
       </Card>
@@ -121,9 +158,10 @@ export function SettingsTab({ initial, modelOptions, reload }: { initial: AdminS
           </Field>
           <Field label="Modell für Chat-Titel" hint="Ein schnelles, günstiges Modell">
             <select className={inputClass} value={s.titleModelId} onChange={(e) => set("titleModelId", e.target.value)}>
-              {modelOptions.map((m) => (
+              {titleOptions.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
+                  {m.enabled ? "" : " (deaktiviert)"}
                 </option>
               ))}
             </select>
@@ -147,6 +185,7 @@ export function SettingsTab({ initial, modelOptions, reload }: { initial: AdminS
         <textarea
           className={textareaClass}
           rows={5}
+          aria-label="Hinweise an das Modell"
           value={s.systemPromptAddendum}
           placeholder="z. B. Heute ist die Schulung „KI im Vertrieb“ für die Firma Muster GmbH. Beispiele bitte aus dem Vertriebsalltag wählen."
           onChange={(e) => set("systemPromptAddendum", e.target.value)}
@@ -154,8 +193,14 @@ export function SettingsTab({ initial, modelOptions, reload }: { initial: AdminS
       </Card>
 
       <div className="sticky bottom-4 flex items-center justify-end gap-3">
-        {message && <Notice tone={message.tone}>{message.text}</Notice>}
-        <Button variant="primary" size="lg" onClick={save} disabled={busy}>
+        {message ? (
+          <div role="status">
+            <Notice tone={message.tone}>{message.text}</Notice>
+          </div>
+        ) : (
+          dirty && <span className="rounded-full bg-surface px-3 py-1.5 text-sm text-muted shadow-sm">Ungespeicherte Änderungen</span>
+        )}
+        <Button variant="primary" size="lg" onClick={save} disabled={busy || !dirty}>
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Einstellungen speichern
         </Button>
       </div>

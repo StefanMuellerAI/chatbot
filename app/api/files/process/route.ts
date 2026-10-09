@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db/client";
 import { estimateTokens, extractText } from "@/lib/files/extract";
 import { categoryOf } from "@/lib/files/limits";
 import { sniffImageMime } from "@/lib/files/sniff";
-import { getSettings } from "@/lib/settings";
+import { requireFeature } from "@/lib/guards";
 import type { Attachment } from "@/lib/shared/types";
 import { assertSafeKey, getFile, registerFile } from "@/lib/storage";
 
@@ -23,9 +23,9 @@ export async function POST(request: Request) {
     if (!key.startsWith("uploads/")) throw new HttpError(400, "Ungültiger Pfad.");
     const category = categoryOf(key);
     if (category !== "image" && category !== "document") throw new HttpError(400, "Dateityp nicht unterstützt.");
+    const settings = await requireFeature("uploads");
     const file = await getFile(key);
     if (!file) throw new HttpError(404, "Die hochgeladene Datei wurde nicht gefunden.");
-    const settings = await getSettings();
     const sha256 = createHash("sha256").update(file.data).digest("hex");
 
     if (category === "image") {
@@ -53,11 +53,16 @@ export async function POST(request: Request) {
     if (cached[0]) {
       text = cached[0].extractedText;
       tokens = cached[0].tokenEstimate;
+      // Erneut genutzt: Aufbewahrungsfrist beginnt von vorn.
+      await db.update(schema.fileCache).set({ createdAt: new Date() }).where(eq(schema.fileCache.sha256, sha256));
     } else {
+      const isPdf = name.toLowerCase().endsWith(".pdf");
       try {
         text = await extractText(file.data, name, mime);
       } catch (err) {
-        throw new HttpError(422, err instanceof Error ? err.message : "Die Datei konnte nicht gelesen werden.");
+        // Eingescannte PDFs ohne Textebene: mit „PDF nativ“ kann das Modell sie trotzdem lesen.
+        if (!(isPdf && settings.nativePdf && err instanceof HttpError && err.message.startsWith("In der Datei wurde kein lesbarer Text"))) throw err;
+        text = "[Eingescanntes PDF ohne Textebene – nur für Modelle mit nativer PDF-Verarbeitung lesbar.]";
       }
       tokens = estimateTokens(text);
       await db
@@ -66,6 +71,7 @@ export async function POST(request: Request) {
         .onConflictDoNothing();
     }
     await registerFile(key, "document", mime, file.data.length, settings.fileRetentionDays);
+    const headers = { "X-Freebie-Cache": cached[0] ? "hit" : "miss" };
     const attachment: Attachment = {
       id: randomUUID(),
       kind: "document",
@@ -76,8 +82,10 @@ export async function POST(request: Request) {
       storageKey: key,
       tokenEstimate: tokens,
       preview: text.slice(0, 600),
+      // PDFs dürfen nativ ans Modell, wenn „PDF nativ“ an ist und das Modell es kann (entscheidet prepare.ts).
+      native: name.toLowerCase().endsWith(".pdf") || undefined,
     };
-    return Response.json(attachment);
+    return Response.json(attachment, { headers });
   } catch (err) {
     if (err instanceof z.ZodError) return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });
     return errorResponse(err);

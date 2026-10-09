@@ -1,6 +1,17 @@
 // Ohne "server-only", weil proxy.ts diese Datei ebenfalls nutzt.
 import { createHash } from "node:crypto";
 import { jwtVerify, SignJWT } from "jose";
+import { HttpError } from "@/lib/errors";
+
+/**
+ * Secure-Cookies über HTTPS – auf Vercel immer. Lokal (http://localhost) lehnen manche Browser
+ * (Safari/WebKit) Secure-Cookies ab, dort wird das Flag daher weggelassen.
+ */
+export function secureCookie(request: Request): boolean {
+  if (process.env.VERCEL) return true;
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return (forwarded || new URL(request.url).protocol.slice(0, -1)) === "https";
+}
 
 export const USER_COOKIE = "freebie_session";
 export const ADMIN_COOKIE = "freebie_admin";
@@ -23,7 +34,7 @@ function secretKey(): Uint8Array {
   // In Produktion Pflicht: Ein aus den Passwörtern abgeleiteter Schlüssel wäre für Teilnehmende,
   // die APP_PASSWORD kennen, offline angreifbar.
   if (process.env.NODE_ENV === "production") {
-    throw new Error("SESSION_SECRET fehlt (mindestens 16 Zeichen). Bitte in Vercel setzen.");
+    throw new HttpError(500, "SESSION_SECRET fehlt (mindestens 16 Zeichen). Bitte in Vercel setzen.");
   }
   // Lokale Entwicklung: aus den Passwörtern abgeleitet, damit es ohne Extra-Variable läuft.
   const material = `freebie|${devPassword("APP_PASSWORD")}|${devPassword("ADMIN_PASSWORD")}`;

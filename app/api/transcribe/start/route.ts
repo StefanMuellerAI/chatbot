@@ -5,7 +5,7 @@ import { splitAudio } from "@/lib/audio/ffmpeg";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
 import { categoryOf } from "@/lib/files/limits";
-import { getSettings } from "@/lib/settings";
+import { requireFeature } from "@/lib/guards";
 import { transcriptAttachment } from "@/lib/audio/attachment";
 import { assertSafeKey, getFile, putFile, registerFile } from "@/lib/storage";
 
@@ -17,9 +17,7 @@ const Body = z.object({ key: z.string().max(300), name: z.string().min(1).max(30
 export async function POST(request: Request) {
   try {
     await requireUser();
-    const settings = await getSettings();
-    if (settings.paused) throw new HttpError(503, settings.pausedMessage);
-    if (!settings.features.transcription) throw new HttpError(403, "Die Transkription ist deaktiviert.");
+    const settings = await requireFeature("transcription");
     const { key, name } = Body.parse(await request.json());
     assertSafeKey(key);
     if (!key.startsWith("uploads/") || categoryOf(key) !== "audio") throw new HttpError(400, "Keine Audiodatei.");
@@ -45,7 +43,12 @@ export async function POST(request: Request) {
           extractedText: cached[0].text,
           tokenEstimate: Math.ceil(cached[0].text.length / 3.5),
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({ target: schema.fileCache.sha256, set: { createdAt: new Date() } });
+      // Erneut genutzt: Aufbewahrungsfrist beginnt von vorn.
+      await db
+        .update(schema.transcriptCache)
+        .set({ createdAt: new Date() })
+        .where(and(eq(schema.transcriptCache.sha256, sha256), eq(schema.transcriptCache.model, model)));
       return Response.json({ done: true, cached: true, attachment: transcriptAttachment(sha256, key, name, cached[0].text) });
     }
 
@@ -68,10 +71,6 @@ export async function POST(request: Request) {
     });
     return Response.json({ done: false, jobId, chunks: chunkKeys.length, durationSec });
   } catch (err) {
-    if (err instanceof z.ZodError) return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });
-    if (err instanceof Error && err.message.startsWith("Die Audiodatei")) {
-      return Response.json({ error: err.message }, { status: 422 });
-    }
     return errorResponse(err);
   }
 }

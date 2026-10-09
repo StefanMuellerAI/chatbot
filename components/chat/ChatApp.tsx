@@ -3,7 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { FileDown, Info, Menu, MessageSquarePlus, PanelRight, Printer, TriangleAlert, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
-import { collectArtifacts } from "@/lib/client/artifacts";
+import { collectArtifacts, type ArtifactVersion } from "@/lib/client/artifacts";
 import { appendMessages, db, saveConversation, type Conversation } from "@/lib/client/db";
 import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/export";
 import { streamChat } from "@/lib/client/api";
@@ -54,6 +54,9 @@ function payloadMessages(messages: ChatMessage[]): ChatMessage[] {
     );
 }
 
+/** Zeitpunkt des Seitenaufrufs – ältere Antworten öffnen ihre Artefakte nicht von selbst. */
+const PAGE_LOADED_AT = Date.now();
+
 export function ChatApp() {
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -69,7 +72,8 @@ export function ChatApp() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [streaming, setStreaming] = useState<{ conversationId: string; state: StreamingState } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [artifactId, setArtifactId] = useState<string | null>(null);
+  // Geöffnetes Artefakt; ohne Version gilt die neueste.
+  const [artifactSel, setArtifactSel] = useState<{ id: string; version?: number } | null>(null);
   const autoOpened = useRef<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [imageMode, setImageMode] = useState(false);
@@ -80,6 +84,7 @@ export function ChatApp() {
   const composerRef = useRef<ComposerHandle>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const userScrolling = useRef(false);
 
   // Konfiguration laden
   useEffect(() => {
@@ -102,9 +107,11 @@ export function ChatApp() {
   }, []);
 
   const model = config?.models.find((m) => m.id === modelId);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   // Beim Wechsel des Chats dessen Einstellungen übernehmen
@@ -113,7 +120,7 @@ export function ChatApp() {
       if (streaming) return;
       setActiveId(id);
       setEditIndex(null);
-      setArtifactId(null);
+      setArtifactSel(null);
       setSidebarOpen(false);
       if (!id || !config) {
         setPresetId(null);
@@ -127,9 +134,23 @@ export function ChatApp() {
         setEffort(conv.effort && m.efforts.includes(conv.effort) ? conv.effort : m.defaultEffort);
       }
       setPresetId(conv.presetId);
+      setWebSearch(conv.webSearch ?? true);
+      composerRef.current?.setAttachments([]);
     },
     [config, conversations, streaming],
   );
+
+  // Vorlage wählen; ein empfohlenes Modell wird dabei übernommen (sofern verfügbar).
+  const choosePreset = (id: string | null) => {
+    setPresetId(id);
+    const recommended = config?.presets.find((p) => p.id === id)?.defaultModelId;
+    if (recommended && recommended !== modelId && config?.models.some((m) => m.id === recommended)) void changeModel(recommended);
+  };
+
+  const changeWebSearch = (value: boolean) => {
+    setWebSearch(value);
+    if (active) void db.conversations.update(active.id, { webSearch: value });
+  };
 
   const changeModel = async (id: string) => {
     const next = config?.models.find((m) => m.id === id);
@@ -154,25 +175,74 @@ export function ChatApp() {
   }, [streaming, active?.messages.length]);
 
   const messages = useMemo(() => active?.messages ?? [], [active]);
+  // Endet ein Chat mit einer Frage aus einer früheren Sitzung (Seite während der Antwort neu
+  // geladen), fehlt die Antwort: Hinweis mit „Neu generieren“ statt eines stummen Endes.
+  const missingAnswer = useMemo<ChatMessage | null>(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "user" || streaming || last.createdAt >= PAGE_LOADED_AT) return null;
+    return {
+      id: `fehlt-${last.id}`,
+      role: "assistant",
+      text: "",
+      createdAt: last.createdAt,
+      modelId: active?.modelId,
+      stopReason: "incomplete",
+      error: "Die Antwort fehlt – die Seite wurde während der Antwort neu geladen oder die Verbindung ist abgebrochen. Bitte „Neu generieren“ verwenden.",
+    };
+  }, [messages, streaming, active?.modelId]);
   const streamingHere = streaming && streaming.conversationId === active?.id ? streaming.state : null;
 
+  const artifactsEnabled = config?.features.artifacts ?? true;
   const artifacts = useMemo(() => {
+    if (!artifactsEnabled) return new Map<string, ArtifactVersion[]>();
     const list = messages.map((m) => ({ id: m.id, role: m.role, text: m.text }));
     if (streamingHere) list.push({ id: "streaming", role: "assistant", text: streamingHere.text });
     return collectArtifacts(list);
-  }, [messages, streamingHere]);
+  }, [messages, streamingHere, artifactsEnabled]);
 
-  // Neues Artefakt während des Streamings automatisch öffnen
-  useEffect(() => {
-    if (!streamingHere || !config?.features.artifacts) return;
+  // Öffnet die Version aus der angeklickten Nachricht (nicht pauschal die neueste).
+  const openArtifact = (id: string, messageId: string) => {
+    const versions = artifacts.get(id);
+    const match = versions?.find((v) => v.messageId === messageId);
+    setArtifactSel({ id, version: match && match !== versions![versions!.length - 1] ? match.version : undefined });
+  };
+
+  // Für den Knopf in der Kopfzeile: das zuletzt geänderte Artefakt.
+  const latestArtifactId = useMemo(() => {
+    const order = new Map(messages.map((m, i) => [m.id, i]));
+    let best: string | null = null;
+    let bestIndex = -1;
     for (const [id, versions] of artifacts) {
       const last = versions[versions.length - 1];
-      if (last.messageId === "streaming" && !autoOpened.current.has(`${active?.id}:${id}:${versions.length}`)) {
-        autoOpened.current.add(`${active?.id}:${id}:${versions.length}`);
-        setArtifactId(id);
+      const index = last.messageId === "streaming" ? Infinity : (order.get(last.messageId) ?? -1);
+      if (index >= bestIndex) {
+        best = id;
+        bestIndex = index;
       }
     }
-  }, [artifacts, streamingHere, active?.id, config?.features.artifacts]);
+    return best;
+  }, [artifacts, messages]);
+
+  // Neues Artefakt automatisch öffnen – während des Streamings oder, bei sehr kurzen Antworten,
+  // sobald die Antwort fertig ist. Jede Version wird höchstens einmal automatisch geöffnet.
+  useEffect(() => {
+    if (!config?.features.artifacts) return;
+    const lastMessage = messages[messages.length - 1];
+    for (const [id, versions] of artifacts) {
+      const last = versions[versions.length - 1];
+      const fresh =
+        last.messageId === "streaming" ||
+        (!streamingHere &&
+          lastMessage?.id === last.messageId &&
+          lastMessage.createdAt >= PAGE_LOADED_AT &&
+          lastMessage.stopReason !== "stopped");
+      const key = `${active?.id}:${id}:${versions.length}`;
+      if (fresh && !autoOpened.current.has(key)) {
+        autoOpened.current.add(key);
+        setArtifactSel({ id });
+      }
+    }
+  }, [artifacts, messages, streamingHere, active?.id, config?.features.artifacts]);
 
   const runAssistant = async (conv: Conversation, bypassCache: boolean) => {
     const controller = new AbortController();
@@ -281,10 +351,8 @@ export function ChatApp() {
     if (!config || !model || streaming) return;
     const now = Date.now();
     let baseMessages = active?.messages ?? [];
-    let allAttachments = attachments;
+    const allAttachments = attachments;
     if (editIndex !== null && active) {
-      const original = baseMessages[editIndex];
-      allAttachments = [...(original?.attachments ?? []), ...attachments];
       baseMessages = baseMessages.slice(0, editIndex);
       setEditIndex(null);
     }
@@ -309,11 +377,12 @@ export function ChatApp() {
       }),
       modelId: model.id,
       effort,
+      webSearch,
       messages: [...baseMessages, userMsg],
     } as Conversation;
     if (active && editIndex === null) {
       // Normaler Fall: nur anhängen (ein parallel gesetzter Titel bleibt erhalten).
-      await appendMessages(active.id, [userMsg], { modelId: model.id, effort });
+      await appendMessages(active.id, [userMsg], { modelId: model.id, effort, webSearch });
     } else {
       await saveConversation(conv);
     }
@@ -327,8 +396,10 @@ export function ChatApp() {
   const regenerate = async () => {
     if (!active || streaming) return;
     const msgs = [...active.messages];
-    if (msgs[msgs.length - 1]?.role === "assistant") msgs.pop();
-    const conv = { ...active, modelId: modelId || active.modelId, messages: msgs };
+    const previous = msgs[msgs.length - 1]?.role === "assistant" ? msgs.pop() : undefined;
+    // Mit dem Modell der ursprünglichen Antwort, solange es noch verfügbar ist.
+    const original = previous?.modelId && config?.models.some((m) => m.id === previous.modelId) ? previous.modelId : undefined;
+    const conv = { ...active, modelId: original ?? (modelId || active.modelId), messages: msgs };
     await saveConversation(conv);
     await runAssistant(conv, true);
   };
@@ -338,20 +409,27 @@ export function ChatApp() {
     if (!m || streaming) return;
     setEditIndex(index);
     setText(m.text);
+    composerRef.current?.setAttachments(m.attachments ?? []);
     composerRef.current?.focus();
   };
 
-  const newChat = () => {
-    if (streaming) return;
+  const resetToNewChat = () => {
     setActiveId(null);
     setEditIndex(null);
-    setArtifactId(null);
+    setArtifactSel(null);
     setPresetId(null);
+    setWebSearch(true);
     setText("");
+    composerRef.current?.setAttachments([]);
     setSidebarOpen(false);
     const def = config?.models.find((m) => m.id === modelId) ?? config?.models.find((m) => m.isDefault);
     if (def) setEffort(def.defaultEffort);
     setTimeout(() => composerRef.current?.focus(), 0);
+  };
+
+  const newChat = () => {
+    if (streaming) return;
+    resetToNewChat();
   };
 
   const addImageModeResult = async (prompt: string, image: GeneratedImage) => {
@@ -378,11 +456,11 @@ export function ChatApp() {
   const deleteConversation = async (id: string) => {
     if (streaming?.conversationId === id) abortRef.current?.abort();
     await db.conversations.delete(id);
-    if (id === activeId) newChat();
+    if (id === activeId) resetToNewChat();
   };
 
   const presetName = config?.presets.find((p) => p.id === (active?.presetId ?? presetId))?.name;
-  const artifactVersions = artifactId ? artifacts.get(artifactId) : undefined;
+  const artifactVersions = artifactSel ? artifacts.get(artifactSel.id) : undefined;
   const modelName = (id?: string) => config?.models.find((m) => m.id === id)?.displayName;
 
   if (configError) {
@@ -409,6 +487,7 @@ export function ChatApp() {
           onSelect={selectConversation}
           onNew={newChat}
           onDelete={deleteConversation}
+          busy={Boolean(streaming)}
           theme={theme}
           onTheme={setTheme}
           onClose={() => setSidebarOpen(false)}
@@ -420,13 +499,14 @@ export function ChatApp() {
       <main
         className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:block print:bg-white"
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files")) {
+          if (e.dataTransfer.types.includes("Files") && config && !config.paused && model) {
             e.preventDefault();
             setDragging(true);
           }
         }}
         onDragLeave={(e) => {
-          if (e.currentTarget === e.target) setDragging(false);
+          // Erst schließen, wenn die Maus den Bereich wirklich verlässt (nicht beim Wechsel auf ein Kindelement).
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
         }}
         onDrop={(e) => {
           e.preventDefault();
@@ -438,7 +518,7 @@ export function ChatApp() {
           <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-full p-2 text-muted hover:bg-surface-2 md:hidden" aria-label="Menü öffnen">
             <Menu className="h-5 w-5" />
           </button>
-          {config && <ModelPicker models={config.models} value={modelId} onChange={changeModel} />}
+          {config && <ModelPicker models={config.models} value={modelId} onChange={changeModel} disabled={Boolean(streaming)} />}
           {presetName && <span className="ml-1 truncate rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary">{presetName}</span>}
           <div className="flex-1" />
           {active && active.messages.length > 0 && !streaming && (
@@ -466,7 +546,9 @@ export function ChatApp() {
           {artifacts.size > 0 && (
             <button
               type="button"
-              onClick={() => setArtifactId(artifactId ? null : [...artifacts.keys()].pop() ?? null)}
+              onClick={() => setArtifactSel(artifactSel ? null : latestArtifactId ? { id: latestArtifactId } : null)}
+              aria-expanded={Boolean(artifactSel)}
+              aria-label={`Artefakte (${artifacts.size})`}
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted hover:bg-surface-2 hover:text-text"
               title="Artefakte anzeigen"
             >
@@ -474,7 +556,13 @@ export function ChatApp() {
               <span className="max-sm:hidden">Artefakte ({artifacts.size})</span>
             </button>
           )}
-          <button type="button" onClick={newChat} className="rounded-full p-2 text-muted hover:bg-surface-2 md:hidden" aria-label="Neuer Chat">
+          <button
+            type="button"
+            onClick={newChat}
+            disabled={Boolean(streaming)}
+            className="rounded-full p-2 text-muted hover:bg-surface-2 disabled:opacity-40 md:hidden"
+            aria-label="Neuer Chat"
+          >
             <MessageSquarePlus className="h-5 w-5" />
           </button>
         </header>
@@ -490,10 +578,32 @@ export function ChatApp() {
 
         <div
           ref={scrollRef}
+          role="region"
+          aria-label="Gespräch"
           className="min-h-0 flex-1 overflow-y-auto print:overflow-visible"
+          // Nur echte Eingaben lösen die Ansicht vom Ende – das eigene Mitscrollen nicht.
           onScroll={(e) => {
             const el = e.currentTarget;
-            stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            if (nearBottom || userScrolling.current) stickToBottom.current = nearBottom;
+          }}
+          onWheel={(e) => {
+            if (e.deltaY < 0) stickToBottom.current = false;
+          }}
+          onTouchStart={() => {
+            userScrolling.current = true;
+          }}
+          onTouchEnd={() => {
+            userScrolling.current = false;
+          }}
+          onPointerDown={() => {
+            userScrolling.current = true;
+          }}
+          onPointerUp={() => {
+            userScrolling.current = false;
+          }}
+          onKeyDown={(e) => {
+            if (["PageUp", "ArrowUp", "Home"].includes(e.key)) stickToBottom.current = false;
           }}
         >
           {messages.length === 0 && !streamingHere ? (
@@ -501,7 +611,7 @@ export function ChatApp() {
               <EmptyState
                 presets={config.presets}
                 presetId={presetId}
-                onPreset={setPresetId}
+                onPreset={choosePreset}
                 onExample={(t) => {
                   setText(t);
                   composerRef.current?.focus();
@@ -522,9 +632,22 @@ export function ChatApp() {
                     showCacheBadge={config?.features.showCacheBadge ?? true}
                     showCost={config?.features.showCost ?? false}
                     onRegenerate={m.stopReason === "image-mode" ? undefined : regenerate}
-                    onOpenArtifact={(id) => setArtifactId(id)}
+                    artifactsEnabled={artifactsEnabled}
+                    onOpenArtifact={openArtifact}
                   />
                 ),
+              )}
+              {missingAnswer && (
+                <AssistantMessage
+                  message={missingAnswer}
+                  modelName={modelName(missingAnswer.modelId)}
+                  isLast
+                  showCacheBadge={false}
+                  showCost={false}
+                  onRegenerate={regenerate}
+                  artifactsEnabled={artifactsEnabled}
+                  onOpenArtifact={openArtifact}
+                />
               )}
               {streamingHere && (
                 <AssistantMessage
@@ -532,7 +655,8 @@ export function ChatApp() {
                   isLast
                   showCacheBadge={false}
                   showCost={false}
-                  onOpenArtifact={(id) => setArtifactId(id)}
+                  artifactsEnabled={artifactsEnabled}
+                  onOpenArtifact={openArtifact}
                 />
               )}
             </div>
@@ -543,7 +667,15 @@ export function ChatApp() {
           {editIndex !== null && (
             <div className="mb-2 flex items-center justify-between rounded-2xl bg-primary-soft px-4 py-2 text-sm text-primary">
               <span>Du bearbeitest eine frühere Nachricht. Beim Senden wird das Gespräch ab dort neu fortgesetzt.</span>
-              <button type="button" className="font-medium underline" onClick={() => { setEditIndex(null); setText(""); }}>
+              <button
+                type="button"
+                className="font-medium underline"
+                onClick={() => {
+                  setEditIndex(null);
+                  setText("");
+                  composerRef.current?.setAttachments([]);
+                }}
+              >
                 Abbrechen
               </button>
             </div>
@@ -558,9 +690,9 @@ export function ChatApp() {
               effort={effort}
               onEffortChange={setEffort}
               webSearch={webSearch}
-              onWebSearchChange={setWebSearch}
+              onWebSearchChange={changeWebSearch}
               streaming={Boolean(streaming)}
-              disabled={config.paused || !model}
+              disabledReason={config.paused ? "Freebie macht gerade Pause." : !model ? "Gerade ist kein Modell verfügbar." : undefined}
               onSend={send}
               onStop={() => abortRef.current?.abort()}
               onImageMode={() => !streaming && setImageMode(true)}
@@ -595,8 +727,14 @@ export function ChatApp() {
 
       {/* Artefakt-Panel */}
       {artifactVersions && artifactVersions.length > 0 && (
-        <section className="fixed inset-0 z-50 border-l border-border md:static md:z-auto md:w-[min(46vw,760px)] md:shrink-0 print:hidden">
-          <ArtifactPanel key={artifactId} versions={artifactVersions} dark={isDark} onClose={() => setArtifactId(null)} />
+        <section className="fixed inset-0 z-50 border-border md:static md:border-l md:z-auto md:w-[min(46vw,760px)] md:shrink-0 print:hidden">
+          <ArtifactPanel
+            key={`${artifactSel?.id}:${artifactSel?.version ?? "neu"}`}
+            versions={artifactVersions}
+            initialVersion={artifactSel?.version}
+            dark={isDark}
+            onClose={() => setArtifactSel(null)}
+          />
         </section>
       )}
 

@@ -1,6 +1,6 @@
 "use client";
 import { Code, Download, ExternalLink, Eye, X } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { fileNameFor, hardenHtml, svgDocument, type ArtifactVersion } from "@/lib/client/artifacts";
 import { CodeBlock, CopyButton } from "@/components/chat/CodeBlock";
 import { Markdown } from "@/components/chat/Markdown";
@@ -25,6 +25,12 @@ export function ArtifactPanel({
   const [mermaidSvg, setMermaidSvg] = useState<string | null>(null);
   const artifact = versions[(selected ?? versions.length) - 1] ?? versions[versions.length - 1];
   const onSvg = useCallback((svg: string) => setMermaidSvg(svg), []);
+  const panelId = useId();
+  const rootRef = useRef<HTMLElement>(null);
+  // Beim Öffnen den Fokus ins Panel holen, damit Esc und Tastatur sofort wirken.
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
 
   const srcDoc = useMemo(() => {
     if (!artifact) return "";
@@ -62,7 +68,18 @@ export function ArtifactPanel({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-surface">
+    <section
+      ref={rootRef}
+      tabIndex={-1}
+      aria-label={`Artefakt: ${artifact.title}`}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.stopPropagation();
+          onClose();
+        }
+      }}
+      className="flex h-full min-h-0 flex-col bg-surface outline-none"
+    >
       <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <div className="min-w-0 flex-1">
           <div className="truncate font-display font-semibold">{artifact.title}</div>
@@ -95,21 +112,24 @@ export function ArtifactPanel({
         </button>
       </div>
       <div className="flex items-center gap-1 border-b border-border px-3 py-2">
-        {previewable && (
-          <TabButton active={tab === "preview"} onClick={() => setTab("preview")}>
-            <Eye className="h-4 w-4" /> Vorschau
+        <div role="tablist" aria-label="Ansicht" className="flex items-center gap-1">
+          {previewable && (
+            <TabButton active={tab === "preview"} controls={panelId} onClick={() => setTab("preview")}>
+              <Eye className="h-4 w-4" /> Vorschau
+            </TabButton>
+          )}
+          <TabButton active={tab === "code" || !previewable} controls={panelId} onClick={() => setTab("code")}>
+            <Code className="h-4 w-4" /> Code
           </TabButton>
-        )}
-        <TabButton active={tab === "code" || !previewable} onClick={() => setTab("code")}>
-          <Code className="h-4 w-4" /> Code
-        </TabButton>
+        </div>
         <div className="flex-1" />
-        <CopyButton text={artifact.content} />
+        <CopyButton text={artifact.content} ariaLabel="Quelltext kopieren" />
         <button
           type="button"
           onClick={() => download("source")}
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-3 hover:text-text"
           title="Herunterladen"
+          aria-label={`${fileNameFor(artifact)} herunterladen`}
         >
           <Download className="h-3.5 w-3.5" />
           <span className="max-sm:hidden">{fileNameFor(artifact).split(".").pop()?.toUpperCase()}</span>
@@ -119,6 +139,7 @@ export function ArtifactPanel({
             type="button"
             onClick={() => download("svg")}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-3 hover:text-text"
+            aria-label="Diagramm als SVG herunterladen"
           >
             <Download className="h-3.5 w-3.5" /> SVG
           </button>
@@ -129,12 +150,13 @@ export function ArtifactPanel({
             onClick={openInTab}
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-3 hover:text-text"
             title="In neuem Tab öffnen"
+            aria-label="In neuem Tab öffnen"
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div id={panelId} role="tabpanel" className="min-h-0 flex-1 overflow-auto">
         {tab === "code" || !previewable ? (
           <div className="p-3">
             <CodeBlock code={artifact.content} lang={codeLang(artifact.type, artifact.language)} />
@@ -173,14 +195,17 @@ export function ArtifactPanel({
           </div>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabButton({ active, controls, onClick, children }: { active: boolean; controls: string; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
+      role="tab"
+      aria-selected={active}
+      aria-controls={controls}
       onClick={onClick}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm",

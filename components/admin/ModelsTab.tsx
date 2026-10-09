@@ -17,9 +17,11 @@ const CAP_LABELS: { key: keyof ModelCapabilities; label: string; hint: string }[
   { key: "tools", label: "Werkzeuge", hint: "Bildgenerierung per Tool" },
   { key: "reasoning", label: "Denkt nach (Effort)", hint: "Thinking/Reasoning mit Effort-Stufen" },
   { key: "perMessageEffort", label: "Effort-Wechsel ohne Cache-Verlust", hint: "Claude: Mid-Conversation-Effort · GPT-6: configuration_update" },
-  { key: "systemMessages", label: "System-Nachrichten im Verlauf", hint: "Für Hinweise wie „Websuche aus“" },
   { key: "fallbacks", label: "Refusal-Fallback", hint: "Claude: fallbacks „default“ (nicht für Haiku)" },
 ];
+
+const NUMBER_FIELDS = ["sortOrder", "maxOutputTokens", "priceIn", "priceOut", "priceCacheRead", "priceCacheWrite"] as const;
+type NumberField = (typeof NUMBER_FIELDS)[number];
 
 function blankModel(provider: "anthropic" | "openai", modelId = "", name = ""): ModelRow {
   const isClaude = provider === "anthropic";
@@ -39,7 +41,6 @@ function blankModel(provider: "anthropic" | "openai", modelId = "", name = ""): 
       tools: true,
       reasoning: true,
       perMessageEffort: isClaude || /^gpt-6/.test(modelId),
-      systemMessages: true,
       fallbacks: isClaude && !/haiku/.test(modelId),
       anthropicWebTools: isClaude ? (/haiku/.test(modelId) ? "basic" : "dynamic") : undefined,
     },
@@ -134,28 +135,52 @@ export function ModelsTab({ models, reload }: { models: ModelRow[]; reload: () =
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" onClick={() => test(m)} disabled={tests[m.id]?.busy} title="Verbindung testen">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => test(m)}
+                  disabled={tests[m.id]?.busy}
+                  title="Verbindung testen"
+                  aria-label={`${m.displayName} testen`}
+                >
                   {tests[m.id]?.busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />} Test
                 </Button>
                 {!m.isDefault && (
-                  <Button size="sm" variant="ghost" onClick={() => toggle(m, { isDefault: true, enabled: true })} title="Als Standard setzen">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => toggle(m, { isDefault: true, enabled: true })}
+                    title="Als Standard setzen"
+                    aria-label={`${m.displayName} als Standard setzen`}
+                  >
                     <Star className="h-4 w-4" />
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" onClick={() => toggle(m, { enabled: !m.enabled })}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => toggle(m, { enabled: !m.enabled })}
+                  aria-label={`${m.displayName} ${m.enabled ? "deaktivieren" : "aktivieren"}`}
+                >
                   {m.enabled ? "Deaktivieren" : "Aktivieren"}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditing({ model: m, isNew: false })} aria-label="Bearbeiten">
+                <Button size="sm" variant="ghost" onClick={() => setEditing({ model: m, isNew: false })} aria-label={`${m.displayName} bearbeiten`} title="Bearbeiten">
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <Button
                   size="sm"
                   variant="ghost"
-                  aria-label="Löschen"
+                  aria-label={`${m.displayName} löschen`}
+                  title="Löschen"
                   onClick={async () => {
                     if (!confirm(`Modell „${m.displayName}“ löschen?`)) return;
-                    await api(`/api/admin/models?id=${encodeURIComponent(m.id)}`, { method: "DELETE", admin: true });
-                    reload();
+                    setError(null);
+                    try {
+                      await api(`/api/admin/models?id=${encodeURIComponent(m.id)}`, { method: "DELETE", admin: true });
+                      reload();
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+                    }
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -214,7 +239,22 @@ function ModelDialog({ initial, isNew, onClose, onSave }: { initial: ModelRow; i
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof ModelRow>(k: K, v: ModelRow[K]) => setM((x) => ({ ...x, [k]: v }));
-  const num = (v: string) => (v === "" ? 0 : Number(v.replace(",", ".")));
+  // Zahlen als Text bearbeiten (Komma erlaubt), erst beim Speichern umwandeln.
+  const [numbers, setNumbers] = useState<Record<NumberField, string>>(() =>
+    Object.fromEntries(NUMBER_FIELDS.map((k) => [k, String(initial[k]).replace(".", ",")])) as Record<NumberField, string>,
+  );
+  const numberInput = (k: NumberField, decimal = true) => (
+    <input
+      className={inputClass}
+      inputMode={decimal ? "decimal" : "numeric"}
+      value={numbers[k]}
+      onChange={(e) => setNumbers((n) => ({ ...n, [k]: e.target.value }))}
+    />
+  );
+  const toSave = (): ModelRow => ({
+    ...m,
+    ...Object.fromEntries(NUMBER_FIELDS.map((k) => [k, numbers[k].trim() === "" ? Number.NaN : Number(numbers[k].replace(",", "."))])),
+  });
 
   return (
     <Dialog open onClose={onClose} title={isNew ? "Modell anlegen" : "Modell bearbeiten"} className="w-[min(760px,calc(100vw-2rem))]">
@@ -237,24 +277,12 @@ function ModelDialog({ initial, isNew, onClose, onSave }: { initial: ModelRow; i
         <Field label="Beschreibung" className="sm:col-span-2">
           <input className={inputClass} value={m.description} onChange={(e) => set("description", e.target.value)} />
         </Field>
-        <Field label="Reihenfolge">
-          <input className={inputClass} type="number" value={m.sortOrder} onChange={(e) => set("sortOrder", num(e.target.value))} />
-        </Field>
-        <Field label="Max. Output-Tokens">
-          <input className={inputClass} type="number" value={m.maxOutputTokens} onChange={(e) => set("maxOutputTokens", num(e.target.value))} />
-        </Field>
-        <Field label="Preis Input ($/1 Mio.)">
-          <input className={inputClass} inputMode="decimal" value={m.priceIn} onChange={(e) => set("priceIn", num(e.target.value))} />
-        </Field>
-        <Field label="Preis Output ($/1 Mio.)">
-          <input className={inputClass} inputMode="decimal" value={m.priceOut} onChange={(e) => set("priceOut", num(e.target.value))} />
-        </Field>
-        <Field label="Preis Cache-Read ($/1 Mio.)">
-          <input className={inputClass} inputMode="decimal" value={m.priceCacheRead} onChange={(e) => set("priceCacheRead", num(e.target.value))} />
-        </Field>
-        <Field label="Preis Cache-Write ($/1 Mio.)">
-          <input className={inputClass} inputMode="decimal" value={m.priceCacheWrite} onChange={(e) => set("priceCacheWrite", num(e.target.value))} />
-        </Field>
+        <Field label="Reihenfolge">{numberInput("sortOrder", false)}</Field>
+        <Field label="Max. Output-Tokens">{numberInput("maxOutputTokens", false)}</Field>
+        <Field label="Preis Input ($/1 Mio.)">{numberInput("priceIn")}</Field>
+        <Field label="Preis Output ($/1 Mio.)">{numberInput("priceOut")}</Field>
+        <Field label="Preis Cache-Read ($/1 Mio.)">{numberInput("priceCacheRead")}</Field>
+        <Field label="Preis Cache-Write ($/1 Mio.)">{numberInput("priceCacheWrite")}</Field>
 
         <div className="sm:col-span-2">
           <div className="mb-1 text-sm font-medium">Fähigkeiten</div>
@@ -299,6 +327,11 @@ function ModelDialog({ initial, isNew, onClose, onSave }: { initial: ModelRow; i
                       if (e.target.value.trim()) map[l.value] = e.target.value.trim();
                       else delete map[l.value];
                       set("effortMap", map);
+                      // Fällt die Standard-Stufe weg, die nächste angebotene nehmen.
+                      if (!map[m.defaultEffort]) {
+                        const next = EFFORT_LEVELS.find((x) => map[x.value]);
+                        if (next) set("defaultEffort", next.value);
+                      }
                     }}
                   />
                 </Field>
@@ -332,7 +365,7 @@ function ModelDialog({ initial, isNew, onClose, onSave }: { initial: ModelRow; i
             setBusy(true);
             setError(null);
             try {
-              await onSave(m);
+              await onSave(toSave());
             } catch (err) {
               setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
             } finally {

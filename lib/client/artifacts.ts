@@ -9,6 +9,8 @@ export interface Artifact {
   language?: string;
   content: string;
   complete: boolean;
+  /** Ohne id im Tag vergeben – gilt dann nur innerhalb seiner Nachricht. */
+  autoId?: boolean;
 }
 
 export type Segment = { kind: "text"; text: string } | { kind: "artifact"; artifact: Artifact };
@@ -35,11 +37,13 @@ export function parseSegments(text: string): Segment[] {
     const complete = close !== -1;
     const raw = text.slice(bodyStart, complete ? close : undefined);
     const rawType = (attr(attrs, "type") ?? "code").toLowerCase();
+    const explicitId = attr(attrs, "id");
     const type = (TYPES.includes(rawType as ArtifactType) ? rawType : "code") as ArtifactType;
     segments.push({
       kind: "artifact",
       artifact: {
-        id: (attr(attrs, "id") ?? `artefakt-${segments.length}`).slice(0, 80),
+        id: (explicitId ?? `artefakt-${segments.length}`).slice(0, 80),
+        autoId: !explicitId,
         type,
         title: attr(attrs, "title") ?? "Artefakt",
         language: attr(attrs, "language"),
@@ -73,6 +77,11 @@ export interface ArtifactVersion extends Artifact {
   version: number;
 }
 
+/** Schlüssel eines Artefakts im Gespräch: Artefakte ohne eigene id gehören nur zu ihrer Nachricht. */
+export function artifactKey(a: Artifact, messageId: string): string {
+  return a.autoId ? `${messageId}/${a.id}` : a.id;
+}
+
 /** Sammelt alle Artefakte eines Gesprächs; gleiche id = neue Version. */
 export function collectArtifacts(messages: { id: string; role: string; text: string }[]): Map<string, ArtifactVersion[]> {
   const map = new Map<string, ArtifactVersion[]>();
@@ -80,9 +89,10 @@ export function collectArtifacts(messages: { id: string; role: string; text: str
     if (m.role !== "assistant") continue;
     for (const seg of parseSegments(m.text)) {
       if (seg.kind !== "artifact") continue;
-      const list = map.get(seg.artifact.id) ?? [];
+      const key = artifactKey(seg.artifact, m.id);
+      const list = map.get(key) ?? [];
       list.push({ ...seg.artifact, messageId: m.id, version: list.length + 1 });
-      map.set(seg.artifact.id, list);
+      map.set(key, list);
     }
   }
   return map;
@@ -126,6 +136,6 @@ export function hardenHtml(html: string): string {
 
 export function svgDocument(svg: string): string {
   return hardenHtml(
-    `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;display:grid;place-items:center;background:#fff}svg{max-width:100%;max-height:100vh;height:auto}</style></head><body>${svg}</body></html>`,
+    `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;display:grid;place-items:center;background:#fff}svg{max-width:100%;max-height:100vh;height:auto}svg:not([width]){width:100%}</style></head><body>${svg}</body></html>`,
   ).replace("script-src 'unsafe-inline' 'unsafe-eval'", "script-src 'none'");
 }

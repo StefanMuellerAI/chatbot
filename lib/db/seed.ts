@@ -25,7 +25,6 @@ const CLAUDE_CAPS: ModelCapabilities = {
   tools: true,
   reasoning: true,
   perMessageEffort: true,
-  systemMessages: true,
   fallbacks: true,
 };
 
@@ -37,7 +36,6 @@ const GPT6_CAPS: ModelCapabilities = {
   reasoning: true,
   // GPT-6: configuration_update-Items ändern den Effort ohne Präfix-Änderung
   perMessageEffort: true,
-  systemMessages: true,
   fallbacks: false,
 };
 

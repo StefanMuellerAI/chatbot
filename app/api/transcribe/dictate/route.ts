@@ -1,7 +1,7 @@
 import { transcribeBuffer } from "@/lib/audio/transcribe";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
 import { DIRECT_UPLOAD_LIMIT } from "@/lib/files/limits";
-import { getSettings } from "@/lib/settings";
+import { requireFeature } from "@/lib/guards";
 import { logUsage, TRANSCRIPTION_PRICE_PER_MIN } from "@/lib/usage";
 
 export const maxDuration = 120;
@@ -10,9 +10,7 @@ export const maxDuration = 120;
 export async function POST(request: Request) {
   try {
     const session = await requireUser();
-    const settings = await getSettings();
-    if (settings.paused) throw new HttpError(503, settings.pausedMessage);
-    if (!settings.features.dictation) throw new HttpError(403, "Die Spracheingabe ist deaktiviert.");
+    const settings = await requireFeature("dictation");
     const form = await request.formData();
     const file = form.get("file");
     const durationSec = Math.max(0, Math.min(3600, Number(form.get("durationSec") ?? 0)));

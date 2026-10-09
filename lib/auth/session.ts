@@ -3,17 +3,12 @@ import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
+import { ZodError } from "zod";
+import { HttpError, isProviderError, providerErrorMessage } from "@/lib/errors";
 import { getSettings } from "@/lib/settings";
 import { ADMIN_COOKIE, USER_COOKIE, verifyAdmin, verifyUser } from "./tokens";
 
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { HttpError };
 
 export interface UserSession {
   sid: string;
@@ -52,26 +47,30 @@ export function hashId(value: string): string {
   return createHash("sha256").update(`freebie:${value}`).digest("hex").slice(0, 16);
 }
 
-/** Wandelt Fehler in eine JSON-Antwort um. */
+/** Wandelt Fehler in eine JSON-Antwort um – ohne interne Details nach außen zu geben. */
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError) {
     return Response.json({ error: err.message }, { status: err.status });
   }
+  if (err instanceof ZodError) return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });
+  if (err instanceof SyntaxError) return Response.json({ error: "Ungültige Anfrage (kein gültiges JSON)." }, { status: 400 });
   console.error(err);
-  const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-  return Response.json({ error: message }, { status: 500 });
+  if (isProviderError(err)) return Response.json({ error: providerErrorMessage(err) }, { status: 502 });
+  return Response.json({ error: "Es ist ein interner Fehler aufgetreten. Bitte erneut versuchen." }, { status: 500 });
 }
 
-const MAX_ATTEMPTS = 30;
+const MAX_ATTEMPTS = 50;
 
 /**
- * Brute-Force-Schutz für Logins: höchstens 30 Fehlversuche pro 10 Minuten und IP.
+ * Brute-Force-Schutz für Logins: höchstens 50 Fehlversuche pro 10 Minuten, IP und Bereich
+ * (Teilnehmende und Admin zählen getrennt).
  * Gezählt wird atomar VOR der Passwortprüfung (parallele Anfragen werden mitgezählt);
  * eine erfolgreiche Anmeldung erstattet ihren Versuch zurück. Der Wert ist großzügig,
- * weil eine ganze Schulungsgruppe oft über dieselbe IP-Adresse kommt.
+ * weil eine ganze Schulungsgruppe oft über dieselbe IP-Adresse kommt: 25 gleichzeitige
+ * Anmeldungen plus 25 Tippfehler sperren noch niemanden aus.
  */
-export async function consumeLoginAttempt(request: Request): Promise<() => Promise<void>> {
-  const ipHash = hashId(clientIp(request));
+export async function consumeLoginAttempt(request: Request, scope: "user" | "admin"): Promise<() => Promise<void>> {
+  const ipHash = hashId(`${scope}:${clientIp(request)}`);
   const db = await getDb();
   const res = (await db.execute(sql`
     INSERT INTO login_attempts (ip_hash, window_start, count) VALUES (${ipHash}, now(), 1)
@@ -94,6 +93,7 @@ export async function consumeLoginAttempt(request: Request): Promise<() => Promi
   return refund;
 }
 
+/** Auf Vercel setzt die Plattform x-forwarded-for selbst (von außen nicht fälschbar). */
 function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
   return forwarded?.split(",")[0]?.trim() || request.headers.get("x-real-ip") || "unknown";

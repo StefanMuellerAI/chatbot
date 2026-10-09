@@ -16,7 +16,8 @@ export function useHighlighted(code: string, lang: string | undefined, delay = 1
         const language = name && name in shiki.bundledLanguages ? name : "text";
         const out = await shiki.codeToHtml(code, {
           lang: language,
-          themes: { light: "github-light", dark: "github-dark" },
+          // Kontrastreiche Varianten erfüllen WCAG AA auch auf dem Code-Hintergrund.
+          themes: { light: "github-light-high-contrast", dark: "github-dark-high-contrast" },
           defaultColor: "light",
         });
         if (!cancelled) setHtml(out);
@@ -32,26 +33,53 @@ export function useHighlighted(code: string, lang: string | undefined, delay = 1
   return html;
 }
 
-export function CopyButton({ text, className, label = "Kopieren" }: { text: string; className?: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+/** Kopiert Text; ohne Clipboard-API (z. B. ohne HTTPS) über den klassischen Weg. */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  }
+}
+
+export function CopyButton({
+  text,
+  className,
+  label = "Kopieren",
+  ariaLabel,
+}: {
+  text: string;
+  className?: string;
+  label?: string;
+  /** Eindeutiger Name für Screenreader, z. B. „Antwort kopieren“. */
+  ariaLabel?: string;
+}) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   return (
     <button
       type="button"
       onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(text);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        } catch {
-          // Zwischenablage nicht verfügbar
-        }
+        setState((await copyText(text)) ? "copied" : "failed");
+        setTimeout(() => setState("idle"), 1500);
       }}
       className={className ?? "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-3 hover:text-text"}
-      title={label}
-      aria-label={label}
+      title={ariaLabel ?? label}
+      aria-label={ariaLabel ?? label}
     >
-      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-      <span className="max-sm:hidden">{copied ? "Kopiert" : label}</span>
+      {state === "copied" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+      <span className="max-sm:hidden" aria-live="polite">
+        {state === "copied" ? "Kopiert" : state === "failed" ? "Nicht kopiert" : label}
+      </span>
     </button>
   );
 }
@@ -62,7 +90,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
     <div className="not-prose my-3 overflow-hidden rounded-2xl border border-border bg-code">
       <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
         <span className="font-mono text-xs text-muted">{lang || "text"}</span>
-        <CopyButton text={code} />
+        <CopyButton text={code} ariaLabel="Code kopieren" />
       </div>
       {html ? (
         <div className="overflow-x-auto p-4 text-[0.85rem] leading-relaxed [&_pre]:!bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />

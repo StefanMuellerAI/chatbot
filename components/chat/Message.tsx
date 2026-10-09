@@ -15,13 +15,13 @@ import {
   Workflow,
   Zap,
 } from "lucide-react";
-import { memo, useMemo, useState } from "react";
-import { parseSegments, type Artifact } from "@/lib/client/artifacts";
+import { memo, useId, useMemo, useState } from "react";
+import { artifactKey, parseSegments, type Artifact } from "@/lib/client/artifacts";
 import type { Attachment, ChatMessage, Citation, GeneratedImage } from "@/lib/shared/types";
 import { labelFor } from "@/components/artifacts/ArtifactPanel";
 import { LogoMark } from "@/components/ui/Logo";
 import { cn } from "@/components/ui/cn";
-import { CopyButton } from "./CodeBlock";
+import { CodeBlock, CopyButton } from "./CodeBlock";
 import { Markdown } from "./Markdown";
 
 export interface StreamingState {
@@ -36,7 +36,7 @@ export interface StreamingState {
 
 export function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: () => void }) {
   return (
-    <div className="group flex justify-end">
+    <article aria-label="Deine Nachricht" className="group flex justify-end">
       <div className="flex max-w-[85%] flex-col items-end gap-2">
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex flex-wrap justify-end gap-2">
@@ -51,11 +51,12 @@ export function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?
           </div>
         )}
         <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
-          <CopyButton text={message.text} />
+          {message.text && <CopyButton text={message.text} ariaLabel="Nachricht kopieren" />}
           {onEdit && (
             <button
               type="button"
               onClick={onEdit}
+              aria-label="Bearbeiten"
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted hover:bg-surface-3 hover:text-text"
               title="Bearbeiten und neu senden"
             >
@@ -65,7 +66,7 @@ export function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -73,7 +74,7 @@ export function AttachmentChip({ attachment, extra }: { attachment: Pick<Attachm
   const isImage = attachment.kind === "image";
   const Icon = attachment.kind === "transcript" ? FileAudio : /sheet|excel|csv|spreadsheet/.test(attachment.mime) || /\.(xlsx?|csv|ods)$/i.test(attachment.name) ? FileSpreadsheet : FileText;
   return (
-    <div className="flex max-w-64 items-center gap-2 rounded-2xl border border-border bg-surface px-2.5 py-2 text-sm shadow-sm">
+    <div role="group" aria-label={attachment.name} className="flex max-w-64 items-center gap-2 rounded-2xl border border-border bg-surface px-2.5 py-2 text-sm shadow-sm">
       {isImage && attachment.storageKey ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/api/files/${attachment.storageKey}`} alt="" className="h-9 w-9 rounded-lg object-cover" />
@@ -106,6 +107,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   isLast,
   showCacheBadge,
   showCost,
+  artifactsEnabled = true,
   onRegenerate,
   onOpenArtifact,
 }: {
@@ -115,6 +117,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   isLast: boolean;
   showCacheBadge: boolean;
   showCost: boolean;
+  /** Ohne Artefakte (im Admin abgeschaltet) erscheint der Inhalt als normaler Codeblock. */
+  artifactsEnabled?: boolean;
   onRegenerate?: () => void;
   onOpenArtifact: (id: string, messageId: string) => void;
 }) {
@@ -129,12 +133,12 @@ export const AssistantMessage = memo(function AssistantMessage({
   const messageId = message?.id ?? "streaming";
 
   return (
-    <div className="group flex gap-3">
+    <article aria-label="Antwort von Freebie" aria-busy={isStreaming} className="group flex gap-3">
       <LogoMark size={30} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         {thinking && <ThinkingBlock text={thinking} active={isStreaming && !text} />}
         {streaming?.status && (
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-sm text-muted">
+          <div role="status" className="mb-2 inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-sm text-muted">
             <span className="dot-pulse inline-flex gap-1 text-primary">
               <span />
               <span />
@@ -144,7 +148,7 @@ export const AssistantMessage = memo(function AssistantMessage({
           </div>
         )}
         {isStreaming && !text && !thinking && !streaming?.status && (
-          <div className="dot-pulse inline-flex gap-1 py-2 text-primary">
+          <div role="status" aria-label="Freebie schreibt …" className="dot-pulse inline-flex gap-1 py-2 text-primary">
             <span />
             <span />
             <span />
@@ -154,8 +158,10 @@ export const AssistantMessage = memo(function AssistantMessage({
           {segments.map((seg, i) =>
             seg.kind === "text" ? (
               <Markdown key={i} text={seg.text} />
+            ) : artifactsEnabled ? (
+              <ArtifactCard key={i} artifact={seg.artifact} onOpen={() => onOpenArtifact(artifactKey(seg.artifact, messageId), messageId)} />
             ) : (
-              <ArtifactCard key={i} artifact={seg.artifact} onOpen={() => onOpenArtifact(seg.artifact.id, messageId)} />
+              <CodeBlock key={i} code={seg.artifact.content} lang={seg.artifact.type === "code" ? seg.artifact.language : seg.artifact.type === "svg" ? "xml" : seg.artifact.type} />
             ),
           )}
         </div>
@@ -170,7 +176,7 @@ export const AssistantMessage = memo(function AssistantMessage({
                 <figcaption className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-muted">
                   <span className="line-clamp-2">{img.prompt}</span>
                   <a href={img.url} download className="shrink-0 rounded-md px-2 py-1 hover:bg-surface-3 hover:text-text">
-                    Download
+                    Herunterladen
                   </a>
                 </figcaption>
               </figure>
@@ -179,18 +185,19 @@ export const AssistantMessage = memo(function AssistantMessage({
         )}
         {citations.length > 0 && <Sources citations={citations} />}
         {message?.error && (
-          <div className="mt-2 flex items-start gap-2 rounded-2xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
+          <div role="alert" className="mt-2 flex items-start gap-2 rounded-2xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{message.error}</span>
           </div>
         )}
         {!isStreaming && message && (
           <div className="mt-2 flex flex-wrap items-center gap-1 text-xs text-muted opacity-70 transition-opacity group-hover:opacity-100">
-            {text && <CopyButton text={text} />}
+            {text && <CopyButton text={text} ariaLabel="Antwort kopieren" />}
             {isLast && onRegenerate && (
               <button
                 type="button"
                 onClick={onRegenerate}
+                aria-label="Neu generieren"
                 className="inline-flex items-center gap-1 rounded-md px-2 py-1 hover:bg-surface-3 hover:text-text"
                 title="Neu generieren (ohne Cache)"
               >
@@ -217,17 +224,20 @@ export const AssistantMessage = memo(function AssistantMessage({
           </div>
         )}
       </div>
-    </div>
+    </article>
   );
 });
 
 function ThinkingBlock({ text, active }: { text: string; active: boolean }) {
   const [open, setOpen] = useState(false);
+  const id = useId();
   return (
     <div className="mb-3">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={id}
         className="inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-sm text-muted hover:text-text"
       >
         <Brain className={cn("h-4 w-4", active && "animate-pulse text-primary")} />
@@ -235,7 +245,7 @@ function ThinkingBlock({ text, active }: { text: string; active: boolean }) {
         <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
       </button>
       {open && (
-        <div className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap border-l-2 border-border-strong pl-4 text-sm leading-relaxed text-muted">
+        <div id={id} className="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap border-l-2 border-border-strong pl-4 text-sm leading-relaxed text-muted">
           {text}
         </div>
       )}
@@ -243,14 +253,18 @@ function ThinkingBlock({ text, active }: { text: string; active: boolean }) {
   );
 }
 
+export const MAX_SOURCES = 12;
+
 function Sources({ citations }: { citations: Citation[] }) {
+  // Doppelte Quellen nur einmal zeigen.
+  const unique = citations.filter((c, i) => citations.findIndex((x) => x.url === c.url) === i).slice(0, MAX_SOURCES);
   return (
-    <div className="mt-4">
+    <nav aria-label="Quellen" className="mt-4">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
         <Globe className="h-3.5 w-3.5" /> Quellen
       </div>
       <div className="flex flex-wrap gap-2">
-        {citations.slice(0, 12).map((c, i) => (
+        {unique.map((c, i) => (
           <a
             key={c.url}
             href={c.url}
@@ -267,7 +281,7 @@ function Sources({ citations }: { citations: Citation[] }) {
           </a>
         ))}
       </div>
-    </div>
+    </nav>
   );
 }
 

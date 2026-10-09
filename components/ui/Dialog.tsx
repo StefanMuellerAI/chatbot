@@ -1,6 +1,6 @@
 "use client";
 import { X } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { cn } from "./cn";
 
 export function Dialog({
@@ -19,6 +19,7 @@ export function Dialog({
   dismissible?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -28,6 +29,7 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={title ? titleId : undefined}
       onCancel={(e) => {
         e.preventDefault();
         if (dismissible) onClose();
@@ -44,7 +46,9 @@ export function Dialog({
         <div className="p-6">
           {(title || dismissible) && (
             <div className="mb-4 flex items-start justify-between gap-4">
-              <h2 className="font-display text-xl font-bold">{title}</h2>
+              <h2 id={titleId} className="font-display text-xl font-bold">
+                {title}
+              </h2>
               {dismissible && (
                 <button
                   type="button"

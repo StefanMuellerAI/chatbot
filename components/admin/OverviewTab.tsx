@@ -18,14 +18,26 @@ const FEATURE_LABEL: Record<string, string> = {
   dictation: "Diktat (Minuten)",
 };
 
+function storageHint(s: OverviewData["status"]): string {
+  if (s.storage === "blob") {
+    return `Vercel Blob (privat, ${s.storageAuth === "oidc" ? "OIDC-Anmeldung" : "Token"} über ${s.storageSource})`;
+  }
+  if (s.blobVars.length > 0) {
+    return `Blob-Variablen gefunden (${s.blobVars.join(", ")}), aber weder Token noch Store-ID – Store in Vercel neu verbinden und neu deployen`;
+  }
+  return s.onVercel
+    ? "Kein Blob-Store gefunden – in Vercel unter Storage einen privaten Blob-Store verbinden und neu deployen. Bis dahin gehen Dateien verloren."
+    : "Lokaler Speicher (Entwicklung)";
+}
+
 export function OverviewTab({ data, modelNames }: { data: OverviewData; modelNames: Record<string, string> }) {
   const s = data.status;
   const checks: { ok: boolean; warn?: boolean; label: string; hint: string }[] = [
     { ok: s.anthropic, label: "Anthropic-API-Schlüssel", hint: s.anthropic ? "Claude-Modelle verfügbar" : "ANTHROPIC_API_KEY in Vercel setzen" },
     { ok: s.openai, label: "OpenAI-API-Schlüssel", hint: s.openai ? "GPT, Bilder und Transkription verfügbar" : "OPENAI_API_KEY in Vercel setzen" },
     { ok: s.database === "postgres", warn: true, label: "Datenbank", hint: s.database === "postgres" ? "Neon Postgres verbunden" : "Ohne DATABASE_URL gehen Einstellungen und Caches beim Neustart verloren" },
-    { ok: s.storage === "blob", warn: true, label: "Dateispeicher", hint: s.storage === "blob" ? "Vercel Blob (privat)" : "Lokaler Speicher – auf Vercel bitte einen Blob-Store verbinden" },
-    { ok: s.sessionSecret, warn: true, label: "SESSION_SECRET", hint: s.sessionSecret ? "Gesetzt" : "Empfohlen: zufälliger Wert mit mind. 32 Zeichen" },
+    { ok: s.storage === "blob", warn: true, label: "Dateispeicher", hint: storageHint(s) },
+    { ok: s.sessionSecret, warn: true, label: "SESSION_SECRET", hint: s.sessionSecret ? "Gesetzt" : "Fehlt oder zu kurz – zufälligen Wert mit mindestens 16 (besser 32) Zeichen setzen" },
     { ok: s.cronSecret, warn: true, label: "Aufräumjob (CRON_SECRET)", hint: s.cronSecret ? "Täglicher Cron aktiv" : "Ohne CRON_SECRET werden alte Dateien nicht gelöscht" },
     { ok: s.appPassword !== "missing", label: "Teilnehmer-Passwort", hint: s.appPassword === "admin" ? "Im Admin-Bereich gesetzt" : s.appPassword === "env" ? "Aus APP_PASSWORD" : "Kein Passwort gesetzt" },
   ];
@@ -81,7 +93,8 @@ export function OverviewTab({ data, modelNames }: { data: OverviewData; modelNam
                 </thead>
                 <tbody>
                   {data.byModel.map((m) => {
-                    const total = m.inputTokens + m.cacheReadTokens;
+                    // Gleiche Formel wie oben: gelesene Cache-Tokens am gesamten Input.
+                    const total = m.inputTokens + m.cacheReadTokens + m.cacheWriteTokens;
                     return (
                       <tr key={m.modelId} className="border-t border-border">
                         <td className="py-2">{modelNames[m.modelId] ?? m.modelId}</td>
@@ -208,6 +221,7 @@ function DailyChart({ daily }: { daily: OverviewData["daily"] }) {
                 onMouseEnter={() => setHover(i)}
                 onFocus={() => setHover(i)}
                 tabIndex={0}
+                role="img"
                 aria-label={`${formatDay(d.day)}: ${usd(d.costUsd)}`}
               >
                 <div
@@ -250,13 +264,13 @@ function DailyChart({ daily }: { daily: OverviewData["daily"] }) {
   );
 }
 
+/** Die letzten n Kalendertage in deutscher Zeit (wie die Auswertung in der Datenbank). */
 function lastDays(n: number): string[] {
+  const berlin = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin", year: "numeric", month: "2-digit", day: "2-digit" });
+  const today = berlin.format(new Date());
+  const base = new Date(`${today}T12:00:00Z`);
   const out: string[] = [];
-  const now = new Date();
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
-    out.push(d.toISOString().slice(0, 10));
-  }
+  for (let i = n - 1; i >= 0; i--) out.push(new Date(base.getTime() - i * 86_400_000).toISOString().slice(0, 10));
   return out;
 }
 

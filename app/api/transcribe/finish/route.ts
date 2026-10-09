@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
+import { requireFeature } from "@/lib/guards";
 import { deleteFiles } from "@/lib/storage";
 import { logUsage, TRANSCRIPTION_PRICE_PER_MIN } from "@/lib/usage";
 import { transcriptAttachment } from "@/lib/audio/attachment";
@@ -12,6 +13,7 @@ const Body = z.object({ jobId: z.string().uuid(), name: z.string().min(1).max(30
 export async function POST(request: Request) {
   try {
     const session = await requireUser();
+    await requireFeature("transcription");
     const { jobId, name } = Body.parse(await request.json());
     const db = await getDb();
     const rows = await db.select().from(schema.transcriptionJobs).where(eq(schema.transcriptionJobs.id, jobId)).limit(1);

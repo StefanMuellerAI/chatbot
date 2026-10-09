@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { MAX_ATTACHMENTS, MAX_MESSAGE_CHARS } from "@/lib/files/limits";
 
 const Effort = z.enum(["low", "medium", "high", "max"]);
 
@@ -18,9 +19,9 @@ export const AttachmentSchema = z.object({
 export const ChatMessageSchema = z.object({
   id: z.string().max(100),
   role: z.enum(["user", "assistant"]),
-  text: z.string().max(400_000),
+  text: z.string().max(MAX_MESSAGE_CHARS),
   createdAt: z.number(),
-  attachments: z.array(AttachmentSchema).max(20).optional(),
+  attachments: z.array(AttachmentSchema).max(MAX_ATTACHMENTS).optional(),
   contextDate: z.string().max(100).optional(),
   effort: Effort.optional(),
   webSearch: z.boolean().optional(),

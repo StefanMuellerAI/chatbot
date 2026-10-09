@@ -10,6 +10,19 @@ export class ApiError extends Error {
   }
 }
 
+export const NETWORK_ERROR = "Keine Verbindung zu Freebie. Bitte prüfe die Internetverbindung und versuche es erneut.";
+export const STREAM_BROKEN = "Die Verbindung ist während der Antwort abgebrochen. Bitte „Neu generieren“ verwenden.";
+
+/** fetch mit deutscher Meldung, wenn das Netz fehlt (statt „Failed to fetch“). */
+async function request(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    if (init.signal?.aborted) throw err;
+    throw new ApiError(NETWORK_ERROR, 0);
+  }
+}
+
 function handleUnauthorized(status: number, admin = false) {
   if (status === 401 && !admin && typeof window !== "undefined") {
     window.location.replace(`${window.location.origin}/login`);
@@ -18,7 +31,7 @@ function handleUnauthorized(status: number, admin = false) {
 
 export async function api<T>(url: string, init?: RequestInit & { json?: unknown; admin?: boolean }): Promise<T> {
   const { json, admin, ...rest } = init ?? {};
-  const res = await fetch(url, {
+  const res = await request(url, {
     ...rest,
     headers: { ...(json !== undefined ? { "Content-Type": "application/json" } : {}), ...(rest.headers ?? {}) },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
@@ -49,7 +62,7 @@ export async function streamChat(
   const payload = compress
     ? await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer()
     : json;
-  const res = await fetch("/api/chat", {
+  const res = await request("/api/chat", {
     method: "POST",
     headers: compress
       ? { "Content-Type": "application/octet-stream", "X-Freebie-Encoding": "gzip" }
@@ -72,7 +85,14 @@ export async function streamChat(
   const decoder = new TextDecoder();
   let buffer = "";
   for (;;) {
-    const { value, done } = await reader.read();
+    let chunk: ReadableStreamReadResult<Uint8Array>;
+    try {
+      chunk = await reader.read();
+    } catch (err) {
+      if (signal.aborted) throw err;
+      throw new ApiError(STREAM_BROKEN, 0);
+    }
+    const { value, done } = chunk;
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     let idx: number;
