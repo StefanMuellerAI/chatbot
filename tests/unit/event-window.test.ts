@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { effectiveEnd, eventStatus, formatStart, formatTime, guestAccess, guestSessionExpiry, validateEventTimes } from "@/lib/events/window";
+import { effectiveEnd, eventStatus, formatStart, formatTime, guestAccess, validateEventTimes } from "@/lib/events/window";
 
 const at = (iso: string) => new Date(iso);
 const event = { startsAt: at("2026-10-10T07:00:00Z"), endsAt: at("2026-10-10T14:30:00Z"), endedEarlyAt: null as Date | null };
@@ -19,12 +19,6 @@ describe("Zeitfenster von Terminen", () => {
     expect(guestAccess(event, at("2026-10-10T06:30:00Z"))).toEqual({ ok: true });
     expect(guestAccess(event, at("2026-10-10T14:29:59Z"))).toEqual({ ok: true });
     expect(guestAccess(event, at("2026-10-10T14:30:00Z"))).toEqual({ ok: false, reason: "vorbei" });
-  });
-
-  it("Sitzung eines Gastes endet spätestens mit dem Termin", () => {
-    expect(guestSessionExpiry(event, at("2026-10-10T08:00:00Z"))).toEqual(at("2026-10-10T14:30:00Z"));
-    const long = { ...event, endsAt: at("2026-10-11T06:00:00Z") };
-    expect(guestSessionExpiry(long, at("2026-10-10T08:00:00Z"))).toEqual(at("2026-10-10T20:00:00Z"));
   });
 
   it("Prüfung von Beginn und Ende", () => {

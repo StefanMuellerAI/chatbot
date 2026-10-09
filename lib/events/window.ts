@@ -4,8 +4,6 @@
 export const MAX_EVENT_MS = 24 * 60 * 60 * 1000;
 /** Gäste können sich schon 30 Minuten vor Beginn anmelden (Rechner vorbereiten). */
 export const EARLY_LOGIN_MS = 30 * 60 * 1000;
-/** Längste Sitzung – für Gäste zusätzlich begrenzt durch das Termin-Ende. */
-export const SESSION_MAX_MS = 12 * 60 * 60 * 1000;
 
 export interface EventTimes {
   startsAt: Date;
@@ -33,13 +31,6 @@ export function guestAccess(e: EventTimes, now = new Date()): LoginCheck {
   const opensAt = new Date(e.startsAt.getTime() - EARLY_LOGIN_MS);
   if (now < opensAt) return { ok: false, reason: "zu-frueh", opensAt };
   return { ok: true };
-}
-
-/** Ablauf einer neuen Gast-Sitzung: spätestens zum Termin-Ende. */
-export function guestSessionExpiry(e: EventTimes, now = new Date()): Date {
-  const max = new Date(now.getTime() + SESSION_MAX_MS);
-  const end = effectiveEnd(e);
-  return end < max ? end : max;
 }
 
 /** Prüft Beginn und Ende eines Termins; liefert eine deutsche Meldung oder null. */

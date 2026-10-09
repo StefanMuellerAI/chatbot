@@ -4,8 +4,8 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth/tokens";
 // Öffentlich erreichbar: Login-Seite, Login-API und der per CRON_SECRET geschützte Cron-Job.
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/cron/"];
 
-// Schnelle Prüfung ohne Datenbank: Signatur, Ablauf (bei Gästen das Termin-Ende) und Rolle.
-// Vorzeitig beendete Termine und gelöschte Gäste erkennt die Serverprüfung (requireUser).
+// Schnelle Prüfung ohne Datenbank: Signatur, Ablauf und Rolle.
+// Termin-Ende und gelöschte Gäste erkennt die Serverprüfung (requireUser bzw. die Chat-Seite).
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   // Ändernde API-Aufrufe nur von der eigenen Seite (Schutz vor untergeschobenen Formularen).

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Logo } from "@/components/ui/Logo";
-import { getUserSession } from "@/lib/auth/session";
+import { getUserSession, sessionEnd } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { LoginForm } from "./LoginForm";
 
@@ -14,11 +14,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const session = await getUserSession().catch(() => null);
   // Wer schon angemeldet ist, landet direkt im Chat – bzw. als Admin im Admin-Bereich.
   if (session && (!toAdmin || session.role === "admin")) redirect(toAdmin ? "/admin" : "/");
+  // Warum die Sitzung endete: aus dem (noch vorhandenen) Cookie, sonst aus der Weiterleitung.
+  const end = session ? null : await sessionEnd().catch(() => null);
+  const reason = end?.reason ?? (grund === "abgelaufen" || grund === "sitzung" ? grund : null);
   const hint = toAdmin
     ? "Der Admin-Bereich ist nur für die Kursleitung. Bitte mit dem Admin-Zugang anmelden."
-    : grund === "abgelaufen"
+    : reason === "abgelaufen"
       ? "Dein Zugang ist abgelaufen."
-      : null;
+      : reason === "sitzung"
+        ? "Deine Sitzung ist beendet. Bitte melde dich erneut an."
+        : null;
   let notice = "";
   try {
     notice = (await getSettings()).noticeText;
@@ -44,7 +49,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               {hint}
             </p>
           )}
-          <LoginForm toAdmin={toAdmin} />
+          <LoginForm toAdmin={toAdmin} accessExpired={reason === "abgelaufen"} />
           {notice && (
             <div className="mt-6 rounded-2xl border border-[#fcb900]/25 bg-[#fcb900]/10 p-4 text-xs leading-relaxed text-white/80">
               <span className="mb-1 block font-semibold text-[#fcb900]">Spielumgebung</span>

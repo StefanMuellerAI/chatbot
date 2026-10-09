@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import type { Locator, Page } from "@playwright/test";
-import { AdminApi, expect, loginUser, openAdmin, openChat, test, uniq } from "../support/fixtures";
+import { AdminApi, expect, inMinutes, loginUser, openAdmin, openChat, test, uniq } from "../support/fixtures";
 
 // T01–T08: Termine, Gruppen und Gäste im Admin-Bereich.
 
@@ -15,18 +15,13 @@ function berlin(offsetMinutes: number): { date: string; time: string } {
   return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
 }
 
-const iso = (offsetMinutes: number) => new Date(Date.now() + offsetMinutes * 60_000).toISOString();
+const iso = inMinutes;
 const card = (page: Page, name: string) => page.getByRole("region", { name: `Termin „${name}“` });
 const group = (scope: Page | Locator, name: string) => scope.getByRole("group", { name: `Gruppe „${name}“` });
 const rows = (scope: Locator) => scope.getByRole("row").filter({ has: scope.page().getByRole("cell") });
 
-async function apiEvent(admin: AdminApi, name: string, start = -5, end = 120) {
-  return (await admin.json<{ id: string }>("POST", "/api/admin/events", { name, startsAt: iso(start), endsAt: iso(end) })).id;
-}
-
-async function apiGroup(admin: AdminApi, eventId: string, name: string, count: number) {
-  return admin.json<{ id: string; guests: { id: string; username: string; password: string }[] }>("POST", "/api/admin/events/groups", { eventId, name, count });
-}
+const apiEvent = (admin: AdminApi, name: string, start = -5, end = 120) => admin.createEvent(name, start, end);
+const apiGroup = (admin: AdminApi, eventId: string, name: string, count: number) => admin.createGroup(eventId, name, count);
 
 test.describe("T · Termine im Admin", () => {
   test("T01 Termin anlegen mit Prüfungen auf Deutsch", async ({ page }) => {
@@ -163,6 +158,11 @@ test.describe("T · Termine im Admin", () => {
     await admin.json("DELETE", `/api/admin/events/groups?id=${groupId}`);
     await chat.send(`Und jetzt? ${uniq()}`);
     await expect(chat.page).toHaveURL(/\/login$/);
+    // Den Zugang gibt es nicht mehr: Hinweis, und die Chats verschwinden vom Gerät.
+    await expect(chat.page.getByText("Dein Zugang ist abgelaufen.")).toBeVisible();
+    await expect
+      .poll(() => chat.page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name)))
+      .not.toContain(`freebie-g-${guests[0].id}`);
     void page;
   });
 
@@ -234,6 +234,8 @@ test.describe("T · Termine im Admin", () => {
 
     await chat.send(`Und jetzt? ${uniq()}`);
     await expect(chat.page).toHaveURL(/\/login$/);
+    // Der Zugang besteht weiter (die Chats bleiben auf dem Gerät), nur die Sitzung ist beendet.
+    await expect(chat.page.getByText("Deine Sitzung ist beendet. Bitte melde dich erneut an.")).toBeVisible();
     await chat.page.getByLabel("Benutzername").fill(guests[0].username);
     await chat.page.getByLabel("Passwort").fill(guests[0].password);
     await chat.page.getByLabel("Passwort").press("Enter");

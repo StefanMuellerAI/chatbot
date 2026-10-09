@@ -109,6 +109,9 @@ export class ChatPage {
   }
 }
 
+/** Zeitpunkt in so vielen Minuten (ISO). */
+export const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+
 export interface Guest {
   id: string;
   username: string;
@@ -203,10 +206,10 @@ export async function loginUser(
   return "id" in guest ? (guest as Guest) : null;
 }
 
-/** Zweiter Browser-Kontext als Teilnehmerin bzw. Teilnehmer – z. B. um Admin-Änderungen im Chat zu prüfen. */
 /** Von openChat geöffnete Browser-Kontexte – werden nach jedem Test geschlossen. */
 const extraContexts: BrowserContext[] = [];
 
+/** Zweiter Browser-Kontext als Teilnehmerin bzw. Teilnehmer – z. B. um Admin-Änderungen im Chat zu prüfen. */
 export async function openChat(
   browser: Browser,
   baseURL: string,
@@ -275,6 +278,13 @@ export class AdminApi {
   }
   security(action: string, extra: Record<string, unknown> = {}) {
     return this.json("POST", "/api/admin/security", { action, ...extra });
+  }
+  /** Termin von jetzt + start bis jetzt + end Minuten; liefert die ID. */
+  async createEvent(name: string, start = -5, end = 120): Promise<string> {
+    return (await this.json<{ id: string }>("POST", "/api/admin/events", { name, startsAt: inMinutes(start), endsAt: inMinutes(end) })).id;
+  }
+  createGroup(eventId: string, name: string, count: number) {
+    return this.json<{ id: string; guests: Guest[] }>("POST", "/api/admin/events/groups", { eventId, name, count });
   }
 
   /** Zustand direkt nach dem Serverstart (einmal pro Lauf gesichert). */

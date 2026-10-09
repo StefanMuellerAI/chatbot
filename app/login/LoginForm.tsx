@@ -1,11 +1,15 @@
 "use client";
 import { ArrowRight, Loader2, Lock, User } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
-import { forgetOtherGuests } from "@/lib/client/db";
+import { useCallback, useEffect, useState } from "react";
+import { forgetExpiredGuest, forgetOtherGuests } from "@/lib/client/db";
 
-export function LoginForm({ toAdmin = false }: { toAdmin?: boolean }) {
+export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?: boolean; accessExpired?: boolean }) {
   const router = useRouter();
+  // Chats verfallener Gast-Zugänge nicht auf (oft gemeinsam genutzten) Schulungsrechnern liegen lassen.
+  useEffect(() => {
+    void (accessExpired ? forgetOtherGuests() : forgetExpiredGuest()).catch(() => {});
+  }, [accessExpired]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);

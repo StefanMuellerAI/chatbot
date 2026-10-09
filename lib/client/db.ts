@@ -32,11 +32,44 @@ export function databaseName(key: string, role: "admin" | "guest"): string {
   return role === "admin" ? "freebie" : `${GUEST_PREFIX}${key}`;
 }
 
+/** Merkt sich, wann der Zugang des Gasts auf diesem Gerät verfällt (es gibt höchstens einen). */
+const EXPIRY_KEY = "freebie-gast-ablauf";
+
 /** Wählt die Datenbank des angemeldeten Kontos (idempotent, vor dem ersten Zugriff aufrufen). */
-export function selectAccount(key: string, role: "admin" | "guest") {
+export function selectAccount(key: string, role: "admin" | "guest", validUntil: string | null = null) {
+  if (role === "guest" && validUntil) writeExpiry({ key, until: Date.parse(validUntil) });
   if (active?.key === key && active.role === role) return;
   active?.db.close();
   active = { key, role, db: new FreebieDB(databaseName(key, role)) };
+}
+
+function readExpiry(): { key: string; until: number } | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(EXPIRY_KEY) ?? "null") as { key?: unknown; until?: unknown } | null;
+    return typeof value?.key === "string" && typeof value.until === "number" ? { key: value.key, until: value.until } : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeExpiry(value: { key: string; until: number } | null) {
+  try {
+    if (value) localStorage.setItem(EXPIRY_KEY, JSON.stringify(value));
+    else localStorage.removeItem(EXPIRY_KEY);
+  } catch {
+    // ohne Speicher (privates Fenster) bleibt es beim Löschen bei Anmeldung und Abmeldung
+  }
+}
+
+/**
+ * Auf der Login-Seite: Chats eines Gasts löschen, dessen Termin inzwischen vorbei ist – auch wenn
+ * das Fenster zum Ende geschlossen war.
+ */
+export async function forgetExpiredGuest(): Promise<void> {
+  const expiry = readExpiry();
+  if (!expiry || expiry.until > Date.now()) return;
+  writeExpiry(null);
+  await Dexie.delete(`${GUEST_PREFIX}${expiry.key}`);
 }
 
 function current(): FreebieDB {
@@ -56,6 +89,7 @@ export const db = new Proxy({} as FreebieDB, {
 /** Gast-Chats vom Gerät löschen (Abmelden, Ablauf). Admin-Chats bleiben. */
 export async function forgetCurrentGuest(): Promise<void> {
   if (!active || active.role !== "guest") return;
+  writeExpiry(null);
   const name = active.db.name;
   active.db.close();
   active = null;
@@ -64,6 +98,7 @@ export async function forgetCurrentGuest(): Promise<void> {
 
 /** Nach der Anmeldung: Chats früherer Gäste auf diesem Gerät entfernen (außer dem eigenen Konto). */
 export async function forgetOtherGuests(exceptKey?: string): Promise<void> {
+  if (readExpiry()?.key !== exceptKey) writeExpiry(null);
   const names = await Dexie.getDatabaseNames();
   const keep = exceptKey ? `${GUEST_PREFIX}${exceptKey}` : null;
   await Promise.all(names.filter((n) => n.startsWith(GUEST_PREFIX) && n !== keep).map((n) => Dexie.delete(n)));

@@ -7,7 +7,7 @@ import { adminCredentials } from "@/lib/auth/tokens";
 import { getDb, schema } from "@/lib/db/client";
 import { HttpError } from "@/lib/errors";
 import { generatePassword, generateUsername, normalizeUsername } from "./credentials";
-import { effectiveEnd, eventStatus, guestAccess, validateEventTimes, type EventStatus, type EventTimes } from "./window";
+import { EARLY_LOGIN_MS, effectiveEnd, eventStatus, guestAccess, validateEventTimes, type EventStatus, type EventTimes } from "./window";
 
 /** Höchstzahl neuer Gäste je Vorgang (beliebig viele über mehrere Vorgänge). */
 export const MAX_GUESTS_PER_ACTION = 200;
@@ -53,11 +53,17 @@ const times = (e: EventRow): EventTimes => ({ startsAt: e.startsAt, endsAt: e.en
 
 // ---------------------------------------------------------------- Zwischenspeicher der Sitzungsprüfung
 
+/** Zugangsfenster eines Gasts in ms: ab 30 Minuten vor Beginn bis zum (tatsächlichen) Ende. */
+export interface GuestWindow {
+  from: number;
+  until: number;
+}
+
 /**
- * Gast-ID → gültig bis (ms) bzw. ungültig. Kurz, damit Änderungen anderer Instanzen schnell greifen.
- * Auf globalThis, damit alle Routen einer Instanz denselben Speicher sehen (wie die DB-Verbindung).
+ * Gast-ID → Zugangsfenster bzw. null (Gast gelöscht). Kurz, damit Änderungen anderer Instanzen schnell
+ * greifen. Auf globalThis, damit alle Routen einer Instanz denselben Speicher sehen (wie die DB-Verbindung).
  */
-type GuestCache = Map<string, { checkedAt: number; validUntil: number | null }>;
+type GuestCache = Map<string, { checkedAt: number; access: GuestWindow | null }>;
 const globalForGuests = globalThis as unknown as { freebieGuestCache?: GuestCache };
 const guestCache: GuestCache = (globalForGuests.freebieGuestCache ??= new Map());
 const GUEST_CACHE_MS = 15_000;
@@ -67,11 +73,11 @@ export function invalidateGuestCache() {
   guestCache.clear();
 }
 
-/** Ist der Gast (noch) da und läuft sein Termin? */
-export async function guestSessionValid(guestId: string): Promise<boolean> {
+/** Zugangsfenster des Gasts – null, wenn es ihn (oder seinen Termin) nicht mehr gibt. */
+export async function guestWindow(guestId: string): Promise<GuestWindow | null> {
   const now = Date.now();
   const cached = guestCache.get(guestId);
-  if (cached && now - cached.checkedAt < GUEST_CACHE_MS) return cached.validUntil !== null && now < cached.validUntil;
+  if (cached && now - cached.checkedAt < GUEST_CACHE_MS) return cached.access;
   const db = await getDb();
   const rows = await db
     .select({ event: schema.events })
@@ -80,9 +86,16 @@ export async function guestSessionValid(guestId: string): Promise<boolean> {
     .where(eq(schema.guests.id, guestId))
     .limit(1);
   const event = rows[0]?.event;
-  const validUntil = event && guestAccess(times(event)).ok ? effectiveEnd(times(event)).getTime() : null;
-  guestCache.set(guestId, { checkedAt: now, validUntil });
-  return validUntil !== null && now < validUntil;
+  const access = event ? { from: event.startsAt.getTime() - EARLY_LOGIN_MS, until: effectiveEnd(times(event)).getTime() } : null;
+  guestCache.set(guestId, { checkedAt: now, access });
+  return access;
+}
+
+/** Ist der Gast (noch) da und läuft sein Termin? */
+export async function guestSessionValid(guestId: string): Promise<boolean> {
+  const access = await guestWindow(guestId);
+  const now = Date.now();
+  return access !== null && access.from <= now && now < access.until;
 }
 
 // ---------------------------------------------------------------- Anmeldung

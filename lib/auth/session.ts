@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db/client";
 import { ZodError } from "zod";
 import { HttpError, isProviderError, providerErrorMessage } from "@/lib/errors";
 import { getSettings } from "@/lib/settings";
-import { guestSessionValid } from "@/lib/events/store";
+import { guestWindow } from "@/lib/events/store";
 import { SESSION_COOKIE, verifySession, type Role } from "./tokens";
 
 export { HttpError };
@@ -19,6 +19,8 @@ export interface UserSession {
   username: string;
   /** Ablauf der Sitzung (bei Gästen spätestens das Termin-Ende). */
   expiresAt: Date;
+  /** Nur Gäste: Ende des Termins – danach verfällt der Zugang. */
+  accessUntil?: Date;
   guestId?: string;
   eventId?: string;
   groupId?: string;
@@ -30,25 +32,45 @@ export async function getUserSession(): Promise<UserSession | null> {
   const claims = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!claims) return null;
   if (!(await versionCurrent(claims.v))) return null;
-  if (claims.role === "guest" && !(await guestSessionValid(claims.gid!))) return null;
+  let accessUntil: Date | undefined;
+  if (claims.role === "guest") {
+    const access = await guestWindow(claims.gid!);
+    const now = Date.now();
+    if (!access || now < access.from || now >= access.until) return null;
+    accessUntil = new Date(access.until);
+  }
   return {
     sid: claims.sid,
     sessionHash: hashId(claims.sid),
     role: claims.role,
     username: claims.name,
     expiresAt: new Date(claims.exp * 1000),
+    accessUntil,
     guestId: claims.gid,
     eventId: claims.eid,
     groupId: claims.grp,
   };
 }
 
-/** Warum eine noch gültig signierte Sitzung nicht mehr gilt: bei Gästen meist das Termin-Ende. */
-export async function sessionEndReason(): Promise<"abgelaufen" | null> {
+export type SessionEnd =
+  /** Der Gast-Zugang ist verfallen (Termin vorbei, Gast oder Termin gelöscht) – lokale Chats weg. */
+  | { reason: "abgelaufen"; guestKey: string }
+  /** Nur die Sitzung ist abgelaufen oder der Termin wurde verschoben – neu anmelden, Chats bleiben. */
+  | { reason: "sitzung" };
+
+/**
+ * Warum die (echte, aber nicht mehr gültige) Sitzung im Cookie endete. Null, wenn es keine gab
+ * oder alle abgemeldet wurden.
+ */
+export async function sessionEnd(): Promise<SessionEnd | null> {
   const jar = await cookies();
-  const claims = await verifySession(jar.get(SESSION_COOKIE)?.value);
-  if (!claims || claims.role !== "guest") return null;
-  return (await versionCurrent(claims.v)) ? "abgelaufen" : null;
+  const claims = await verifySession(jar.get(SESSION_COOKIE)?.value, { allowExpired: true });
+  if (!claims || !(await versionCurrent(claims.v))) return null;
+  if (claims.role === "guest") {
+    const access = await guestWindow(claims.gid!);
+    if (!access || Date.now() >= access.until) return { reason: "abgelaufen", guestKey: claims.gid! };
+  }
+  return { reason: "sitzung" };
 }
 
 /**

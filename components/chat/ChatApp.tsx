@@ -12,6 +12,7 @@ import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, Publ
 import { ArtifactPanel } from "@/components/artifacts/ArtifactPanel";
 import { cn } from "@/components/ui/cn";
 import { useTheme } from "@/components/ui/theme";
+import { AccessExpiry } from "./AccessExpiry";
 import { Composer, type ComposerHandle } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { ImageModeDialog } from "./ImageModeDialog";
@@ -59,7 +60,10 @@ const PAGE_LOADED_AT = Date.now();
 
 export function ChatApp({ account }: { account: AccountInfo }) {
   // Vor dem ersten Datenbankzugriff: lokale Chats gehören zu genau diesem Konto.
-  selectAccount(account.key, account.role);
+  selectAccount(account.key, account.role, account.validUntil);
+  // Ende des Gast-Zugangs – kann sich ändern, wenn die Kursleitung den Termin verschiebt.
+  const [accessUntil, setAccessUntil] = useState(account.validUntil);
+  const shownAccount = useMemo(() => ({ ...account, validUntil: accessUntil }), [account, accessUntil]);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
   const conversations = useLiveQuery(() => db.conversations.orderBy("updatedAt").reverse().toArray(), [], [] as Conversation[]);
@@ -484,7 +488,7 @@ export function ChatApp({ account }: { account: AccountInfo }) {
       {/* Seitenleiste */}
       <div className={cn("fixed inset-y-0 left-0 z-50 w-72 transition-transform md:static md:translate-x-0 print:hidden", sidebarOpen ? "translate-x-0" : "-translate-x-full")}>
         <Sidebar
-          account={account}
+          account={shownAccount}
           conversations={conversations}
           activeId={activeId}
           onSelect={selectConversation}
@@ -569,6 +573,7 @@ export function ChatApp({ account }: { account: AccountInfo }) {
             <MessageSquarePlus className="h-5 w-5" />
           </button>
         </header>
+        {account.role === "guest" && <AccessExpiry validUntil={accessUntil} onChange={setAccessUntil} />}
 
         {config?.paused && (
           <div className="mx-4 mb-2 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning">{config.pausedMessage}</div>

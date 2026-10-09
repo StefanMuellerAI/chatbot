@@ -91,7 +91,7 @@ test.describe("A · Zugang und Sitzung", () => {
     await expect(page).toHaveURL(/\/login$/);
   });
 
-  test("A05 Gast meldet sich per Enter an: Chat öffnet, Sitzungs-Cookie läuft mit dem Termin ab", async ({ page, context, baseURL }) => {
+  test("A05 Gast meldet sich per Enter an: Chat öffnet, Sitzungs-Cookie gilt 12 Stunden", async ({ page, context, baseURL }) => {
     const guest = await createGuest(baseURL!);
     await page.goto("/login");
     // Groß-/Kleinschreibung und Leerzeichen im Benutzernamen spielen keine Rolle.
@@ -105,7 +105,7 @@ test.describe("A · Zugang und Sitzung", () => {
     // Über http://localhost ohne Secure (sonst lehnt Safari das Cookie ab); über HTTPS mit Secure (U01).
     expect(cookie!.secure).toBe(false);
     expect(cookie!.sameSite).toBe("Lax");
-    // Höchstens 12 Stunden (der Test-Termin läuft länger).
+    // 12 Stunden – das Termin-Ende prüft der Server bei jeder Anfrage (T11).
     const hours = (cookie!.expires * 1000 - Date.now()) / 3_600_000;
     expect(hours).toBeGreaterThan(11.9);
     expect(hours).toBeLessThan(12.1);

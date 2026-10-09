@@ -6,7 +6,7 @@ import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/sessio
 import { adminCredentials, SESSION_COOKIE, SESSION_MAX_AGE_S, sessionCookie, signSession, type SessionClaims } from "@/lib/auth/tokens";
 import { normalizeUsername } from "@/lib/events/credentials";
 import { checkGuestLogin, purgeExpiredGuests } from "@/lib/events/store";
-import { formatStart, guestSessionExpiry } from "@/lib/events/window";
+import { formatStart } from "@/lib/events/window";
 import { getSettings } from "@/lib/settings";
 
 const Body = z.object({ username: z.string().trim().min(1), password: z.string().min(1) });
@@ -24,13 +24,14 @@ export async function POST(request: Request) {
     const refundAttempt = await consumeLoginAttempt(request, username, username === admin.username);
     const settings = await getSettings({ fresh: true });
 
+    // Sitzungen gelten 12 Stunden; das Termin-Ende prüft der Server bei jeder Anfrage. So bleiben
+    // Gäste angemeldet, wenn ein laufender Termin verlängert wird.
+    const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_S * 1000);
     let claims: SessionClaims;
-    let expiresAt: Date;
     if (username === admin.username) {
       if (!admin.password) throw new HttpError(500, "ADMIN_PASSWORD ist nicht konfiguriert.");
       if (password.length > MAX_INPUT || !safeEqual(password, admin.password)) throw new HttpError(401, WRONG);
       claims = { sid: randomUUID(), v: settings.sessionVersion, role: "admin", name: username };
-      expiresAt = new Date(Date.now() + SESSION_MAX_AGE_S * 1000);
     } else {
       await purgeExpiredGuests();
       const result = await checkGuestLogin(username, password.slice(0, MAX_INPUT + 1));
@@ -41,7 +42,6 @@ export async function POST(request: Request) {
       }
       const { guest, event } = result;
       claims = { sid: randomUUID(), v: settings.sessionVersion, role: "guest", name: guest.username, gid: guest.id, eid: event.id, grp: guest.groupId };
-      expiresAt = guestSessionExpiry({ startsAt: event.startsAt, endsAt: event.endsAt, endedEarlyAt: event.endedEarlyAt });
     }
 
     await refundAttempt();

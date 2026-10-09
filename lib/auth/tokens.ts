@@ -1,6 +1,6 @@
 // Ohne "server-only", weil proxy.ts diese Datei ebenfalls nutzt.
 import { createHash } from "node:crypto";
-import { jwtVerify, SignJWT } from "jose";
+import { errors, jwtVerify, SignJWT, type JWTPayload } from "jose";
 import { HttpError } from "@/lib/errors";
 
 /**
@@ -15,7 +15,7 @@ export function secureCookie(request: Request): boolean {
 
 /** Ein Cookie für alle: Admin und Gäste unterscheiden sich nur in der Rolle im Token. */
 export const SESSION_COOKIE = "freebie_session";
-/** Längste Sitzung in Sekunden (Gäste zusätzlich bis zum Termin-Ende). */
+/** Sitzungsdauer in Sekunden – für Admin und Gäste (das Termin-Ende prüft der Server bei jeder Anfrage). */
 export const SESSION_MAX_AGE_S = 12 * 60 * 60;
 
 export type Role = "admin" | "guest";
@@ -67,20 +67,26 @@ export async function signSession(claims: SessionClaims, expiresAt: Date): Promi
     .sign(secretMaterial());
 }
 
-export async function verifySession(token: string | undefined): Promise<VerifiedSession | null> {
+/**
+ * Prüft Signatur, Empfänger und Ablauf. Mit `allowExpired` gilt auch ein abgelaufenes Token – nur um
+ * zu erklären, warum die Sitzung endete (Signatur und Empfänger prüft jose vor dem Ablauf).
+ */
+export async function verifySession(token: string | undefined, opts: { allowExpired?: boolean } = {}): Promise<VerifiedSession | null> {
   if (!token) return null;
+  let payload: JWTPayload;
   try {
-    const { payload } = await jwtVerify(token, secretMaterial(), { audience: "freebie-session" });
-    const { sid, v, role, name, gid, eid, grp, exp } = payload as Record<string, unknown>;
-    if (typeof sid !== "string" || typeof v !== "number" || typeof name !== "string" || typeof exp !== "number") return null;
-    if (role === "admin") return { sid, v, role, name, exp };
-    if (role === "guest" && typeof gid === "string" && typeof eid === "string" && typeof grp === "string") {
-      return { sid, v, role, name, gid, eid, grp, exp };
-    }
-    return null;
-  } catch {
-    return null;
+    ({ payload } = await jwtVerify(token, secretMaterial(), { audience: "freebie-session" }));
+  } catch (err) {
+    if (!opts.allowExpired || !(err instanceof errors.JWTExpired)) return null;
+    payload = err.payload;
   }
+  const { sid, v, role, name, gid, eid, grp, exp } = payload as Record<string, unknown>;
+  if (typeof sid !== "string" || typeof v !== "number" || typeof name !== "string" || typeof exp !== "number") return null;
+  if (role === "admin") return { sid, v, role, name, exp };
+  if (role === "guest" && typeof gid === "string" && typeof eid === "string" && typeof grp === "string") {
+    return { sid, v, role, name, gid, eid, grp, exp };
+  }
+  return null;
 }
 
 /** Cookie-Optionen passend zum Ablauf des Tokens. */
