@@ -134,17 +134,19 @@ test.describe("O · Admin: Zugang und Übersicht", () => {
   });
 
   for (const scheme of ["light", "dark"] as const) {
-    test(`N02/N03 Admin-Bereich ${scheme === "light" ? "hell" : "dunkel"}: barrierearm, Screenshot je Bereich`, async ({ page }, testInfo) => {
+    test(`N02/N03 Admin-Bereich ${scheme === "light" ? "hell" : "dunkel"}: barrierearm, Screenshot je Bereich`, async ({ page, baseURL }, testInfo) => {
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto("/admin");
       await expectAccessible(page, testInfo, `admin-login-${scheme}`);
+      // Der E2E-Testtermin sorgt dafür, dass „Termine“ eine Karte mit Gruppe zeigt.
+      await createGuest(baseURL!);
       await openAdmin(page);
       const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       const [r, g, b] = background.match(/\d+/g)!.map(Number);
       // Hell: heller Hintergrund, dunkel: dunkler Hintergrund.
       if (scheme === "dark") expect(r + g + b).toBeLessThan(150);
       else expect(r + g + b).toBeGreaterThan(600);
-      for (const tab of ["Übersicht", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
+      for (const tab of ["Übersicht", "Termine", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
         await page.getByRole("tab", { name: tab }).click();
         await expect(page.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
         await expectAccessible(page, testInfo, `admin-${tab.toLowerCase()}-${scheme}`);

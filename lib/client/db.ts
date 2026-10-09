@@ -34,10 +34,16 @@ export function databaseName(key: string, role: "admin" | "guest"): string {
 
 /** Merkt sich, wann der Zugang des Gasts auf diesem Gerät verfällt (es gibt höchstens einen). */
 const EXPIRY_KEY = "freebie-gast-ablauf";
+let rememberedExpiry: string | null = null;
 
 /** Wählt die Datenbank des angemeldeten Kontos (idempotent, vor dem ersten Zugriff aufrufen). */
 export function selectAccount(key: string, role: "admin" | "guest", validUntil: string | null = null) {
-  if (role === "guest" && validUntil) writeExpiry({ key, until: Date.parse(validUntil) });
+  // Läuft bei jedem Rendern des Chats – nur bei Änderungen schreiben.
+  const expiry = role === "guest" && validUntil ? `${key}|${validUntil}` : null;
+  if (expiry && expiry !== rememberedExpiry) {
+    writeExpiry({ key, until: Date.parse(validUntil!) });
+    rememberedExpiry = expiry;
+  }
   if (active?.key === key && active.role === role) return;
   active?.db.close();
   active = { key, role, db: new FreebieDB(databaseName(key, role)) };
@@ -53,6 +59,7 @@ function readExpiry(): { key: string; until: number } | null {
 }
 
 function writeExpiry(value: { key: string; until: number } | null) {
+  if (!value) rememberedExpiry = null;
   try {
     if (value) localStorage.setItem(EXPIRY_KEY, JSON.stringify(value));
     else localStorage.removeItem(EXPIRY_KEY);

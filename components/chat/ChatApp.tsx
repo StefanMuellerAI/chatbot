@@ -59,10 +59,10 @@ function payloadMessages(messages: ChatMessage[]): ChatMessage[] {
 const PAGE_LOADED_AT = Date.now();
 
 export function ChatApp({ account }: { account: AccountInfo }) {
-  // Vor dem ersten Datenbankzugriff: lokale Chats gehören zu genau diesem Konto.
-  selectAccount(account.key, account.role, account.validUntil);
   // Ende des Gast-Zugangs – kann sich ändern, wenn die Kursleitung den Termin verschiebt.
   const [accessUntil, setAccessUntil] = useState(account.validUntil);
+  // Vor dem ersten Datenbankzugriff: lokale Chats gehören zu genau diesem Konto.
+  selectAccount(account.key, account.role, accessUntil);
   const shownAccount = useMemo(() => ({ ...account, validUntil: accessUntil }), [account, accessUntil]);
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
