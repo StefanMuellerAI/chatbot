@@ -3,6 +3,8 @@ export const PASSWORDS = { app: "e2e-teilnehmer", admin: "e2e-admin-passwort" };
 export const SESSION_SECRET = "e2e-session-secret-0123456789abcdef";
 export const CRON_SECRET = "e2e-cron-secret";
 export const FAKE_API_PORT = 3300;
+/** Feste Nutzungswerte jeder Fake-Antwort, damit Tests Kosten exakt nachrechnen können. */
+export const FAKE_USAGE = { input: 1200, output: 300, cacheRead: 4000, cacheWrite: 800 };
 
 /** Ein Server pro Zweck: parallel nutzbare (nur lesend) und serielle (ändern Einstellungen). */
 export const SERVERS = {

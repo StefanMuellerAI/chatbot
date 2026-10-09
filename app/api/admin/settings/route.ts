@@ -37,7 +37,8 @@ const Patch = z
         showCacheBadge: z.boolean(),
         showCost: z.boolean(),
       })
-      .partial(),
+      .partial()
+      .strict(),
     imageModel: z.string().min(1).max(100),
     imageDefaultQuality: z.enum(["low", "medium", "high"]),
     imageDefaultSize: z.enum(["1024x1024", "1536x1024", "1024x1536"]),
@@ -54,7 +55,9 @@ const Patch = z
     pausedMessage: z.string().min(5).max(500),
     systemPromptAddendum: z.string().max(10000),
   })
-  .partial();
+  .partial()
+  // Tippfehler im Feldnamen sollen auffallen statt still nichts zu ändern.
+  .strict();
 
 export async function GET() {
   try {

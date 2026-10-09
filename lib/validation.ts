@@ -9,6 +9,10 @@ const nf = new Intl.NumberFormat("de-DE");
 export function germanZodMessage(err: z.ZodError, labels: Record<string, string> = {}): string {
   const issue = err.issues[0];
   if (!issue) return "Ungültige Eingabe.";
+  if (issue.code === "unrecognized_keys") {
+    const keys = (issue as unknown as { keys: string[] }).keys;
+    return `Unbekanntes Feld: ${keys.join(", ")}`;
+  }
   const path = issue.path.map(String);
   const label = labels[path.join(".")] ?? labels[path[0] ?? ""] ?? (path.join(".") || "Eingabe");
   const i = issue as unknown as { code: string; origin?: string; minimum?: number; maximum?: number; expected?: string; format?: string; message: string };

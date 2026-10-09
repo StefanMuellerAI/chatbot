@@ -6,8 +6,9 @@ import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/sessio
 import { devPassword, signUser, USER_COOKIE, USER_MAX_AGE_S } from "@/lib/auth/tokens";
 import { getSettings } from "@/lib/settings";
 
-// Lange Eingaben sind erlaubt (gelten dann einfach als falsch); die Obergrenze schützt nur den Server.
-const Body = z.object({ password: z.string().min(1).max(4000) });
+const Body = z.object({ password: z.string().min(1) });
+// Längere Eingaben gelten einfach als falsch (und werden gar nicht erst verglichen).
+const MAX_PASSWORD = 4000;
 
 export async function POST(request: Request) {
   try {
@@ -15,7 +16,9 @@ export async function POST(request: Request) {
     const refundAttempt = await consumeLoginAttempt(request, "user");
     const settings = await getSettings();
     let ok = false;
-    if (settings.appPasswordHash) {
+    if (password.length > MAX_PASSWORD) {
+      ok = false;
+    } else if (settings.appPasswordHash) {
       ok = await verifyHashedPassword(password, settings.appPasswordHash);
     } else {
       const expected = devPassword("APP_PASSWORD");

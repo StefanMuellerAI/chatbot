@@ -5,8 +5,9 @@ import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/sessio
 import { ADMIN_COOKIE, ADMIN_MAX_AGE_S, devPassword, signAdmin } from "@/lib/auth/tokens";
 import { getSettings } from "@/lib/settings";
 
-// Lange Eingaben sind erlaubt (gelten dann einfach als falsch); die Obergrenze schützt nur den Server.
-const Body = z.object({ password: z.string().min(1).max(4000) });
+const Body = z.object({ password: z.string().min(1) });
+// Längere Eingaben gelten einfach als falsch (und werden gar nicht erst verglichen).
+const MAX_PASSWORD = 4000;
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     const refundAttempt = await consumeLoginAttempt(request, "admin");
     const expected = devPassword("ADMIN_PASSWORD");
     if (!expected) throw new HttpError(500, "ADMIN_PASSWORD ist nicht konfiguriert.");
-    if (!safeEqual(password, expected)) {
+    if (password.length > MAX_PASSWORD || !safeEqual(password, expected)) {
       throw new HttpError(401, "Das Admin-Passwort stimmt nicht.");
     }
     await refundAttempt();
