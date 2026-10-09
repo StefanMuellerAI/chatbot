@@ -57,8 +57,6 @@ jobs:
     name: E2E (Safari-Engine und Firefox)
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    # Bis die ersten Läufe auf WebKit/Firefox grün waren, nur zur Information (lokal nicht prüfbar).
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

@@ -454,7 +454,7 @@ liegt bei dir.
 | 3 · Admin | Bereiche O–S inkl. jeder Einstellung | erledigt |
 | 4 · Schnittstellen | Fake-API, Bereiche U und V | erledigt |
 | 5 · Fehler beheben | Abschnitt 6 | erledigt (34 Fehler, je mit Test) |
-| 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | erledigt; WebKit/Firefox laufen nur in der CI (lokal nicht installierbar) |
+| 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | erledigt; WebKit und Firefox grün in der CI (lokal nicht installierbar) |
 | 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
 
 Ergebnis: 207 E2E-Tests in 19 Dateien (plus 6 Live-Smoke-Tests) und 46 Unit-Tests; die komplette Suite läuft lokal in gut 5 Minuten
