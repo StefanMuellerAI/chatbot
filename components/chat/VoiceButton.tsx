@@ -8,7 +8,7 @@ import { cn } from "@/components/ui/cn";
 const MAX_SECONDS = 10 * 60;
 
 /** Spracheingabe: Aufnahme im Browser, Transkription auf dem Server, Text ins Eingabefeld. */
-export function VoiceButton({ onText }: { onText: (text: string) => void }) {
+export function VoiceButton({ onText, disabled }: { onText: (text: string) => void; disabled?: boolean }) {
   const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
   const [seconds, setSeconds] = useState(0);
   const [level, setLevel] = useState(0);
@@ -92,10 +92,11 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
       <button
         type="button"
         onClick={state === "recording" ? stop : start}
-        disabled={state === "transcribing"}
+        disabled={state === "transcribing" || (disabled && state === "idle")}
         title={state === "recording" ? "Aufnahme beenden" : "Spracheingabe"}
+        aria-label={state === "recording" ? "Aufnahme beenden" : state === "transcribing" ? "Transkribiere …" : "Spracheingabe"}
         className={cn(
-          "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors",
+          "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors disabled:opacity-40",
           state === "recording" ? "bg-danger-soft text-danger" : "text-muted hover:bg-surface-2 hover:text-text",
         )}
       >
@@ -121,9 +122,15 @@ export function VoiceButton({ onText }: { onText: (text: string) => void }) {
         {state === "transcribing" && <span className="max-sm:hidden">Transkribiere …</span>}
       </button>
       {error && (
-        <div className="absolute bottom-11 left-0 z-30 w-64 rounded-xl border border-danger/30 bg-danger-soft p-2 text-xs text-danger" role="alert" onClick={() => setError(null)}>
+        <button
+          type="button"
+          className="absolute bottom-11 left-0 z-30 w-64 rounded-xl border border-danger/30 bg-danger-soft p-2 text-left text-xs text-danger"
+          role="alert"
+          title="Schließen"
+          onClick={() => setError(null)}
+        >
           {error}
-        </div>
+        </button>
       )}
     </div>
   );

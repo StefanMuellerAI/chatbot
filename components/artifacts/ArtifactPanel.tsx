@@ -104,7 +104,7 @@ export function ArtifactPanel({
           <Code className="h-4 w-4" /> Code
         </TabButton>
         <div className="flex-1" />
-        <CopyButton text={artifact.content} />
+        <CopyButton text={artifact.content} ariaLabel="Quelltext kopieren" />
         <button
           type="button"
           onClick={() => download("source")}

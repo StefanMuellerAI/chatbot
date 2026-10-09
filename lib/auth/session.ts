@@ -65,13 +65,14 @@ export function errorResponse(err: unknown): Response {
 const MAX_ATTEMPTS = 30;
 
 /**
- * Brute-Force-Schutz für Logins: höchstens 30 Fehlversuche pro 10 Minuten und IP.
+ * Brute-Force-Schutz für Logins: höchstens 30 Fehlversuche pro 10 Minuten, IP und Bereich
+ * (Teilnehmende und Admin zählen getrennt).
  * Gezählt wird atomar VOR der Passwortprüfung (parallele Anfragen werden mitgezählt);
  * eine erfolgreiche Anmeldung erstattet ihren Versuch zurück. Der Wert ist großzügig,
  * weil eine ganze Schulungsgruppe oft über dieselbe IP-Adresse kommt.
  */
-export async function consumeLoginAttempt(request: Request): Promise<() => Promise<void>> {
-  const ipHash = hashId(clientIp(request));
+export async function consumeLoginAttempt(request: Request, scope: "user" | "admin"): Promise<() => Promise<void>> {
+  const ipHash = hashId(`${scope}:${clientIp(request)}`);
   const db = await getDb();
   const res = (await db.execute(sql`
     INSERT INTO login_attempts (ip_hash, window_start, count) VALUES (${ipHash}, now(), 1)

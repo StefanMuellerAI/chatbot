@@ -1,5 +1,7 @@
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Logo } from "@/components/ui/Logo";
+import { getUserSession } from "@/lib/auth/session";
 import { getSettings } from "@/lib/settings";
 import { LoginForm } from "./LoginForm";
 
@@ -7,6 +9,7 @@ export const metadata = { title: "Anmelden – Freebie" };
 
 export default async function LoginPage() {
   await connection();
+  if (await getUserSession().catch(() => null)) redirect("/");
   let notice = "";
   try {
     notice = (await getSettings()).noticeText;

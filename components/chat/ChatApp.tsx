@@ -102,9 +102,11 @@ export function ChatApp() {
   }, []);
 
   const model = config?.models.find((m) => m.id === modelId);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const showToast = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 4000);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 4000);
   }, []);
 
   // Beim Wechsel des Chats dessen Einstellungen übernehmen
@@ -127,9 +129,16 @@ export function ChatApp() {
         setEffort(conv.effort && m.efforts.includes(conv.effort) ? conv.effort : m.defaultEffort);
       }
       setPresetId(conv.presetId);
+      setWebSearch(conv.webSearch ?? true);
+      composerRef.current?.setAttachments([]);
     },
     [config, conversations, streaming],
   );
+
+  const changeWebSearch = (value: boolean) => {
+    setWebSearch(value);
+    if (active) void db.conversations.update(active.id, { webSearch: value });
+  };
 
   const changeModel = async (id: string) => {
     const next = config?.models.find((m) => m.id === id);
@@ -281,10 +290,8 @@ export function ChatApp() {
     if (!config || !model || streaming) return;
     const now = Date.now();
     let baseMessages = active?.messages ?? [];
-    let allAttachments = attachments;
+    const allAttachments = attachments;
     if (editIndex !== null && active) {
-      const original = baseMessages[editIndex];
-      allAttachments = [...(original?.attachments ?? []), ...attachments];
       baseMessages = baseMessages.slice(0, editIndex);
       setEditIndex(null);
     }
@@ -309,11 +316,12 @@ export function ChatApp() {
       }),
       modelId: model.id,
       effort,
+      webSearch,
       messages: [...baseMessages, userMsg],
     } as Conversation;
     if (active && editIndex === null) {
       // Normaler Fall: nur anhängen (ein parallel gesetzter Titel bleibt erhalten).
-      await appendMessages(active.id, [userMsg], { modelId: model.id, effort });
+      await appendMessages(active.id, [userMsg], { modelId: model.id, effort, webSearch });
     } else {
       await saveConversation(conv);
     }
@@ -327,8 +335,10 @@ export function ChatApp() {
   const regenerate = async () => {
     if (!active || streaming) return;
     const msgs = [...active.messages];
-    if (msgs[msgs.length - 1]?.role === "assistant") msgs.pop();
-    const conv = { ...active, modelId: modelId || active.modelId, messages: msgs };
+    const previous = msgs[msgs.length - 1]?.role === "assistant" ? msgs.pop() : undefined;
+    // Mit dem Modell der ursprünglichen Antwort, solange es noch verfügbar ist.
+    const original = previous?.modelId && config?.models.some((m) => m.id === previous.modelId) ? previous.modelId : undefined;
+    const conv = { ...active, modelId: original ?? (modelId || active.modelId), messages: msgs };
     await saveConversation(conv);
     await runAssistant(conv, true);
   };
@@ -338,20 +348,27 @@ export function ChatApp() {
     if (!m || streaming) return;
     setEditIndex(index);
     setText(m.text);
+    composerRef.current?.setAttachments(m.attachments ?? []);
     composerRef.current?.focus();
   };
 
-  const newChat = () => {
-    if (streaming) return;
+  const resetToNewChat = () => {
     setActiveId(null);
     setEditIndex(null);
     setArtifactId(null);
     setPresetId(null);
+    setWebSearch(true);
     setText("");
+    composerRef.current?.setAttachments([]);
     setSidebarOpen(false);
     const def = config?.models.find((m) => m.id === modelId) ?? config?.models.find((m) => m.isDefault);
     if (def) setEffort(def.defaultEffort);
     setTimeout(() => composerRef.current?.focus(), 0);
+  };
+
+  const newChat = () => {
+    if (streaming) return;
+    resetToNewChat();
   };
 
   const addImageModeResult = async (prompt: string, image: GeneratedImage) => {
@@ -378,7 +395,7 @@ export function ChatApp() {
   const deleteConversation = async (id: string) => {
     if (streaming?.conversationId === id) abortRef.current?.abort();
     await db.conversations.delete(id);
-    if (id === activeId) newChat();
+    if (id === activeId) resetToNewChat();
   };
 
   const presetName = config?.presets.find((p) => p.id === (active?.presetId ?? presetId))?.name;
@@ -409,6 +426,7 @@ export function ChatApp() {
           onSelect={selectConversation}
           onNew={newChat}
           onDelete={deleteConversation}
+          busy={Boolean(streaming)}
           theme={theme}
           onTheme={setTheme}
           onClose={() => setSidebarOpen(false)}
@@ -420,13 +438,14 @@ export function ChatApp() {
       <main
         className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:block print:bg-white"
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files")) {
+          if (e.dataTransfer.types.includes("Files") && config && !config.paused && model) {
             e.preventDefault();
             setDragging(true);
           }
         }}
         onDragLeave={(e) => {
-          if (e.currentTarget === e.target) setDragging(false);
+          // Erst schließen, wenn die Maus den Bereich wirklich verlässt (nicht beim Wechsel auf ein Kindelement).
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
         }}
         onDrop={(e) => {
           e.preventDefault();
@@ -438,7 +457,7 @@ export function ChatApp() {
           <button type="button" onClick={() => setSidebarOpen(true)} className="rounded-full p-2 text-muted hover:bg-surface-2 md:hidden" aria-label="Menü öffnen">
             <Menu className="h-5 w-5" />
           </button>
-          {config && <ModelPicker models={config.models} value={modelId} onChange={changeModel} />}
+          {config && <ModelPicker models={config.models} value={modelId} onChange={changeModel} disabled={Boolean(streaming)} />}
           {presetName && <span className="ml-1 truncate rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary">{presetName}</span>}
           <div className="flex-1" />
           {active && active.messages.length > 0 && !streaming && (
@@ -474,7 +493,13 @@ export function ChatApp() {
               <span className="max-sm:hidden">Artefakte ({artifacts.size})</span>
             </button>
           )}
-          <button type="button" onClick={newChat} className="rounded-full p-2 text-muted hover:bg-surface-2 md:hidden" aria-label="Neuer Chat">
+          <button
+            type="button"
+            onClick={newChat}
+            disabled={Boolean(streaming)}
+            className="rounded-full p-2 text-muted hover:bg-surface-2 disabled:opacity-40 md:hidden"
+            aria-label="Neuer Chat"
+          >
             <MessageSquarePlus className="h-5 w-5" />
           </button>
         </header>
@@ -490,6 +515,8 @@ export function ChatApp() {
 
         <div
           ref={scrollRef}
+          role="region"
+          aria-label="Gespräch"
           className="min-h-0 flex-1 overflow-y-auto print:overflow-visible"
           onScroll={(e) => {
             const el = e.currentTarget;
@@ -543,7 +570,15 @@ export function ChatApp() {
           {editIndex !== null && (
             <div className="mb-2 flex items-center justify-between rounded-2xl bg-primary-soft px-4 py-2 text-sm text-primary">
               <span>Du bearbeitest eine frühere Nachricht. Beim Senden wird das Gespräch ab dort neu fortgesetzt.</span>
-              <button type="button" className="font-medium underline" onClick={() => { setEditIndex(null); setText(""); }}>
+              <button
+                type="button"
+                className="font-medium underline"
+                onClick={() => {
+                  setEditIndex(null);
+                  setText("");
+                  composerRef.current?.setAttachments([]);
+                }}
+              >
                 Abbrechen
               </button>
             </div>
@@ -558,9 +593,9 @@ export function ChatApp() {
               effort={effort}
               onEffortChange={setEffort}
               webSearch={webSearch}
-              onWebSearchChange={setWebSearch}
+              onWebSearchChange={changeWebSearch}
               streaming={Boolean(streaming)}
-              disabled={config.paused || !model}
+              disabledReason={config.paused ? "Freebie macht gerade Pause." : !model ? "Gerade ist kein Modell verfügbar." : undefined}
               onSend={send}
               onStop={() => abortRef.current?.abort()}
               onImageMode={() => !streaming && setImageMode(true)}

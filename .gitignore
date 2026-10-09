@@ -43,3 +43,8 @@ next-env.d.ts
 # lokale Daten (PGlite, Uploads)
 /.data
 !.env.example
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/

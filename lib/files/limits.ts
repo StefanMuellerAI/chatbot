@@ -13,6 +13,10 @@ export const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 // Vercel stellt 500 MB in /tmp bereit; Original + umgewandelte Abschnitte müssen hineinpassen.
 export const MAX_AUDIO_BYTES = 300 * 1024 * 1024;
 /** Unterhalb dieser Grenze geht ein Diktat direkt an den Server (Vercel-Limit 4,5 MB). */
+/** Grenzen pro Chat-Nachricht (Browser und Server prüfen dieselben Werte). */
+export const MAX_MESSAGE_CHARS = 400_000;
+export const MAX_ATTACHMENTS = 20;
+
 export const DIRECT_UPLOAD_LIMIT = 4 * 1024 * 1024;
 
 export type UploadCategory = "image" | "audio" | "document";

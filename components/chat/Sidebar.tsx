@@ -13,6 +13,7 @@ export function Sidebar({
   onSelect,
   onNew,
   onDelete,
+  busy,
   theme,
   onTheme,
   onClose,
@@ -22,10 +23,13 @@ export function Sidebar({
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  /** Während einer Antwort sind Chatwechsel und neuer Chat gesperrt. */
+  busy?: boolean;
   theme: Theme;
   onTheme: (t: Theme) => void;
   onClose?: () => void;
 }) {
+  const busyTitle = busy ? "Während einer Antwort nicht möglich" : undefined;
   const [query, setQuery] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
   const groups = useMemo(() => groupByDate(filterConversations(conversations, query)), [conversations, query]);
@@ -44,16 +48,20 @@ export function Sidebar({
         <button
           type="button"
           onClick={onNew}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-gradient px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:opacity-95"
+          disabled={busy}
+          title={busyTitle}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-gradient px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:opacity-95 disabled:opacity-50"
         >
           <MessageSquarePlus className="h-4.5 w-4.5" /> Neuer Chat
         </button>
         <label className="mt-3 flex items-center gap-2 rounded-full bg-white/8 px-3 py-2 text-sm text-white/70 focus-within:bg-white/12">
           <Search className="h-4 w-4" />
           <input
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Chats durchsuchen"
+            aria-label="Chats durchsuchen"
             className="w-full bg-transparent text-white outline-none placeholder:text-white/40"
           />
         </label>
@@ -71,16 +79,24 @@ export function Sidebar({
                   c.id === activeId ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/6 hover:text-white",
                 )}
               >
-                <button type="button" onClick={() => onSelect(c.id)} className="min-w-0 flex-1 truncate px-3 py-2 text-left">
+                <button
+                  type="button"
+                  onClick={() => onSelect(c.id)}
+                  disabled={busy && c.id !== activeId}
+                  title={busy && c.id !== activeId ? busyTitle : undefined}
+                  aria-current={c.id === activeId ? "page" : undefined}
+                  className="min-w-0 flex-1 truncate px-3 py-2 text-left disabled:cursor-not-allowed"
+                >
                   {c.title || "Neuer Chat"}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm(`Chat „${c.title}“ löschen?`)) onDelete(c.id);
+                    if (confirm(`Chat „${c.title || "Neuer Chat"}“ löschen?`)) onDelete(c.id);
                   }}
-                  className="mr-1 rounded-lg p-1.5 text-white/40 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 max-md:opacity-100"
-                  aria-label="Chat löschen"
+                  className="mr-1 rounded-lg p-1.5 text-white/40 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                  aria-label={`Chat „${c.title || "Neuer Chat"}“ löschen`}
+                  title="Chat löschen"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -104,6 +120,7 @@ export function Sidebar({
               onClick={() => onTheme(value)}
               className={cn("flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-xs", theme === value ? "bg-white/15 text-white" : "text-white/55 hover:text-white")}
               title={label}
+              aria-pressed={theme === value}
             >
               <Icon className="h-3.5 w-3.5" /> {label}
             </button>
@@ -137,9 +154,9 @@ export function Sidebar({
               if (!file) return;
               try {
                 const n = await importAll(await file.text());
-                alert(`${n} Chat(s) importiert.`);
+                alert(n === 1 ? "1 Chat importiert." : `${n} Chats importiert.`);
               } catch {
-                alert("Die Datei konnte nicht importiert werden.");
+                alert("Die Datei konnte nicht importiert werden. Bitte eine Export-Datei von Freebie wählen.");
               }
             }}
           />
@@ -148,8 +165,12 @@ export function Sidebar({
           </Link>
           <SideAction
             onClick={async () => {
-              await fetch("/api/auth/logout", { method: "POST" });
-              window.location.replace(`${window.location.origin}/login`);
+              try {
+                await fetch("/api/auth/logout", { method: "POST" });
+                window.location.replace(`${window.location.origin}/login`);
+              } catch {
+                alert("Abmelden hat nicht geklappt – bitte die Internetverbindung prüfen und erneut versuchen.");
+              }
             }}
           >
             <LogOut className="h-4 w-4" /> Abmelden
@@ -171,7 +192,7 @@ function SideAction({ children, onClick }: { children: React.ReactNode; onClick:
 function filterConversations(list: Conversation[], query: string): Conversation[] {
   const q = query.trim().toLowerCase();
   if (!q) return list;
-  return list.filter((c) => c.title.toLowerCase().includes(q) || c.messages.some((m) => m.text.toLowerCase().includes(q)));
+  return list.filter((c) => (c.title ?? "").toLowerCase().includes(q) || (c.messages ?? []).some((m) => (m.text ?? "").toLowerCase().includes(q)));
 }
 
 function groupByDate(list: Conversation[]): [string, Conversation[]][] {
