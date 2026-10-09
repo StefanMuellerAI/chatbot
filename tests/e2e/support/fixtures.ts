@@ -27,7 +27,12 @@ const browserErrors: string[] = [];
 
 /** Sammelt unbehandelte Ausnahmen aller Seiten eines Kontexts – der Test schlägt am Ende fehl. */
 export function trackErrors(context: BrowserContext) {
-  const watch = (page: Page) => page.on("pageerror", (err) => browserErrors.push(`${page.url()}: ${err.message}`));
+  const watch = (page: Page) =>
+    page.on("pageerror", (err) => {
+      // Von der Sandbox blockierte Zugriffe aus Artefakten sind gewollt (K02), kein Fehler der App.
+      if (/sandboxed/i.test(err.message)) return;
+      browserErrors.push(`${page.url()}: ${err.message}`);
+    });
   context.pages().forEach(watch);
   context.on("page", watch);
 }

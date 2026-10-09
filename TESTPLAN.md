@@ -458,7 +458,8 @@ liegt bei dir.
 | 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
 
 Ergebnis: 207 E2E-Tests in 19 Dateien (plus 6 Live-Smoke-Tests) und 46 Unit-Tests; die komplette Suite läuft lokal in gut 5 Minuten
-(3 Worker) und dreimal hintereinander ohne Wiederholungen grün.
+(3 Worker) und dreimal hintereinander ohne Wiederholungen grün (621 von 621). In der CI laufen zusätzlich die
+Chat-Tests in WebKit und Firefox.
 
 ## 9. Was automatisiert nicht geht – kurze manuelle Abnahme
 
