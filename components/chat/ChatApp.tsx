@@ -80,6 +80,7 @@ export function ChatApp() {
   const composerRef = useRef<ComposerHandle>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const userScrolling = useRef(false);
 
   // Konfiguration laden
   useEffect(() => {
@@ -518,9 +519,29 @@ export function ChatApp() {
           role="region"
           aria-label="Gespräch"
           className="min-h-0 flex-1 overflow-y-auto print:overflow-visible"
+          // Nur echte Eingaben lösen die Ansicht vom Ende – das eigene Mitscrollen nicht.
           onScroll={(e) => {
             const el = e.currentTarget;
-            stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+            if (nearBottom || userScrolling.current) stickToBottom.current = nearBottom;
+          }}
+          onWheel={(e) => {
+            if (e.deltaY < 0) stickToBottom.current = false;
+          }}
+          onTouchStart={() => {
+            userScrolling.current = true;
+          }}
+          onTouchEnd={() => {
+            userScrolling.current = false;
+          }}
+          onPointerDown={() => {
+            userScrolling.current = true;
+          }}
+          onPointerUp={() => {
+            userScrolling.current = false;
+          }}
+          onKeyDown={(e) => {
+            if (["PageUp", "ArrowUp", "Home"].includes(e.key)) stickToBottom.current = false;
           }}
         >
           {messages.length === 0 && !streamingHere ? (

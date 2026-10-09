@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db/client";
 import { estimateTokens, extractText } from "@/lib/files/extract";
 import { categoryOf } from "@/lib/files/limits";
 import { sniffImageMime } from "@/lib/files/sniff";
-import { getSettings } from "@/lib/settings";
+import { requireFeature } from "@/lib/guards";
 import type { Attachment } from "@/lib/shared/types";
 import { assertSafeKey, getFile, registerFile } from "@/lib/storage";
 
@@ -23,9 +23,9 @@ export async function POST(request: Request) {
     if (!key.startsWith("uploads/")) throw new HttpError(400, "Ungültiger Pfad.");
     const category = categoryOf(key);
     if (category !== "image" && category !== "document") throw new HttpError(400, "Dateityp nicht unterstützt.");
+    const settings = await requireFeature("uploads");
     const file = await getFile(key);
     if (!file) throw new HttpError(404, "Die hochgeladene Datei wurde nicht gefunden.");
-    const settings = await getSettings();
     const sha256 = createHash("sha256").update(file.data).digest("hex");
 
     if (category === "image") {
@@ -54,11 +54,7 @@ export async function POST(request: Request) {
       text = cached[0].extractedText;
       tokens = cached[0].tokenEstimate;
     } else {
-      try {
-        text = await extractText(file.data, name, mime);
-      } catch (err) {
-        throw new HttpError(422, err instanceof Error ? err.message : "Die Datei konnte nicht gelesen werden.");
-      }
+      text = await extractText(file.data, name, mime);
       tokens = estimateTokens(text);
       await db
         .insert(schema.fileCache)
@@ -66,6 +62,7 @@ export async function POST(request: Request) {
         .onConflictDoNothing();
     }
     await registerFile(key, "document", mime, file.data.length, settings.fileRetentionDays);
+    const headers = { "X-Freebie-Cache": cached[0] ? "hit" : "miss" };
     const attachment: Attachment = {
       id: randomUUID(),
       kind: "document",
@@ -77,7 +74,7 @@ export async function POST(request: Request) {
       tokenEstimate: tokens,
       preview: text.slice(0, 600),
     };
-    return Response.json(attachment);
+    return Response.json(attachment, { headers });
   } catch (err) {
     if (err instanceof z.ZodError) return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });
     return errorResponse(err);

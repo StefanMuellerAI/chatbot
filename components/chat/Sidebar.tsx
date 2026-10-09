@@ -137,15 +137,17 @@ export function Sidebar({
               a.click();
               URL.revokeObjectURL(url);
             }}
+            label="Alle Chats exportieren"
           >
             <Download className="h-4 w-4" /> Export
           </SideAction>
-          <SideAction onClick={() => importRef.current?.click()}>
+          <SideAction onClick={() => importRef.current?.click()} label="Chats importieren">
             <Upload className="h-4 w-4" /> Import
           </SideAction>
           <input
             ref={importRef}
             type="file"
+            aria-label="Export-Datei für den Import"
             accept="application/json,.json"
             className="hidden"
             onChange={async (e) => {
@@ -181,9 +183,9 @@ export function Sidebar({
   );
 }
 
-function SideAction({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function SideAction({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label?: string }) {
   return (
-    <button type="button" onClick={onClick} className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-white/70 hover:bg-white/8 hover:text-white">
+    <button type="button" onClick={onClick} aria-label={label} className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-white/70 hover:bg-white/8 hover:text-white">
       {children}
     </button>
   );

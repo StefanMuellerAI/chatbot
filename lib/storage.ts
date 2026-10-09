@@ -4,6 +4,7 @@ import path from "node:path";
 import { del, get, put } from "@vercel/blob";
 import { inArray, lt } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
+import { HttpError } from "@/lib/errors";
 
 export type StorageMode = "blob" | "local";
 
@@ -52,7 +53,7 @@ function localRoot(): string {
 /** Erlaubt nur sichere Schlüssel wie "uploads/<uuid>/name.pdf". */
 export function assertSafeKey(key: string): void {
   if (!/^(uploads|images|audio)\/[a-zA-Z0-9-]{8,64}\/[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,119}$/.test(key)) {
-    throw new Error("Ungültiger Dateischlüssel");
+    throw new HttpError(400, "Ungültiger Dateipfad.");
   }
 }
 

@@ -2,7 +2,7 @@ import { issueSignedToken } from "@vercel/blob";
 import { handleUpload, handleUploadPresigned, type HandleUploadBody, type HandleUploadPresignedBody } from "@vercel/blob/client";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
 import { categoryOf, maxBytesFor } from "@/lib/files/limits";
-import { getSettings } from "@/lib/settings";
+import { requireFeature } from "@/lib/guards";
 import { assertSafeKey, blobAuth, registerFile } from "@/lib/storage";
 
 /**
@@ -12,10 +12,6 @@ import { assertSafeKey, blobAuth, registerFile } from "@/lib/storage";
 export async function POST(request: Request) {
   try {
     await requireUser();
-    const settings = await getSettings();
-    if (!settings.features.uploads && !settings.features.transcription && !settings.features.dictation) {
-      throw new HttpError(403, "Uploads sind deaktiviert.");
-    }
     const auth = blobAuth();
     if (!auth) throw new HttpError(400, "Es ist kein Blob-Speicher verbunden.");
 
@@ -25,6 +21,7 @@ export async function POST(request: Request) {
       if (!pathname.startsWith("uploads/")) throw new HttpError(400, "Ungültiger Upload-Pfad.");
       const category = categoryOf(pathname);
       if (!category) throw new HttpError(400, "Dieses Dateiformat wird nicht unterstützt.");
+      const settings = await requireFeature(category === "audio" ? "transcription" : "uploads");
       await registerFile(pathname, category, "application/octet-stream", 0, settings.fileRetentionDays);
       return maxBytesFor(category);
     };

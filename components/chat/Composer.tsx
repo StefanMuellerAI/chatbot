@@ -164,7 +164,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   return (
     <div className="rounded-[28px] border border-border bg-surface shadow-soft focus-within:border-border-strong">
       {pending.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-3 pt-3">
+        <div role="group" aria-label="Anhänge" className="flex flex-wrap gap-2 px-3 pt-3">
           {pending.map((p) => (
             <div key={p.localId} className="relative">
               <AttachmentChip
@@ -192,7 +192,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
                   setPending((l) => l.filter((x) => x.localId !== p.localId));
                 }}
                 className="absolute -top-1.5 -right-1.5 grid h-5 w-5 place-items-center rounded-full border border-border bg-surface text-muted shadow hover:text-text"
-                aria-label="Anhang entfernen"
+                aria-label={`${p.name} entfernen`}
+                title="Anhang entfernen"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -237,6 +238,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
               ref={fileRef}
               type="file"
               multiple
+              aria-label="Dateien zum Anhängen"
               accept={ACCEPT_ATTRIBUTE}
               className="hidden"
               onChange={(e) => {

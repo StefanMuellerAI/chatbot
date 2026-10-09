@@ -135,7 +135,8 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
     );
   } else if (images.length === 0) {
     await say(diagnosis(req, parts, lastText));
-    if (flag("#zeige-dateien")) await say(`\n\n\`\`\`text\n${fileContents(parts)}\n\`\`\``);
+    // Tilden-Zaun: Dateiinhalte enthalten selbst ```-Blöcke (z. B. Tabellen als CSV).
+    if (flag("#zeige-dateien")) await say(`\n\n~~~~text\n${fileContents(parts)}\n~~~~`);
   }
 
   if (flag("#maxtokens")) {
@@ -197,7 +198,7 @@ function diagnosis(req: ProviderRequest, parts: PreparedPart[], lastText: string
 
 function fileContents(parts: PreparedPart[]): string {
   return parts
-    .flatMap((p) => (p.type === "text" && /^<(datei|transkript) /.test(p.text) ? [p.text.slice(0, 2000)] : []))
+    .flatMap((p) => (p.type === "text" ? [...p.text.matchAll(/<(datei|transkript) [^>]*>[\s\S]*?<\/\1>/g)].map((m) => m[0].slice(0, 2000)) : []))
     .join("\n\n");
 }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
-import { getSettings } from "@/lib/settings";
+import { requireFeature } from "@/lib/guards";
 import { generateImage } from "@/lib/tools/images";
 
 export const maxDuration = 300;
@@ -16,9 +16,7 @@ const Body = z.object({
 export async function POST(request: Request) {
   try {
     const session = await requireUser();
-    const settings = await getSettings();
-    if (settings.paused) throw new HttpError(503, settings.pausedMessage);
-    if (!settings.features.imageGeneration) throw new HttpError(403, "Die Bildgenerierung ist deaktiviert.");
+    const settings = await requireFeature("imageGeneration");
     const body = Body.parse(await request.json());
     const result = await generateImage(
       { prompt: body.prompt, size: body.size, quality: body.quality, reference_image_ids: body.referenceIds },

@@ -3,17 +3,12 @@ import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
+import { ZodError } from "zod";
+import { HttpError, isProviderError, providerErrorMessage } from "@/lib/errors";
 import { getSettings } from "@/lib/settings";
 import { ADMIN_COOKIE, USER_COOKIE, verifyAdmin, verifyUser } from "./tokens";
 
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { HttpError };
 
 export interface UserSession {
   sid: string;
@@ -52,14 +47,16 @@ export function hashId(value: string): string {
   return createHash("sha256").update(`freebie:${value}`).digest("hex").slice(0, 16);
 }
 
-/** Wandelt Fehler in eine JSON-Antwort um. */
+/** Wandelt Fehler in eine JSON-Antwort um – ohne interne Details nach außen zu geben. */
 export function errorResponse(err: unknown): Response {
   if (err instanceof HttpError) {
     return Response.json({ error: err.message }, { status: err.status });
   }
+  if (err instanceof ZodError) return Response.json({ error: "Ungültige Anfrage." }, { status: 400 });
+  if (err instanceof SyntaxError) return Response.json({ error: "Ungültige Anfrage (kein gültiges JSON)." }, { status: 400 });
   console.error(err);
-  const message = err instanceof Error ? err.message : "Unbekannter Fehler";
-  return Response.json({ error: message }, { status: 500 });
+  if (isProviderError(err)) return Response.json({ error: providerErrorMessage(err) }, { status: 502 });
+  return Response.json({ error: "Es ist ein interner Fehler aufgetreten. Bitte erneut versuchen." }, { status: 500 });
 }
 
 const MAX_ATTEMPTS = 30;

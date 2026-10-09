@@ -161,7 +161,9 @@ test.describe("C · Chat-Grundfunktionen", () => {
 
     await chat.send(`#lang #langsam ${uniq()}`);
     await expect(chat.lastAnswer).toContainText("Absatz 3", { timeout: 15_000 });
-    await region.evaluate((el) => el.scrollTo({ top: 0 }));
+    await region.hover();
+    await page.mouse.wheel(0, -100_000);
+    await expect.poll(() => region.evaluate((el) => el.scrollTop)).toBeLessThan(50);
     await page.waitForTimeout(1500);
     expect(await region.evaluate((el) => el.scrollTop)).toBeLessThan(50);
     await chat.stopButton.click();

@@ -74,7 +74,7 @@ export function AttachmentChip({ attachment, extra }: { attachment: Pick<Attachm
   const isImage = attachment.kind === "image";
   const Icon = attachment.kind === "transcript" ? FileAudio : /sheet|excel|csv|spreadsheet/.test(attachment.mime) || /\.(xlsx?|csv|ods)$/i.test(attachment.name) ? FileSpreadsheet : FileText;
   return (
-    <div className="flex max-w-64 items-center gap-2 rounded-2xl border border-border bg-surface px-2.5 py-2 text-sm shadow-sm">
+    <div role="group" aria-label={attachment.name} className="flex max-w-64 items-center gap-2 rounded-2xl border border-border bg-surface px-2.5 py-2 text-sm shadow-sm">
       {isImage && attachment.storageKey ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/api/files/${attachment.storageKey}`} alt="" className="h-9 w-9 rounded-lg object-cover" />
