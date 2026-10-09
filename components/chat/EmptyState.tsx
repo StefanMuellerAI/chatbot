@@ -50,6 +50,7 @@ export function EmptyState({
                   key={p.id}
                   type="button"
                   onClick={() => onPreset(active ? null : p.id)}
+                  aria-pressed={active}
                   className={cn(
                     "flex items-start gap-3 rounded-2xl border p-3 text-left transition",
                     active ? "border-primary bg-primary-soft" : "border-border bg-surface hover:border-border-strong hover:shadow-sm",

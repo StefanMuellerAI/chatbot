@@ -23,7 +23,7 @@ const chrome = {
 const fakeApiReady = existsSync("tests/e2e/fake-api/server.mjs");
 
 const projects: Project[] = [
-  { name: "chat", testDir: "tests/e2e/chat", use: { ...chrome, baseURL: baseUrl("mock") } },
+  { name: "chat", testDir: "tests/e2e/chat", grepInvert: /@mobil|@tablet/, use: { ...chrome, baseURL: baseUrl("mock") } },
   { name: "admin", testDir: "tests/e2e/admin", workers: 1, use: { ...chrome, baseURL: baseUrl("mock-serial") } },
   { name: "api", testDir: "tests/e2e/api", use: { baseURL: baseUrl("mock") } },
   {

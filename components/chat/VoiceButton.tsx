@@ -58,6 +58,8 @@ export function VoiceButton({ onText, disabled }: { onText: (text: string) => vo
         const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
         if (blob.size < 1000) {
           setState("idle");
+          setSeconds(0);
+          setError("Die Aufnahme war zu kurz. Bitte etwas länger sprechen.");
           return;
         }
         setState("transcribing");

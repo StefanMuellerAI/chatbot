@@ -3,7 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { FileDown, Info, Menu, MessageSquarePlus, PanelRight, Printer, TriangleAlert, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
-import { collectArtifacts } from "@/lib/client/artifacts";
+import { collectArtifacts, type ArtifactVersion } from "@/lib/client/artifacts";
 import { appendMessages, db, saveConversation, type Conversation } from "@/lib/client/db";
 import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/export";
 import { streamChat } from "@/lib/client/api";
@@ -54,6 +54,9 @@ function payloadMessages(messages: ChatMessage[]): ChatMessage[] {
     );
 }
 
+/** Zeitpunkt des Seitenaufrufs – ältere Antworten öffnen ihre Artefakte nicht von selbst. */
+const PAGE_LOADED_AT = Date.now();
+
 export function ChatApp() {
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -69,7 +72,8 @@ export function ChatApp() {
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [streaming, setStreaming] = useState<{ conversationId: string; state: StreamingState } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [artifactId, setArtifactId] = useState<string | null>(null);
+  // Geöffnetes Artefakt; ohne Version gilt die neueste.
+  const [artifactSel, setArtifactSel] = useState<{ id: string; version?: number } | null>(null);
   const autoOpened = useRef<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [imageMode, setImageMode] = useState(false);
@@ -116,7 +120,7 @@ export function ChatApp() {
       if (streaming) return;
       setActiveId(id);
       setEditIndex(null);
-      setArtifactId(null);
+      setArtifactSel(null);
       setSidebarOpen(false);
       if (!id || !config) {
         setPresetId(null);
@@ -135,6 +139,13 @@ export function ChatApp() {
     },
     [config, conversations, streaming],
   );
+
+  // Vorlage wählen; ein empfohlenes Modell wird dabei übernommen (sofern verfügbar).
+  const choosePreset = (id: string | null) => {
+    setPresetId(id);
+    const recommended = config?.presets.find((p) => p.id === id)?.defaultModelId;
+    if (recommended && recommended !== modelId && config?.models.some((m) => m.id === recommended)) void changeModel(recommended);
+  };
 
   const changeWebSearch = (value: boolean) => {
     setWebSearch(value);
@@ -166,23 +177,57 @@ export function ChatApp() {
   const messages = useMemo(() => active?.messages ?? [], [active]);
   const streamingHere = streaming && streaming.conversationId === active?.id ? streaming.state : null;
 
+  const artifactsEnabled = config?.features.artifacts ?? true;
   const artifacts = useMemo(() => {
+    if (!artifactsEnabled) return new Map<string, ArtifactVersion[]>();
     const list = messages.map((m) => ({ id: m.id, role: m.role, text: m.text }));
     if (streamingHere) list.push({ id: "streaming", role: "assistant", text: streamingHere.text });
     return collectArtifacts(list);
-  }, [messages, streamingHere]);
+  }, [messages, streamingHere, artifactsEnabled]);
 
-  // Neues Artefakt während des Streamings automatisch öffnen
-  useEffect(() => {
-    if (!streamingHere || !config?.features.artifacts) return;
+  // Öffnet die Version aus der angeklickten Nachricht (nicht pauschal die neueste).
+  const openArtifact = (id: string, messageId: string) => {
+    const versions = artifacts.get(id);
+    const match = versions?.find((v) => v.messageId === messageId);
+    setArtifactSel({ id, version: match && match !== versions![versions!.length - 1] ? match.version : undefined });
+  };
+
+  // Für den Knopf in der Kopfzeile: das zuletzt geänderte Artefakt.
+  const latestArtifactId = useMemo(() => {
+    const order = new Map(messages.map((m, i) => [m.id, i]));
+    let best: string | null = null;
+    let bestIndex = -1;
     for (const [id, versions] of artifacts) {
       const last = versions[versions.length - 1];
-      if (last.messageId === "streaming" && !autoOpened.current.has(`${active?.id}:${id}:${versions.length}`)) {
-        autoOpened.current.add(`${active?.id}:${id}:${versions.length}`);
-        setArtifactId(id);
+      const index = last.messageId === "streaming" ? Infinity : (order.get(last.messageId) ?? -1);
+      if (index >= bestIndex) {
+        best = id;
+        bestIndex = index;
       }
     }
-  }, [artifacts, streamingHere, active?.id, config?.features.artifacts]);
+    return best;
+  }, [artifacts, messages]);
+
+  // Neues Artefakt automatisch öffnen – während des Streamings oder, bei sehr kurzen Antworten,
+  // sobald die Antwort fertig ist. Jede Version wird höchstens einmal automatisch geöffnet.
+  useEffect(() => {
+    if (!config?.features.artifacts) return;
+    const lastMessage = messages[messages.length - 1];
+    for (const [id, versions] of artifacts) {
+      const last = versions[versions.length - 1];
+      const fresh =
+        last.messageId === "streaming" ||
+        (!streamingHere &&
+          lastMessage?.id === last.messageId &&
+          lastMessage.createdAt >= PAGE_LOADED_AT &&
+          lastMessage.stopReason !== "stopped");
+      const key = `${active?.id}:${id}:${versions.length}`;
+      if (fresh && !autoOpened.current.has(key)) {
+        autoOpened.current.add(key);
+        setArtifactSel({ id });
+      }
+    }
+  }, [artifacts, messages, streamingHere, active?.id, config?.features.artifacts]);
 
   const runAssistant = async (conv: Conversation, bypassCache: boolean) => {
     const controller = new AbortController();
@@ -356,7 +401,7 @@ export function ChatApp() {
   const resetToNewChat = () => {
     setActiveId(null);
     setEditIndex(null);
-    setArtifactId(null);
+    setArtifactSel(null);
     setPresetId(null);
     setWebSearch(true);
     setText("");
@@ -400,7 +445,7 @@ export function ChatApp() {
   };
 
   const presetName = config?.presets.find((p) => p.id === (active?.presetId ?? presetId))?.name;
-  const artifactVersions = artifactId ? artifacts.get(artifactId) : undefined;
+  const artifactVersions = artifactSel ? artifacts.get(artifactSel.id) : undefined;
   const modelName = (id?: string) => config?.models.find((m) => m.id === id)?.displayName;
 
   if (configError) {
@@ -486,7 +531,9 @@ export function ChatApp() {
           {artifacts.size > 0 && (
             <button
               type="button"
-              onClick={() => setArtifactId(artifactId ? null : [...artifacts.keys()].pop() ?? null)}
+              onClick={() => setArtifactSel(artifactSel ? null : latestArtifactId ? { id: latestArtifactId } : null)}
+              aria-expanded={Boolean(artifactSel)}
+              aria-label={`Artefakte (${artifacts.size})`}
               className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted hover:bg-surface-2 hover:text-text"
               title="Artefakte anzeigen"
             >
@@ -549,7 +596,7 @@ export function ChatApp() {
               <EmptyState
                 presets={config.presets}
                 presetId={presetId}
-                onPreset={setPresetId}
+                onPreset={choosePreset}
                 onExample={(t) => {
                   setText(t);
                   composerRef.current?.focus();
@@ -570,7 +617,8 @@ export function ChatApp() {
                     showCacheBadge={config?.features.showCacheBadge ?? true}
                     showCost={config?.features.showCost ?? false}
                     onRegenerate={m.stopReason === "image-mode" ? undefined : regenerate}
-                    onOpenArtifact={(id) => setArtifactId(id)}
+                    artifactsEnabled={artifactsEnabled}
+                    onOpenArtifact={openArtifact}
                   />
                 ),
               )}
@@ -580,7 +628,8 @@ export function ChatApp() {
                   isLast
                   showCacheBadge={false}
                   showCost={false}
-                  onOpenArtifact={(id) => setArtifactId(id)}
+                  artifactsEnabled={artifactsEnabled}
+                  onOpenArtifact={openArtifact}
                 />
               )}
             </div>
@@ -651,8 +700,14 @@ export function ChatApp() {
 
       {/* Artefakt-Panel */}
       {artifactVersions && artifactVersions.length > 0 && (
-        <section className="fixed inset-0 z-50 border-l border-border md:static md:z-auto md:w-[min(46vw,760px)] md:shrink-0 print:hidden">
-          <ArtifactPanel key={artifactId} versions={artifactVersions} dark={isDark} onClose={() => setArtifactId(null)} />
+        <section className="fixed inset-0 z-50 border-border md:static md:border-l md:z-auto md:w-[min(46vw,760px)] md:shrink-0 print:hidden">
+          <ArtifactPanel
+            key={`${artifactSel?.id}:${artifactSel?.version ?? "neu"}`}
+            versions={artifactVersions}
+            initialVersion={artifactSel?.version}
+            dark={isDark}
+            onClose={() => setArtifactSel(null)}
+          />
         </section>
       )}
 

@@ -36,7 +36,7 @@ export default async function LoginPage() {
             </div>
           )}
         </div>
-        <p className="mt-6 text-center text-xs text-white/40">
+        <p className="mt-6 text-center text-xs text-white/65">
           Ein Angebot von{" "}
           <a href="https://stefanai.de" className="underline hover:text-white/70" target="_blank" rel="noopener noreferrer">
             StefanAI – Research &amp; Development

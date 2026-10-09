@@ -16,7 +16,8 @@ export function useHighlighted(code: string, lang: string | undefined, delay = 1
         const language = name && name in shiki.bundledLanguages ? name : "text";
         const out = await shiki.codeToHtml(code, {
           lang: language,
-          themes: { light: "github-light", dark: "github-dark" },
+          // Kontrastreiche Varianten erfüllen WCAG AA auch auf dem Code-Hintergrund.
+          themes: { light: "github-light-high-contrast", dark: "github-dark-high-contrast" },
           defaultColor: "light",
         });
         if (!cancelled) setHtml(out);

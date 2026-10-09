@@ -104,6 +104,7 @@ export async function transcribeUpload(key: string, name: string, onProgress?: P
     return start.attachment;
   }
   let finished = 0;
+  onProgress?.(0, `Transkribiere Abschnitt 0/${start.chunks} …`);
   const indexes = Array.from({ length: start.chunks }, (_, i) => i);
   const worker = async () => {
     while (indexes.length) {

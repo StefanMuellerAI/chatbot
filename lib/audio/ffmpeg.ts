@@ -67,6 +67,8 @@ export async function splitAudio(input: Buffer, fileName: string): Promise<{ chu
     ]);
     if (code !== 0) {
       console.warn("ffmpeg:", stderr.slice(-500));
+      // Videos ohne Tonspur: ffmpeg findet nach „-vn“ keinen Datenstrom mehr.
+      if (/does not contain any stream|matches no streams/i.test(stderr)) throw new HttpError(422, "Die Audiodatei enthält keine Tonspur.");
       throw new HttpError(422, "Die Audiodatei konnte nicht gelesen werden. Ist sie beschädigt?");
     }
     const names = (await readdir(dir)).filter((n) => n.startsWith("teil-")).sort();

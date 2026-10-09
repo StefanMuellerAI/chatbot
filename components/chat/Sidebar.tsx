@@ -62,15 +62,15 @@ export function Sidebar({
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Chats durchsuchen"
             aria-label="Chats durchsuchen"
-            className="w-full bg-transparent text-white outline-none placeholder:text-white/40"
+            className="w-full bg-transparent text-white outline-none placeholder:text-white/55"
           />
         </label>
       </div>
       <nav className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Chatverlauf">
-        {groups.length === 0 && <p className="px-3 py-6 text-center text-sm text-white/40">{query ? "Keine Treffer." : "Noch keine Chats."}</p>}
+        {groups.length === 0 && <p className="px-3 py-6 text-center text-sm text-white/65">{query ? "Keine Treffer." : "Noch keine Chats."}</p>}
         {groups.map(([label, items]) => (
           <div key={label} className="mb-3">
-            <div className="px-3 pt-2 pb-1 text-[0.7rem] font-semibold tracking-[0.12em] text-white/40 uppercase">{label}</div>
+            <div className="px-3 pt-2 pb-1 text-[0.7rem] font-semibold tracking-[0.12em] text-white/60 uppercase">{label}</div>
             {items.map((c) => (
               <div
                 key={c.id}
@@ -94,7 +94,7 @@ export function Sidebar({
                   onClick={() => {
                     if (confirm(`Chat „${c.title || "Neuer Chat"}“ löschen?`)) onDelete(c.id);
                   }}
-                  className="mr-1 rounded-lg p-1.5 text-white/40 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                  className="mr-1 rounded-lg p-1.5 text-white/60 opacity-0 hover:bg-white/10 hover:text-white group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
                   aria-label={`Chat „${c.title || "Neuer Chat"}“ löschen`}
                   title="Chat löschen"
                 >
@@ -118,7 +118,7 @@ export function Sidebar({
               key={value}
               type="button"
               onClick={() => onTheme(value)}
-              className={cn("flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-xs", theme === value ? "bg-white/15 text-white" : "text-white/55 hover:text-white")}
+              className={cn("flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-xs", theme === value ? "bg-white/15 text-white" : "text-white/70 hover:text-white")}
               title={label}
               aria-pressed={theme === value}
             >

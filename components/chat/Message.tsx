@@ -16,12 +16,12 @@ import {
   Zap,
 } from "lucide-react";
 import { memo, useId, useMemo, useState } from "react";
-import { parseSegments, type Artifact } from "@/lib/client/artifacts";
+import { artifactKey, parseSegments, type Artifact } from "@/lib/client/artifacts";
 import type { Attachment, ChatMessage, Citation, GeneratedImage } from "@/lib/shared/types";
 import { labelFor } from "@/components/artifacts/ArtifactPanel";
 import { LogoMark } from "@/components/ui/Logo";
 import { cn } from "@/components/ui/cn";
-import { CopyButton } from "./CodeBlock";
+import { CodeBlock, CopyButton } from "./CodeBlock";
 import { Markdown } from "./Markdown";
 
 export interface StreamingState {
@@ -107,6 +107,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   isLast,
   showCacheBadge,
   showCost,
+  artifactsEnabled = true,
   onRegenerate,
   onOpenArtifact,
 }: {
@@ -116,6 +117,8 @@ export const AssistantMessage = memo(function AssistantMessage({
   isLast: boolean;
   showCacheBadge: boolean;
   showCost: boolean;
+  /** Ohne Artefakte (im Admin abgeschaltet) erscheint der Inhalt als normaler Codeblock. */
+  artifactsEnabled?: boolean;
   onRegenerate?: () => void;
   onOpenArtifact: (id: string, messageId: string) => void;
 }) {
@@ -155,8 +158,10 @@ export const AssistantMessage = memo(function AssistantMessage({
           {segments.map((seg, i) =>
             seg.kind === "text" ? (
               <Markdown key={i} text={seg.text} />
+            ) : artifactsEnabled ? (
+              <ArtifactCard key={i} artifact={seg.artifact} onOpen={() => onOpenArtifact(artifactKey(seg.artifact, messageId), messageId)} />
             ) : (
-              <ArtifactCard key={i} artifact={seg.artifact} onOpen={() => onOpenArtifact(seg.artifact.id, messageId)} />
+              <CodeBlock key={i} code={seg.artifact.content} lang={seg.artifact.type === "code" ? seg.artifact.language : seg.artifact.type === "svg" ? "xml" : seg.artifact.type} />
             ),
           )}
         </div>
