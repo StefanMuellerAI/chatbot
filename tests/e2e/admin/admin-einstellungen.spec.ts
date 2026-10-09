@@ -65,7 +65,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     await expect(answer.getByRole("navigation", { name: "Quellen" })).toHaveCount(0);
   });
 
-  test("Q03 Datei-Upload aus: Dokumente werden abgewiesen, auch in der API", async ({ page, browser, baseURL, ip }) => {
+  test("Q03/F08 Datei-Upload aus: Dokumente werden abgewiesen, auch in der API", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Datei-Upload", false);
     const chat = await openChat(browser, baseURL!, ip);
@@ -76,7 +76,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     expect((await res.json()).error).toBe("Datei-Uploads sind deaktiviert.");
   });
 
-  test("Q04 Audio-Transkription aus: Audio wird abgewiesen; ohne Upload und Audio verschwindet die Büroklammer", async ({ page, browser, baseURL, ip }) => {
+  test("Q04/F08 Audio-Transkription aus: Audio wird abgewiesen; ohne Upload und Audio verschwindet die Büroklammer", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Audio-Transkription", false);
     let chat = await openChat(browser, baseURL!, ip);
@@ -89,7 +89,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     await expect(chat.page.getByRole("button", { name: "Datei anhängen" })).toHaveCount(0);
   });
 
-  test("Q05 Spracheingabe aus: kein Mikrofon, API gesperrt", async ({ page, browser, baseURL, ip }) => {
+  test("Q05/H04 Spracheingabe aus: kein Mikrofon, API gesperrt", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Spracheingabe", false);
     const chat = await openChat(browser, baseURL!, ip);
@@ -98,7 +98,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     expect(res.status()).toBe(403);
   });
 
-  test("Q06 Bildgenerierung aus: kein Bild-Modus, kein Werkzeug, API gesperrt", async ({ page, browser, baseURL, ip }) => {
+  test("Q06/I04 Bildgenerierung aus: kein Bild-Modus, kein Werkzeug, API gesperrt", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Bildgenerierung", false);
     const chat = await openChat(browser, baseURL!, ip);
@@ -108,7 +108,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     expect((await chat.page.request.post("/api/images", { data: { prompt: "x", size: "1024x1024", quality: "low" } })).status()).toBe(403);
   });
 
-  test("Q07 Artefakte aus: keine Karten und kein Panel, Inhalt als Code", async ({ page, browser, baseURL, ip }) => {
+  test("Q07/K07 Artefakte aus: keine Karten und kein Panel, Inhalt als Code", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Artefakte", false);
     const chat = await openChat(browser, baseURL!, ip);
@@ -121,7 +121,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     expect(await chat.diagnosis(plain, "Artefakte")).toBe("aus");
   });
 
-  test("Q08 Antwort-Cache aus: gleiche Fragen werden neu beantwortet", async ({ page, browser, baseURL, ip }) => {
+  test("Q08/M04 Antwort-Cache aus: gleiche Fragen werden neu beantwortet", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Antwort-Cache", false);
     const chat = await openChat(browser, baseURL!, ip);
@@ -132,7 +132,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     await expect(again.getByText("aus dem Cache")).toHaveCount(0);
   });
 
-  test("Q09 Cache-Hinweis aus: Treffer ohne Kennzeichen", async ({ page, browser, baseURL, ip }) => {
+  test("Q09/M04 Cache-Hinweis aus: Treffer ohne Kennzeichen", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Cache-Hinweis anzeigen", false);
     const chat = await openChat(browser, baseURL!, ip);

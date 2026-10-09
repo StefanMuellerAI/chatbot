@@ -1,7 +1,16 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { test as base, expect, request as playwrightRequest, type APIRequestContext, type Browser, type Locator, type Page } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  request as playwrightRequest,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { PASSWORDS, SERVERS } from "./servers.mjs";
 
 export { expect };
@@ -11,6 +20,16 @@ export function noticeKey(text: string): string {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
   return `freebie-notice-${h}`;
+}
+
+/** Unbehandelte Fehler im Browser während des laufenden Tests (Kriterium „sauber“). */
+const browserErrors: string[] = [];
+
+/** Sammelt unbehandelte Ausnahmen aller Seiten eines Kontexts – der Test schlägt am Ende fehl. */
+export function trackErrors(context: BrowserContext) {
+  const watch = (page: Page) => page.on("pageerror", (err) => browserErrors.push(`${page.url()}: ${err.message}`));
+  context.pages().forEach(watch);
+  context.on("page", watch);
 }
 
 /** Eigene IP-Kennung pro Test, damit sich die Login-Bremse nicht zwischen Tests auswirkt. */
@@ -88,7 +107,10 @@ export async function loginUser(page: Page, opts: { acknowledgeNotice?: boolean 
   if (opts.acknowledgeNotice !== false) {
     const config = await (await page.request.get("/api/config")).json();
     const key = noticeKey(config.notice.full);
-    await page.addInitScript((k) => localStorage.setItem(k, "1"), key);
+    await page.addInitScript((k) => {
+      // Nur im Hauptfenster: in den abgeschotteten Artefakt-iframes ist localStorage gesperrt.
+      if (window === window.top) localStorage.setItem(k, "1");
+    }, key);
   }
 }
 
@@ -101,6 +123,7 @@ export async function openChat(browser: Browser, baseURL: string, ip: string, op
     timezoneId: "Europe/Berlin",
     extraHTTPHeaders: { "x-forwarded-for": ip },
   });
+  trackErrors(context);
   const page = await context.newPage();
   await loginUser(page, opts);
   const chat = new ChatPage(page);
@@ -216,7 +239,10 @@ export const test = base.extend<Fixtures>({
   },
   context: async ({ context, ip }, use) => {
     await context.setExtraHTTPHeaders({ "x-forwarded-for": ip });
+    browserErrors.length = 0;
+    trackErrors(context);
     await use(context);
+    expect(browserErrors, "unbehandelte Fehler im Browser").toEqual([]);
   },
   chat: async ({ page }, use) => {
     await loginUser(page);

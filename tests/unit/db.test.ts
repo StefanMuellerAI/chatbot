@@ -45,5 +45,8 @@ describe("Datenbank (PGlite im Speicher)", () => {
     expect((await lookupAnswer("k1"))?.answer.text).toBe("erste");
     await storeAnswer("k2", "m", { text: "alt", thinking: "", citations: [], stopReason: "end_turn" }, usage, 0.5, -1);
     expect(await lookupAnswer("k2")).toBeNull();
+    // Ein abgelaufener, noch nicht aufgeräumter Eintrag wird durch die neue Antwort ersetzt.
+    await storeAnswer("k2", "m", { text: "neu", thinking: "", citations: [], stopReason: "end_turn" }, usage, 0.5, 1);
+    expect((await lookupAnswer("k2"))?.answer.text).toBe("neu");
   });
 });

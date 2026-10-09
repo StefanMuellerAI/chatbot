@@ -123,7 +123,7 @@ test.describe("C · Chat-Grundfunktionen", () => {
     await expect(banner).toBeHidden();
   });
 
-  test("C08 Kopieren von Frage, Antwort und Code landet exakt in der Zwischenablage", async ({ chat, page, context }) => {
+  test("C08 Kopieren von Frage, Antwort und Code landet exakt in der Zwischenablage @nur-chromium", async ({ chat, page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     const question = `#formatierung ${uniq()}`;
     await chat.ask(question);

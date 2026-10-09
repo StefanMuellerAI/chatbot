@@ -393,7 +393,7 @@ const server = createServer(async (req, res) => {
     if (path === "/__requests") {
       const contains = url.searchParams.get("contains") ?? "";
       const since = Number(url.searchParams.get("since") ?? 0);
-      return json(res, 200, recorded.filter((r) => r.at >= since && r.raw.includes(contains)).map(({ raw: _raw, ...r }) => r));
+      return json(res, 200, recorded.filter((r) => r.at >= since && r.raw.includes(contains)).map((r) => ({ ...r, raw: undefined })));
     }
 
     const provider = path.startsWith("/v1/messages") || req.headers["anthropic-version"] ? "anthropic" : "openai";
@@ -420,10 +420,11 @@ const server = createServer(async (req, res) => {
         data: [
           { type: "model", id: "claude-fake-1", display_name: "Claude Fake 1", created_at: "2026-09-01T00:00:00Z" },
           { type: "model", id: "claude-fake-2", display_name: "Claude Fake 2", created_at: "2026-09-02T00:00:00Z" },
+          { type: "model", id: "claude-sonnet-5-5", display_name: "Claude Sonnet 5.5", created_at: "2026-08-01T00:00:00Z" },
         ],
         has_more: false,
         first_id: "claude-fake-1",
-        last_id: "claude-fake-2",
+        last_id: "claude-sonnet-5-5",
       });
     }
     if (req.method === "POST" && path === "/v1/responses") return await openaiResponses(req, res, body);

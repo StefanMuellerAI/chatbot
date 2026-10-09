@@ -1,18 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
-import type { Page, TestInfo } from "@playwright/test";
 import { expect, loginUser, test, uniq } from "../support/fixtures";
-
-/** Prüft die Seite mit axe; Inhalte von Artefakten (iframes) stammen vom Modell und bleiben außen vor. */
-async function expectAccessible(page: Page, testInfo: TestInfo, label: string) {
-  const result = await new AxeBuilder({ page }).exclude("iframe").withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
-  const serious = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
-  await testInfo.attach(`axe-${label}.json`, { body: JSON.stringify(result.violations, null, 2), contentType: "application/json" });
-  await testInfo.attach(`screenshot-${label}.png`, { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
-  expect(
-    serious.map((v) => `${v.id}: ${v.help} → ${v.nodes.map((n) => n.target.join(" ")).slice(0, 3).join(" | ")}`),
-    `axe ${label}`,
-  ).toEqual([]);
-}
+import { expectAccessible } from "../support/a11y";
 
 test.describe("N · Darstellung, Handy und Barrierefreiheit", () => {
   test("N01 Handy: Menü öffnet und schließt, Chatwahl schließt die Leiste, Aktionen ohne Hover @mobil", async ({ chat, page }) => {

@@ -59,14 +59,15 @@ export function errorResponse(err: unknown): Response {
   return Response.json({ error: "Es ist ein interner Fehler aufgetreten. Bitte erneut versuchen." }, { status: 500 });
 }
 
-const MAX_ATTEMPTS = 30;
+const MAX_ATTEMPTS = 50;
 
 /**
- * Brute-Force-Schutz für Logins: höchstens 30 Fehlversuche pro 10 Minuten, IP und Bereich
+ * Brute-Force-Schutz für Logins: höchstens 50 Fehlversuche pro 10 Minuten, IP und Bereich
  * (Teilnehmende und Admin zählen getrennt).
  * Gezählt wird atomar VOR der Passwortprüfung (parallele Anfragen werden mitgezählt);
  * eine erfolgreiche Anmeldung erstattet ihren Versuch zurück. Der Wert ist großzügig,
- * weil eine ganze Schulungsgruppe oft über dieselbe IP-Adresse kommt.
+ * weil eine ganze Schulungsgruppe oft über dieselbe IP-Adresse kommt: 25 gleichzeitige
+ * Anmeldungen plus 25 Tippfehler sperren noch niemanden aus.
  */
 export async function consumeLoginAttempt(request: Request, scope: "user" | "admin"): Promise<() => Promise<void>> {
   const ipHash = hashId(`${scope}:${clientIp(request)}`);

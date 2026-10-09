@@ -26,6 +26,8 @@ const projects: Project[] = [
   { name: "chat", testDir: "tests/e2e/chat", grepInvert: /@mobil|@tablet/, use: { ...chrome, baseURL: baseUrl("mock") } },
   { name: "admin", testDir: "tests/e2e/admin", workers: 1, use: { ...chrome, baseURL: baseUrl("mock-serial") } },
   { name: "api", testDir: "tests/e2e/api", use: { baseURL: baseUrl("mock") } },
+  // Last und Ausfälle: einzeln, damit Zeitbudgets nicht von anderen Tests abhängen.
+  { name: "belastung", testDir: "tests/e2e/belastung", workers: 1, timeout: 180_000, use: { ...chrome, baseURL: baseUrl("mock") } },
   {
     name: "mobile",
     testDir: "tests/e2e/chat",

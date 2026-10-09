@@ -5,7 +5,7 @@ import { PASSWORDS } from "../support/servers.mjs";
 const dialog = (page: Page) => page.getByRole("dialog");
 
 test.describe("R · Admin: Vorlagen", () => {
-  test("R01 Vorlage anlegen, bearbeiten und löschen – mit Wirkung im Chat", async ({ page, browser, baseURL, ip }) => {
+  test("R01/R02 Vorlage anlegen, bearbeiten und löschen – mit Symbol, Reihenfolge und Wirkung im Chat", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Vorlagen");
     await page.getByRole("button", { name: "Vorlage anlegen" }).click();
     const d = dialog(page);
@@ -71,7 +71,7 @@ test.describe("R · Admin: Vorlagen", () => {
 });
 
 test.describe("S · Admin: Sicherheit", () => {
-  test("S01/A11 Neues Passwort: Teilnehmende werden abgemeldet, nur das neue gilt", async ({ page, browser, baseURL, ip }) => {
+  test("S01/S02/A11/A12 Neues Passwort: Teilnehmende werden abgemeldet, nur das neue gilt – bis zum Zurücksetzen", async ({ page, browser, baseURL, ip }) => {
     const chat = await openChat(browser, baseURL!, ip);
     await openAdmin(page, "Sicherheit");
     const field = page.getByLabel("Neues Passwort (z. B. pro Schulung)");
@@ -128,7 +128,7 @@ test.describe("S · Admin: Sicherheit", () => {
     await expect(page.getByRole("heading", { name: "Systemstatus" })).toBeVisible();
   });
 
-  test("S04 Antwort-Cache leeren: die nächste gleiche Frage kommt nicht aus dem Cache", async ({ page, browser, baseURL, ip }) => {
+  test("S04/M05 Antwort-Cache leeren: die nächste gleiche Frage kommt nicht aus dem Cache", async ({ page, browser, baseURL, ip }) => {
     const chat = await openChat(browser, baseURL!, ip);
     const question = `Wird geleert ${uniq()}`;
     await chat.ask(question);

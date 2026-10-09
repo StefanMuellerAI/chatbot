@@ -12,7 +12,8 @@ if (!name || !port || !["mock", "fake"].includes(mode)) {
 }
 
 const dataDir = path.resolve(".data/e2e", name);
-rmSync(dataDir, { recursive: true, force: true });
+// Für den Neustart-Test (W01) bleiben Datenbank und Dateien erhalten.
+if (process.env.E2E_KEEP_DATA !== "1") rmSync(dataDir, { recursive: true, force: true });
 
 // Keine echten Schlüssel oder Speicher aus der Umgebung übernehmen.
 const env = Object.fromEntries(

@@ -175,6 +175,21 @@ export function ChatApp() {
   }, [streaming, active?.messages.length]);
 
   const messages = useMemo(() => active?.messages ?? [], [active]);
+  // Endet ein Chat mit einer Frage aus einer früheren Sitzung (Seite während der Antwort neu
+  // geladen), fehlt die Antwort: Hinweis mit „Neu generieren“ statt eines stummen Endes.
+  const missingAnswer = useMemo<ChatMessage | null>(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "user" || streaming || last.createdAt >= PAGE_LOADED_AT) return null;
+    return {
+      id: `fehlt-${last.id}`,
+      role: "assistant",
+      text: "",
+      createdAt: last.createdAt,
+      modelId: active?.modelId,
+      stopReason: "incomplete",
+      error: "Die Antwort fehlt – die Seite wurde während der Antwort neu geladen oder die Verbindung ist abgebrochen. Bitte „Neu generieren“ verwenden.",
+    };
+  }, [messages, streaming, active?.modelId]);
   const streamingHere = streaming && streaming.conversationId === active?.id ? streaming.state : null;
 
   const artifactsEnabled = config?.features.artifacts ?? true;
@@ -621,6 +636,18 @@ export function ChatApp() {
                     onOpenArtifact={openArtifact}
                   />
                 ),
+              )}
+              {missingAnswer && (
+                <AssistantMessage
+                  message={missingAnswer}
+                  modelName={modelName(missingAnswer.modelId)}
+                  isLast
+                  showCacheBadge={false}
+                  showCost={false}
+                  onRegenerate={regenerate}
+                  artifactsEnabled={artifactsEnabled}
+                  onOpenArtifact={openArtifact}
+                />
               )}
               {streamingHere && (
                 <AssistantMessage

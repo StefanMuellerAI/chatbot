@@ -108,7 +108,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | A04 | Falsches Passwort | „Das Passwort stimmt nicht.“, Feld bleibt nutzbar |
 | A05 | Richtiges Passwort per Button und per Enter | Chat öffnet; Cookie HttpOnly, Secure, SameSite=Lax, 12 Stunden |
 | A06 | Passwort mit über 200 Zeichen | verständliche Meldung (heute irreführend) |
-| A07 | 30 Fehlversuche, dann der 31. | Sperre mit Meldung, auch das richtige Passwort wird abgewiesen; andere IP nicht betroffen; Erfolg zählt einen Versuch zurück |
+| A07 | 50 Fehlversuche, dann der 51. | Sperre mit Meldung, auch das richtige Passwort wird abgewiesen; andere IP nicht betroffen; Erfolg zählt einen Versuch zurück |
 | A08 | Abgelaufene, manipulierte oder Admin-Tokens als Teilnehmer-Cookie | abgewiesen, Weiterleitung auf Login |
 | A09 | Bereits angemeldet `/login` öffnen | Weiterleitung in den Chat (heute: Login-Seite) |
 | A10 | „Abmelden“ | zurück zum Login, Cookie weg, Zurück-Taste zeigt keine Daten mehr |
@@ -156,6 +156,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | D07 | Gespeichertes Modell existiert nicht mehr | Rückfall auf das Standardmodell |
 | D08 | Gar kein Modell verfügbar | Hinweisleiste, Eingabe gesperrt mit passendem Text |
 | D09 | Bedienung nur mit Tastatur | Menüs mit Pfeiltasten und Esc bedienbar (heute nicht) |
+| D10 | Modellwahl während einer Antwort | gesperrt, bis die Antwort fertig ist |
 
 ### E · Verlauf und Seitenleiste
 
@@ -214,6 +215,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | I02 | Fehler bei der Erzeugung | Meldung; beim nächsten Öffnen wieder weg (heute bleibt sie stehen) |
 | I03 | Bild im Chat („Erstelle ein Bild von …“), Bild verändern lassen | Statusanzeige, Bild in der Antwort, Referenzbild wird genutzt |
 | I04 | Funktion aus / kein OpenAI-Schlüssel | Button fehlt, Werkzeug wird nicht angeboten, API sperrt |
+| I05 | Sehr lange Bildbeschreibung | auf 4.000 Zeichen begrenzt, Zähler sichtbar |
 
 ### J · Websuche
 
@@ -317,13 +319,16 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | S03 | Alle abmelden (bestätigen / abbrechen) | alle Teilnehmenden raus, eigener Admin-Zugang bleibt |
 | S04 | Cache leeren (bestätigen / abbrechen) | nächste gleiche Frage kommt nicht aus dem Cache |
 
-### U · API-Robustheit (ohne Browser, alle 22 Routen)
+### U · API-Robustheit (ohne Browser, alle 24 Routen)
 
-- ohne Anmeldung, mit abgelaufener und mit fremder Sitzung → 401
-- falsche Methode → 405; kaputtes JSON und Schemafehler → 400 mit deutscher Meldung (heute teils 500)
-- Grenzwerte jedes Feldes; Pfad-Tricks bei Dateien (`../`, kodiert, fremde Präfixe)
-- Aufräumjob ohne und mit falschem bzw. richtigem Secret
-- Sicherheits-Header auf allen Antworten; Datei-Auslieferung mit Sandbox-CSP; Cookie-Attribute
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| U01 | Ohne, mit gefälschter und mit Teilnehmer-Sitzung an Admin-Routen; Cookie-Attribute | 401 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit |
+| U02 | Falsche Methode | 405 |
+| U03 | Kaputtes JSON, falsche Felder, Grenzwerte (Nachricht, Anhänge, Bild-Prompt, Passwort) | 400 mit deutscher Meldung bzw. „Passwort stimmt nicht“ – nie 500 |
+| U04 | Pfad-Tricks (`../`, kodiert, fremde Präfixe, Nullbyte), hochgeladenes HTML | 400/404; Auslieferung als Download mit Sandbox-CSP |
+| U05 | Aufräumjob ohne, mit falschem und richtigem Secret | 401, 401, 200 mit Zählern |
+| U06 | Sicherheits-Header auf Seiten, API-Antworten und Fehlern | nosniff, DENY, Referrer-Policy, HSTS, Permissions-Policy |
 
 ### V · Anbieter-Adapter (Fake-API, je Claude und GPT)
 
@@ -347,14 +352,17 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 ### X · Live-Smoke (`freebie.stefanai.de`)
 
-Nach jedem Production-Deploy und auf Abruf, mit dem Teilnehmer-Passwort, ohne Einstellungen zu ändern:
+Nach jedem Production-Deploy und auf Abruf, mit dem Teilnehmer-Passwort, ohne Einstellungen zu ändern
+(`LIVE=1 LIVE_PASSWORD=… LIVE_ADMIN_PASSWORD=… npm run test:e2e:live`):
 
-1. Systemstatus im Admin komplett grün (inkl. **Blob-Speicher**)
-2. je eine kurze Frage an Claude Haiku und GPT-6 Luna (Denktiefe „Niedrig“)
-3. kleines PDF hochladen (über Blob) und befragen
-4. 10-Sekunden-MP3 transkribieren
-5. ein Bild in Entwurfsqualität
-6. eine Websuche-Frage und ein kleines Artefakt
+| ID | Schritt | Erwartete Wirkung |
+|---|---|---|
+| X01 | Systemstatus im Admin (nur lesen) | alles grün, inkl. **Blob-Speicher**, Postgres, Cron, Schlüssel |
+| X02 | je eine kurze Frage an Claude Haiku und GPT-6 Luna (Denktiefe „Niedrig“) | Antwort ohne Fehlermeldung |
+| X03 | kleines PDF hochladen (über Blob) und befragen | Anhang bereit, Antwort |
+| X04 | kurze MP3 transkribieren | Transkript, Antwort |
+| X05 | ein Bild in Entwurfsqualität | Bild erscheint |
+| X06 | eine Websuche-Frage und ein kleines Artefakt | Quellen; Artefakt-Panel öffnet sich |
 
 Geschätzte Kosten: unter 0,10 $ pro Lauf.
 

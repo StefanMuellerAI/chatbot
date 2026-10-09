@@ -75,7 +75,7 @@ test.describe("K · Artefakte", () => {
     await expect(select).toHaveValue("2");
   });
 
-  test("K05 Kopieren, Herunterladen, neuer Tab, Schließen und Kopfzeilen-Knopf", async ({ chat, page, context }) => {
+  test("K05 Kopieren, Herunterladen, neuer Tab, Schließen und Kopfzeilen-Knopf @nur-chromium", async ({ chat, page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await chat.ask(`Baue eine Landingpage ${uniq()}`);
     const p = panel(page, "Beispielseite");

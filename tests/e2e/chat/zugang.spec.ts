@@ -76,13 +76,13 @@ test.describe("A · Zugang und Sitzung", () => {
     await expect(page.locator("form").getByRole("alert")).toHaveText("Das Passwort stimmt nicht.");
   });
 
-  test("A07 nach 30 Fehlversuchen greift die Login-Bremse – nur für diese IP und nicht für den Admin", async ({ page, playwright, baseURL, ip }) => {
-    for (let i = 0; i < 29; i++) {
+  test("A07 nach 50 Fehlversuchen greift die Login-Bremse – nur für diese IP und nicht für den Admin", async ({ page, playwright, baseURL, ip }) => {
+    for (let i = 0; i < 49; i++) {
       expect((await page.request.post("/api/auth/login", { data: { password: `falsch-${i}` } })).status()).toBe(401);
     }
     // Eine erfolgreiche Anmeldung zählt ihren Versuch zurück.
     expect((await page.request.post("/api/auth/login", { data: { password: PASSWORDS.app } })).status()).toBe(200);
-    expect((await page.request.post("/api/auth/login", { data: { password: "falsch-30" } })).status()).toBe(401);
+    expect((await page.request.post("/api/auth/login", { data: { password: "falsch-50" } })).status()).toBe(401);
     const locked = await page.request.post("/api/auth/login", { data: { password: PASSWORDS.app } });
     expect(locked.status()).toBe(429);
 

@@ -9,7 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "node tests/e2e/smoke.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:live": "LIVE=1 playwright test",
+    "test:coverage": "node tests/e2e/coverage.mjs",
     "check": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {

@@ -211,11 +211,20 @@ test.describe("V06 · Titel, Transkription, Bilder, Modell-Listen", () => {
     expect(request.body).toEqual({ model: "gpt-image-2", prompt, size: "1024x1536", quality: "high", n: 1 });
   });
 
-  test("V06 Modell-Listen beider Anbieter und Verbindungstest", async ({ page }) => {
+  test("V06/P08 Modell-Listen beider Anbieter, Übernahme in den Dialog und Verbindungstest", async ({ page }) => {
     await openAdmin(page, "Modelle");
     await page.getByRole("button", { name: "Claude-Modelle abrufen" }).click();
-    await expect(page.getByRole("button", { name: "Claude Fake 1 (claude-fake-1)" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Claude Fake 2 (claude-fake-2)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Claude Fake 2 (claude-fake-2)" })).toBeEnabled();
+    // Bereits angelegte Modelle sind ausgegraut.
+    await expect(page.getByRole("button", { name: "Claude Sonnet 5.5 (claude-sonnet-5-5)" })).toBeDisabled();
+    await page.getByRole("button", { name: "Claude Fake 1 (claude-fake-1)" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Modell anlegen" })).toBeVisible();
+    await expect(dialog.getByLabel("Anbieter")).toHaveValue("anthropic");
+    await expect(dialog.getByLabel("API-Modell-ID")).toHaveValue("claude-fake-1");
+    await expect(dialog.getByLabel("Anzeigename")).toHaveValue("Claude Fake 1");
+    await dialog.getByRole("button", { name: "Abbrechen" }).click();
+    await expect(dialog).toBeHidden();
     await page.getByRole("button", { name: "OpenAI-Modelle abrufen" }).click();
     await expect(page.getByRole("button", { name: /^gpt-fake-/ })).toHaveText(["gpt-fake-a", "gpt-fake-b"]);
 

@@ -221,6 +221,7 @@ function DailyChart({ daily }: { daily: OverviewData["daily"] }) {
                 onMouseEnter={() => setHover(i)}
                 onFocus={() => setHover(i)}
                 tabIndex={0}
+                role="img"
                 aria-label={`${formatDay(d.day)}: ${usd(d.costUsd)}`}
               >
                 <div

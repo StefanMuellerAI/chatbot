@@ -91,11 +91,16 @@ export async function storeAnswer(
 ): Promise<void> {
   const db = await getDb();
   const expiresAt = new Date(Date.now() + hours * 3_600_000);
-  // Die erste Antwort bleibt die gemeinsame – vorhandene Einträge werden nicht überschrieben.
+  // Die erste Antwort bleibt die gemeinsame – nur abgelaufene Einträge (vom Aufräumjob noch
+  // nicht gelöscht) werden ersetzt, sonst ließe sich der Cache bis dahin nicht neu füllen.
   await db
     .insert(schema.answerCache)
     .values({ keyHash: key, modelId, answer, usage, costUsd, expiresAt })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: schema.answerCache.keyHash,
+      set: { modelId, answer, usage, costUsd, expiresAt, hits: 0, createdAt: new Date() },
+      setWhere: lt(schema.answerCache.expiresAt, new Date()),
+    });
 }
 
 export async function deleteExpiredAnswers(): Promise<void> {

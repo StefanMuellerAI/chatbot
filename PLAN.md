@@ -150,7 +150,7 @@ type NeutralEvent =
   (`HttpOnly`, `Secure`, `SameSite=Lax`, 12 h gültig; das Admin-Cookie hat einen eigenen Scope und
   gilt 2 h).
 - `proxy.ts` schützt alle Routen außer `/login` und statischen Assets, also auch `/api/*`.
-- Brute-Force-Schutz **nur für den Login**: höchstens 30 Fehlversuche pro 10 Minuten und IP, atomar in
+- Brute-Force-Schutz **nur für den Login**: höchstens 50 Fehlversuche pro 10 Minuten und IP, atomar in
   der Datenbank gezählt (großzügig, weil eine Schulungsgruppe oft über eine IP kommt). Das ist eine
   Sicherheitsmaßnahme und keine Nutzungsbegrenzung.
 - Jede Browser-Sitzung erhält eine anonyme Sitzungs-ID (Zufallswert im Cookie). Sie dient der

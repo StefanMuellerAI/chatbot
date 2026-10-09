@@ -59,8 +59,27 @@ Mock-Provider – damit lässt sich die komplette Oberfläche ohne API-Kosten au
 |---|---|
 | `npm run check` | Typecheck, Lint und Unit-Tests |
 | `npm run test` | Unit-Tests (Vitest), u. a. Stabilität der Cache-Präfixe |
-| `npm run test:e2e` | Browser-Test gegen eine laufende Instanz im Testmodus (`BASE_URL`, Playwright) |
-| `npm run build` | Produktions-Build |
+| `npm run build` | Produktions-Build (nötig vor den E2E-Tests) |
+| `npm run test:e2e` | Komplette E2E-Suite mit Playwright gegen den Produktions-Build (startet eigene Server) |
+| `npm run test:coverage` | Abdeckungsmatrix: jede Einstellung, Route und Katalog-ID hat einen Test |
+| `npm run test:e2e:live` | Live-Smoke gegen `freebie.stefanai.de` (`LIVE_PASSWORD`, optional `LIVE_ADMIN_PASSWORD`; < 0,10 $) |
+
+### E2E-Tests
+
+Die Suite (`tests/e2e`, Plan und Katalog in [TESTPLAN.md](TESTPLAN.md)) startet automatisch vier
+Freebie-Instanzen mit frischer Datenbank und eine nachgebaute Anthropic-/OpenAI-API:
+
+| Projekt | Inhalt | Server |
+|---|---|---|
+| `chat`, `mobile`, `tablet` | Oberfläche für Teilnehmende (Desktop, 390 px, 820 px) | Mock, parallel |
+| `admin` | Admin-Bereich, ändert Einstellungen (Rücksetzen nach jedem Test) | Mock, seriell |
+| `api` | alle Routen ohne Browser | Mock, parallel |
+| `provider`, `provider-serial` | echte Claude-/GPT-Adapter gegen die Fake-API inkl. Caching-Vertrag | Fake-API |
+| `belastung` | Neustart, Abbrüche, 500 Chats, 25 Personen über eine IP | Mock |
+| `chat-webkit`, `chat-firefox` | Chat-Tests in Safari-Engine und Firefox (`E2E_BROWSERS=webkit,firefox`) | Mock |
+
+Einzelne Bereiche: `npx playwright test --project=admin`, einzelne Tests: `-g "Q14"`. Testdateien
+(PDF, Office, Audio, Bilder, Grenzfälle) erzeugt `tests/e2e/support/generate-files.ts` beim Start.
 
 ## Architektur in Kürze
 

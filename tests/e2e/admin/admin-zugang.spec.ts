@@ -1,3 +1,4 @@
+import { expectAccessible } from "../support/a11y";
 import { expect, openAdmin, openChat, test, uniq } from "../support/fixtures";
 import { attach, expectReady } from "../support/files";
 import { PASSWORDS } from "../support/servers.mjs";
@@ -112,4 +113,27 @@ test.describe("O · Admin: Zugang und Übersicht", () => {
     await expect(item("Aufräumjob (CRON_SECRET)")).toContainText("Täglicher Cron aktiv");
     await expect(item("Teilnehmer-Passwort")).toContainText("Aus APP_PASSWORD");
   });
+
+  for (const scheme of ["light", "dark"] as const) {
+    test(`N02/N03 Admin-Bereich ${scheme === "light" ? "hell" : "dunkel"}: barrierearm, Screenshot je Bereich`, async ({ page }, testInfo) => {
+      await page.emulateMedia({ colorScheme: scheme });
+      await page.goto("/admin");
+      await expectAccessible(page, testInfo, `admin-login-${scheme}`);
+      await openAdmin(page);
+      const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      const [r, g, b] = background.match(/\d+/g)!.map(Number);
+      // Hell: heller Hintergrund, dunkel: dunkler Hintergrund.
+      if (scheme === "dark") expect(r + g + b).toBeLessThan(150);
+      else expect(r + g + b).toBeGreaterThan(600);
+      for (const tab of ["Übersicht", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
+        await page.getByRole("tab", { name: tab }).click();
+        await expect(page.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
+        await expectAccessible(page, testInfo, `admin-${tab.toLowerCase()}-${scheme}`);
+      }
+      await page.getByRole("tab", { name: "Modelle" }).click();
+      await page.getByRole("button", { name: "Claude Sonnet 5.5 bearbeiten" }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      await expectAccessible(page, testInfo, `admin-modell-dialog-${scheme}`);
+    });
+  }
 });

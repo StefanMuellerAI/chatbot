@@ -72,7 +72,7 @@ test.describe("P · Admin: Modelle", () => {
     });
   }
 
-  test("P03 Fähigkeiten wirken im Chat: Bilder, Websuche, Werkzeuge, Denktiefe", async ({ page, browser, baseURL, ip }) => {
+  test("P03/D05 Fähigkeiten wirken im Chat: Bilder, Websuche, Werkzeuge, Denktiefe", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Modelle");
     await editModel(page, "Claude Sonnet 5.5", async (d) => {
       for (const label of ["Bilder verstehen", "Websuche", "Werkzeuge", "Denkt nach (Effort)"]) await capability(d, label).click();
@@ -89,7 +89,7 @@ test.describe("P · Admin: Modelle", () => {
     expect(await chat.diagnosis(answer, "Websuche")).toBe("aus");
   });
 
-  test("P04 Effort-Stufen lassen sich entfernen, die Standard-Stufe rückt nach", async ({ page, browser, baseURL, ip }) => {
+  test("P04/D05 Effort-Stufen lassen sich entfernen, die Standard-Stufe rückt nach", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Modelle");
     await editModel(page, "Claude Sonnet 5.5", async (d) => {
       await d.getByLabel("Maximal", { exact: true }).fill("");
@@ -154,6 +154,24 @@ test.describe("P · Admin: Modelle", () => {
     await expect(chat.page.getByRole("button", { name: /^Modell:/ })).toHaveAccessibleName("Modell: Claude Sonnet 5.5");
     await chat.page.getByRole("button", { name: /^Modell:/ }).click();
     await expect(chat.page.getByRole("option", { name: /Haiku|Astra/ })).toHaveCount(0);
+  });
+
+  test("D06 Admin deaktiviert das gerade gewählte Modell: Meldung, dann Standardmodell", async ({ page, browser, baseURL, ip }) => {
+    const chat = await openChat(browser, baseURL!, ip);
+    await chat.page.getByRole("button", { name: /^Modell:/ }).click();
+    await chat.page.getByRole("option", { name: /^GPT-6 Luna/ }).click();
+    await chat.ask(`Vorher ${uniq()}`);
+
+    await openAdmin(page, "Modelle");
+    await page.getByRole("button", { name: "GPT-6 Luna deaktivieren" }).click();
+    await expect(row(page, "GPT-6 Luna")).toContainText("deaktiviert");
+
+    const answer = await chat.ask(`Nachher ${uniq()}`);
+    await expect(answer.getByRole("alert")).toHaveText("Dieses Modell ist nicht (mehr) verfügbar. Bitte wähle ein anderes.");
+    await chat.page.reload();
+    await expect(chat.page.getByRole("button", { name: /^Modell:/ })).toHaveAccessibleName("Modell: Claude Sonnet 5.5");
+    await chat.page.getByRole("button", { name: /^Modell:/ }).click();
+    await expect(chat.page.getByRole("option", { name: /^GPT-6 Luna/ })).toHaveCount(0);
   });
 
   test("P07 Test im Testmodus und Abruf ohne Schlüssel", async ({ page }) => {
