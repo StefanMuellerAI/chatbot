@@ -162,7 +162,7 @@ export function Sidebar({
               }
             }}
           />
-          <Link href="/admin" className="flex items-center gap-2 rounded-xl px-3 py-2 text-white/70 hover:bg-white/8 hover:text-white">
+          <Link href="/admin" prefetch={false} className="flex items-center gap-2 rounded-xl px-3 py-2 text-white/70 hover:bg-white/8 hover:text-white">
             <Settings className="h-4 w-4" /> Admin
           </Link>
           <SideAction

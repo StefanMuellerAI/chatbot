@@ -43,6 +43,22 @@ test.describe("A · Zugang und Sitzung", () => {
     expect(posted).toBe(false);
   });
 
+  test("A04 vor dem Laden getipptes oder automatisch ausgefülltes Passwort wird übernommen", async ({ page }) => {
+    // Langsames Netz: das Skript kommt erst, nachdem schon getippt wurde (wie Safari-Autofill).
+    let release!: () => void;
+    const loaded = new Promise<void>((r) => (release = r));
+    await page.route(/\/_next\/static\/chunks\/.*\.js$/, async (route) => {
+      await loaded;
+      await route.continue();
+    });
+    await page.goto("/login", { waitUntil: "commit" });
+    await page.getByLabel("Passwort").fill(PASSWORDS.app);
+    release();
+    await expect(page.getByRole("button", { name: "Los geht's" })).toBeEnabled();
+    await page.getByRole("button", { name: "Los geht's" }).click();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test("A04 falsches Passwort wird abgelehnt, das Feld bleibt nutzbar", async ({ page }) => {
     await page.goto("/login");
     const field = page.getByLabel("Passwort");

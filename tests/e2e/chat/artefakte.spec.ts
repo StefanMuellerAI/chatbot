@@ -20,7 +20,8 @@ test.describe("K · Artefakte", () => {
   test("K02 Sandbox: kein Zugriff auf Cookies, Speicher, API oder die Hauptseite", async ({ chat, page, context }) => {
     await chat.ask(`#artefakt-angriff ${uniq()}`);
     const result = page.frameLocator("iframe[title='Angriff']").locator("#ergebnis");
-    await expect(result).toContainText("cookie=blockiert");
+    // Chromium/Firefox werfen einen Fehler, Safari liefert einen leeren Wert – beides heißt: kein Zugriff.
+    await expect(result).toContainText(/cookie=(blockiert|leer)/);
     await expect(result).toContainText("storage=blockiert");
     await expect(result).toContainText("parent=blockiert");
     await expect(result).toContainText("fetch=blockiert");

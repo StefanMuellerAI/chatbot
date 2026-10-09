@@ -418,6 +418,7 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 | 31 | Tabs im Admin zeigten veraltete Zahlen (kein Neuladen beim Wechsel) | O02 |
 | 32 | Safari/WebKit lehnte das Secure-Cookie über http ab (nur lokal, nicht auf Vercel) – Secure richtet sich jetzt nach dem Protokoll, auf Vercel immer an | A05, U01, `chat-webkit` |
 | 33 | Firefox: SVG-Artefakte ohne Größenangabe blieben in der Vorschau unsichtbar | K03 in `chat-firefox` |
+| 34 | Vor dem Laden getipptes oder automatisch ausgefülltes Passwort (Safari, Passwortmanager): Button blieb gesperrt | A04 |
 
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
@@ -452,11 +453,11 @@ liegt bei dir.
 | 2 · Chat | Bereiche A–N | erledigt |
 | 3 · Admin | Bereiche O–S inkl. jeder Einstellung | erledigt |
 | 4 · Schnittstellen | Fake-API, Bereiche U und V | erledigt |
-| 5 · Fehler beheben | Abschnitt 6 | erledigt (33 Fehler, je mit Test) |
+| 5 · Fehler beheben | Abschnitt 6 | erledigt (34 Fehler, je mit Test) |
 | 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | erledigt; WebKit/Firefox laufen nur in der CI (lokal nicht installierbar) |
 | 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
 
-Ergebnis: 206 E2E-Tests in 19 Dateien (plus 6 Live-Smoke-Tests) und 46 Unit-Tests; die komplette Suite läuft lokal in gut 5 Minuten
+Ergebnis: 207 E2E-Tests in 19 Dateien (plus 6 Live-Smoke-Tests) und 46 Unit-Tests; die komplette Suite läuft lokal in gut 5 Minuten
 (3 Worker) und dreimal hintereinander ohne Wiederholungen grün.
 
 ## 9. Was automatisiert nicht geht – kurze manuelle Abnahme
