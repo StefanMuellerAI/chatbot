@@ -1,5 +1,5 @@
 import { expect, test, uniq } from "../support/fixtures";
-import { attach, chip, expectReady, payload } from "../support/files";
+import { attach, chip, expectReady, freshPayload, payload } from "../support/files";
 
 test.describe("G · Audio-Transkription", () => {
   test("G01 kurze MP3 wird transkribiert und erreicht das Modell", async ({ chat, page }) => {
@@ -21,7 +21,7 @@ test.describe("G · Audio-Transkription", () => {
       await new Promise((r) => setTimeout(r, 600 * (index + 1)));
       await route.continue();
     });
-    await attach(page, "lang.mp3");
+    await attach(page, freshPayload("lang.mp3"));
     await expect(chip(page, "lang.mp3")).toContainText("Transkribiere Abschnitt 0/3", { timeout: 60_000 });
     await expect(chip(page, "lang.mp3")).toContainText(/Transkribiere Abschnitt [12]\/3/);
     await expectReady(page, "lang.mp3", /Tokens|Transkript/);
@@ -59,7 +59,7 @@ test.describe("G · Audio-Transkription", () => {
         await route.continue();
       }
     });
-    await attach(page, "ton.m4a");
+    await attach(page, freshPayload("ton.m4a"));
     await expectReady(page, "ton.m4a", /Tokens|Transkript/);
     expect(failures).toBe(1);
     void chat;
@@ -69,7 +69,7 @@ test.describe("G · Audio-Transkription", () => {
     await page.route("/api/transcribe/chunk", (route) =>
       route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "Der Anbieter hat gerade Probleme. Bitte gleich nochmal versuchen." }) }),
     );
-    await attach(page, "ton.flac");
+    await attach(page, freshPayload("ton.flac"));
     await expect(chip(page, "ton.flac")).toContainText("Der Anbieter hat gerade Probleme.", { timeout: 30_000 });
     void chat;
   });

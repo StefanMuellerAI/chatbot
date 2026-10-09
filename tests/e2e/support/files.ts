@@ -42,6 +42,12 @@ export function payload(name: string, as?: string) {
   return { name: target, mimeType: MIME[ext] ?? "application/octet-stream", buffer: readFileSync(file(name)) };
 }
 
+/** Wie payload(), aber mit eigener Prüfsumme – damit Datei- und Transkript-Cache nicht greifen (auch bei Wiederholungen). */
+export function freshPayload(name: string, as?: string) {
+  const p = payload(name, as);
+  return { ...p, buffer: Buffer.concat([p.buffer, Buffer.from(Math.random().toString(36).slice(2))]) };
+}
+
 export const attachments = (page: Page) => page.getByRole("group", { name: "Anhänge" });
 export const chip = (page: Page, name: string): Locator => attachments(page).getByRole("group", { name, exact: true });
 
