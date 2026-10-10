@@ -29,6 +29,7 @@ export interface AdminSettings {
 const FEATURES: { key: keyof FeatureFlags; label: string; hint: string }[] = [
   { key: "webSearch", label: "Websuche", hint: "Modelle dürfen im Web recherchieren (wird pro Suche abgerechnet)" },
   { key: "uploads", label: "Datei-Upload", hint: "PDF, Word, Excel, PowerPoint, Text und Bilder" },
+  { key: "library", label: "Fundus", hint: "Erfundene Word-, Excel-, PowerPoint-Dateien und E-Mails zum Anhängen – auch wenn der Datei-Upload aus ist" },
   { key: "transcription", label: "Audio-Transkription", hint: "MP3 & Co. hochladen und transkribieren (OpenAI)" },
   { key: "dictation", label: "Spracheingabe", hint: "Mikrofon-Button im Eingabefeld (OpenAI)" },
   { key: "imageGeneration", label: "Bildgenerierung", hint: "Bild-Modus und Bild-Tool für alle Modelle (OpenAI)" },

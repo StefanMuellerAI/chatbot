@@ -13,6 +13,7 @@ const MIME: Record<string, string> = {
   xls: "application/vnd.ms-excel",
   ods: "application/vnd.oasis.opendocument.spreadsheet",
   pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  eml: "message/rfc822",
   csv: "text/csv",
   tsv: "text/tab-separated-values",
   txt: "text/plain",

@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Das ffmpeg-Binary wird nicht per import gefunden und muss explizit ins Funktions-Bundle.
   outputFileTracingIncludes: {
     "/api/transcribe/*": ["./node_modules/ffmpeg-static/ffmpeg"],
+    // Der Fundus (erzeugt beim Build in .library/) wird zur Laufzeit gelesen.
+    "/api/library/**": ["./.library/**"],
+    "/api/chat": ["./.library/**"],
   },
   // Lokale Daten und Entwicklungsdateien gehören nie ins Funktions-Bundle.
   outputFileTracingExcludes: {

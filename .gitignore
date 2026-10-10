@@ -48,3 +48,7 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /blob-report/
+
+# Fundus (erzeugt von library/build beim Build)
+/.library
+/.library.tmp-*

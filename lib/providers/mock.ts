@@ -198,7 +198,7 @@ function diagnosis(req: ProviderRequest, parts: PreparedPart[], lastText: string
 
 function fileContents(parts: PreparedPart[]): string {
   return parts
-    .flatMap((p) => (p.type === "text" ? [...p.text.matchAll(/<(datei|transkript) [^>]*>[\s\S]*?<\/\1>/g)].map((m) => m[0].slice(0, 2000)) : []))
+    .flatMap((p) => (p.type === "text" ? [...p.text.matchAll(/<(datei|transkript) [^>]*>[\s\S]*?<\/\1>/g)].map((m) => m[0].slice(0, 8000)) : []))
     .join("\n\n");
 }
 

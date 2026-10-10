@@ -28,7 +28,8 @@
     "paused": ["Q01"],
     "pausedMessage": ["Q01"],
     "systemPromptAddendum": ["Q19"],
-    "sessionVersion": ["S03", "A11", "A12"]
+    "sessionVersion": ["S03", "A11", "A12"],
+    "features.library": ["Q21", "Y01"]
   },
   "routes": {
     "GET /api/admin/events": ["T01", "T08", "T17", "U01"],
@@ -71,7 +72,11 @@
     "POST /api/transcribe/finish": ["G01", "G02"],
     "POST /api/transcribe/dictate": ["H01", "Q15"],
     "POST /api/upload/local": ["F02", "U04"],
-    "POST /api/upload/token": ["U04", "X03"]
+    "POST /api/upload/token": ["U04", "X03"],
+    "GET /api/library": ["Y03", "Y11", "Y21"],
+    "GET /api/library/[id]": ["Y06", "Y13", "Y21"],
+    "GET /api/library/[id]/file": ["Y07", "Y21"],
+    "POST /api/library/attach": ["Y08", "Y11", "Y18", "Y21"]
   },
   "elements": {
     "Login: Benutzername und Passwort": ["A03", "A04", "A05", "A06", "T14"],
@@ -156,6 +161,21 @@
     "Admin Termine: Gruppe anlegen, umbenennen, löschen": ["T02", "T03"],
     "Admin Termine: Gäste nachlegen, Passwort neu, Gast löschen": ["T03"],
     "Admin Termine: Passwörter zeigen/verbergen": ["T03"],
-    "Admin Termine: Zugangsdaten drucken und als CSV": ["T04"]
+    "Admin Termine: Zugangsdaten drucken und als CSV": ["T04"],
+    "Eingabe: Datenbank-Symbol (Fundus)": ["Y01", "Q21"],
+    "Fundus: Schließen (X, Esc, Klick daneben)": ["Y02"],
+    "Fundus: Reiter Dokumente / E-Mails": ["Y02", "Y19"],
+    "Fundus: Suche": ["Y05", "Y12"],
+    "Fundus: Filter Verwaltung und Organisationseinheit": ["Y03", "Y04"],
+    "Fundus: Typ- und Merkmal-Chips, Filter zurücksetzen": ["Y04"],
+    "Fundus: Liste mit Auswahl (Maus und Tastatur)": ["Y09", "Y19"],
+    "Fundus: Vorschau Word, Excel (Blattreiter), PowerPoint (Notizen)": ["Y06"],
+    "Fundus: Anhängen, Zur Auswahl, Dateien anhängen": ["Y08", "Y09", "Y10"],
+    "Fundus: Herunterladen": ["Y07"],
+    "Fundus: Diese E-Mail anhängen, Ganzen Verlauf anhängen": ["Y14", "Y15"],
+    "Fundus: Anhänge mitnehmen": ["Y16"],
+    "Fundus: Erneut versuchen": ["Y11"],
+    "Fundus: Filter-Knopf und Zurück zur Liste (Handy)": ["Y20"],
+    "Admin: Schalter Fundus": ["Q21"]
   }
 }

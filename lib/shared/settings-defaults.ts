@@ -37,6 +37,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     answerCache: true,
     showCacheBadge: true,
     showCost: false,
+    library: true,
   },
   imageModel: "gpt-image-2",
   imageDefaultQuality: "medium",

@@ -1,10 +1,12 @@
 "use client";
-import { ArrowUp, Brain, Check, Globe, ImagePlus, Loader2, Paperclip, Square, X } from "lucide-react";
+import { ArrowUp, Brain, Check, Database, Globe, ImagePlus, Loader2, Paperclip, Square, X } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ACCEPT_ATTRIBUTE, MAX_ATTACHMENTS, MAX_MESSAGE_CHARS, maxBytesFor } from "@/lib/files/limits";
+import { attachFromLibrary } from "@/lib/client/library";
 import { prepareImage, processUpload, transcribeUpload, uploadCategory, uploadFile } from "@/lib/client/upload";
 import { EFFORT_LEVELS, type Attachment, type Effort, type PublicConfig, type PublicModel } from "@/lib/shared/types";
 import { cn } from "@/components/ui/cn";
+import { LibraryDialog, type LibraryPick } from "./library/LibraryDialog";
 import { AttachmentChip } from "./Message";
 import { VoiceButton } from "./VoiceButton";
 
@@ -18,6 +20,8 @@ interface Pending {
   attachment?: Attachment;
   error?: string;
   controller?: AbortController;
+  /** Aus dem Fundus (ID des Dokuments bzw. der E-Mail). */
+  libraryId?: string;
 }
 
 export interface ComposerHandle {
@@ -54,6 +58,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   }, [pending]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const features = config.features;
 
   const update = (localId: string, patch: Partial<Pending>) =>
@@ -121,6 +126,33 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
     [config, disabled, features.transcription, features.uploads],
   );
 
+  /** Hängt Dokumente oder E-Mails aus dem Fundus an – wie ein Upload, nur ohne Hochladen. */
+  const addLibraryItems = useCallback(
+    (items: LibraryPick[]) => {
+      if (disabled) return;
+      let slots = MAX_ATTACHMENTS - pendingRef.current.filter((p) => p.status !== "error").length;
+      for (const item of items) {
+        if (pendingRef.current.some((p) => p.libraryId === item.id && p.status !== "error")) continue;
+        const localId = crypto.randomUUID();
+        const controller = new AbortController();
+        const base: Pending = { localId, name: item.name, kind: "document", progress: 0.3, label: "Wird aus dem Fundus geholt …", status: "working", controller, libraryId: item.id };
+        if (slots <= 0) {
+          setPending((l) => [...l, { ...base, status: "error", error: `Höchstens ${MAX_ATTACHMENTS} Anhänge pro Nachricht.` }]);
+          continue;
+        }
+        slots--;
+        setPending((l) => [...l, base]);
+        attachFromLibrary(item.id, controller.signal)
+          .then((attachment) => update(localId, { status: "ready", progress: 1, attachment, label: "" }))
+          .catch((err: unknown) => {
+            if (controller.signal.aborted) return;
+            update(localId, { status: "error", error: uploadErrorMessage(err) });
+          });
+      }
+    },
+    [disabled],
+  );
+
   const setAttachments = useCallback((attachments: Attachment[]) => {
     setPending((l) => {
       for (const p of l) p.controller?.abort();
@@ -132,6 +164,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
         label: "",
         status: "ready",
         attachment: a,
+        libraryId: a.libraryId,
       }));
     });
   }, []);
@@ -171,9 +204,10 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
                 attachment={{
                   name: p.name,
                   kind: p.kind === "audio" ? "transcript" : p.kind,
-                  mime: "",
+                  mime: p.attachment?.mime ?? "",
                   storageKey: p.attachment?.storageKey ?? "",
                   tokenEstimate: p.attachment?.tokenEstimate,
+                  libraryId: p.libraryId,
                 }}
                 extra={
                   p.status === "working" ? (
@@ -256,6 +290,11 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             </ToolButton>
           </>
         )}
+        {features.library && (
+          <ToolButton onClick={() => setLibraryOpen(true)} disabled={disabled} title="Fundus: erfundene Dateien und E-Mails aus Verwaltungen anhängen" ariaLabel="Fundus öffnen">
+            <Database className="h-4.5 w-4.5" />
+          </ToolButton>
+        )}
         {features.dictation && <VoiceButton disabled={disabled} onText={(t) => onTextChange(text ? `${text} ${t}` : t)} />}
         {features.webSearch && model?.capabilities.webSearch && (
           <ToolButton
@@ -300,6 +339,19 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
           </button>
         )}
       </div>
+      {features.library && (
+        <LibraryDialog
+          open={libraryOpen && !disabled}
+          onClose={() => setLibraryOpen(false)}
+          attachedIds={pending.filter((p) => p.libraryId && p.status !== "error").map((p) => p.libraryId!)}
+          freeSlots={MAX_ATTACHMENTS - pending.filter((p) => p.status !== "error").length}
+          onAttach={(items) => {
+            addLibraryItems(items);
+            // Nach dem Anhängen direkt weiterschreiben (nach dem Schließen gibt der Dialog den Fokus sonst ans Symbol zurück).
+            setTimeout(() => textareaRef.current?.focus(), 60);
+          }}
+        />
+      )}
     </div>
   );
 });

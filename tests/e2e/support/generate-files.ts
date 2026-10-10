@@ -9,7 +9,7 @@ import { strToU8, zipSync } from "fflate";
 import * as XLSX from "xlsx";
 
 export const FIXTURE_DIR = path.resolve(".data/e2e/fixtures");
-const VERSION = "3";
+const VERSION = "4";
 
 export function fixture(name: string): string {
   return path.join(FIXTURE_DIR, name);
@@ -30,6 +30,20 @@ export async function generateFiles() {
   write("skript.py", 'print("Hallo aus Python")\n');
   write("leer.txt", "");
   write("Übersicht Größe – März 🚀.txt", "Umlaute im Dateinamen funktionieren.");
+  write(
+    "mail.eml",
+    [
+      "From: =?UTF-8?Q?J=C3=BCrgen_Ma=C3=9F?= <j.mass@amt.example>",
+      "To: team@amt.example",
+      "Date: Mon, 06 Oct 2025 08:15:00 +0200",
+      "Subject: =?UTF-8?Q?Einladung_zur_Dienstbesprechung_=E2=80=93_Raum_3.12?=",
+      "MIME-Version: 1.0",
+      "Content-Type: text/plain; charset=utf-8",
+      "Content-Transfer-Encoding: quoted-printable",
+      "",
+      "Hallo zusammen,=0A=0Abitte denkt an die Besprechung am Donnerstag. Gr=C3=BC=C3=9Fe!",
+    ].join("\r\n"),
+  );
 
   // ── PDF (zweiseitig, von Hand gebaut) ─────────────────────────────────
   write("bericht.pdf", pdf(["Umsatzbericht Seite eins", "Fazit Seite zwei"]));

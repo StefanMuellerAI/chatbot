@@ -120,6 +120,17 @@ test("X03 kleines PDF über den Blob-Speicher hochladen und befragen", async ({ 
   await ask(page, `Worum geht es in dem PDF? Ein Satz. (Smoke ${uniq()})`);
 });
 
+test("X08 eine Fundus-Datei anhängen und befragen", async ({ page }) => {
+  await login(page);
+  await chooseModel(page, "Claude Haiku 5.5");
+  await page.getByRole("button", { name: "Fundus öffnen" }).click();
+  const fundus = page.getByRole("dialog", { name: "Fundus" });
+  await fundus.getByRole("listbox", { name: "Dokumente" }).locator('[data-id="fb-beschlussvorlage-kita-nordstadt"]').click();
+  await fundus.getByRole("region", { name: "Vorschau" }).getByRole("button", { name: "Anhängen", exact: true }).click();
+  await expectReady(page, "V-2025-0412 Beschlussvorlage Kita-Ausbau Nordstadt.docx", /Fundus · ca\. [\d.]+ Tokens/);
+  await ask(page, `Was soll der Rat beschließen? Ein Satz. (Smoke ${uniq()})`);
+});
+
 test("X04 kurze MP3 transkribieren", async ({ page }) => {
   await login(page);
   await chooseModel(page, "Claude Haiku 5.5");

@@ -22,6 +22,10 @@ const USER_ROUTES: [Method, string][] = [
   ["POST", "/api/upload/token"],
   ["POST", "/api/auth/logout"],
   ["GET", "/api/auth/session"],
+  ["GET", "/api/library"],
+  ["GET", "/api/library/fb-buergeramt-2030"],
+  ["GET", "/api/library/fb-buergeramt-2030/file"],
+  ["POST", "/api/library/attach"],
 ];
 const ADMIN_ROUTES: [Method, string][] = [
   ["GET", "/api/admin/events"],
@@ -145,6 +149,9 @@ test.describe("U · API-Robustheit", () => {
       [api, "GET", "/api/upload/token"],
       [api, "POST", "/api/files/uploads/abcdefgh-1234/notiz.txt"],
       [api, "POST", "/api/cron/cleanup"],
+      [api, "POST", "/api/library"],
+      [api, "GET", "/api/library/attach"],
+      [api, "DELETE", "/api/library/fb-buergeramt-2030"],
       [admin, "GET", "/api/admin/security"],
       [admin, "DELETE", "/api/admin/settings"],
       [admin, "GET", "/api/admin/models/test"],
@@ -257,6 +264,56 @@ test.describe("U · API-Robustheit", () => {
     expect(res.headers()["content-security-policy"]).toContain("sandbox");
     expect(res.headers()["content-disposition"]).toMatch(/^attachment;/);
     expect(res.headers()["x-content-type-options"]).toBe("nosniff");
+    await api.dispose();
+  });
+
+  test("Y21 Fundus-API: Katalog, Vorschau, Download und Anhängen – IDs, Pfad-Tricks, Header, keine Fundus-Pfade für Uploads", async ({ baseURL, ip }) => {
+    const api = await client(baseURL!, ip, "user");
+    const res = await api.get("/api/library");
+    expect(res.status()).toBe(200);
+    const catalog = (await res.json()) as { version: string; documents: { id: string; fileName: string; sha256: string }[]; threads: { id: string; mails: { id: string }[] }[] };
+    expect(catalog.documents.length).toBeGreaterThan(0);
+    expect(res.headers().etag).toBe(`"fundus-${catalog.version}"`);
+    expect((await api.get("/api/library", { headers: { "if-none-match": res.headers().etag } })).status()).toBe(304);
+
+    // Vorschau für Dokument, Verlauf und E-Mail (eine E-Mail zeigt ihren Verlauf)
+    const doc = catalog.documents.find((d) => d.id === "fb-beschlussvorlage-kita-nordstadt")!;
+    const thread = catalog.threads[0];
+    expect(((await (await api.get(`/api/library/${doc.id}`)).json()) as { type: string }).type).toBe("word");
+    expect(((await (await api.get(`/api/library/${thread.id}`)).json()) as { type: string }).type).toBe("thread");
+    expect(((await (await api.get(`/api/library/${thread.mails[0].id}`)).json()) as { type: string }).type).toBe("thread");
+
+    // Ungültige und unbekannte IDs, Pfad-Tricks
+    for (const bad of ["Gross", "a", "fb_x", "..%2F..%2F.env", "fb-x%00", `${"a".repeat(90)}`]) {
+      await expectGermanError(await api.get(`/api/library/${bad}`), 400, "Ungültige ID.");
+      await expectGermanError(await api.get(`/api/library/${bad}/file`), 400, "Ungültige ID.");
+    }
+    await expectGermanError(await api.get("/api/library/gibt-es-nicht"), 404, "Nicht im Fundus gefunden.");
+    await expectGermanError(await api.get(`/api/library/${thread.id}/file`), 404, /Ein Verlauf hat keine eigene Datei/);
+
+    // Download: als Anhang, ohne Ausführung, mit Dateinamen
+    const file = await api.get(`/api/library/${doc.id}/file`);
+    expect(file.status()).toBe(200);
+    expect(file.headers()["content-type"]).toBe("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    expect(file.headers()["content-disposition"]).toBe(`attachment; filename="${doc.fileName}"; filename*=UTF-8''${encodeURIComponent(doc.fileName)}`);
+    expect(file.headers()["content-security-policy"]).toMatch(/^sandbox;/);
+    expect(file.headers()["x-content-type-options"]).toBe("nosniff");
+
+    // Anhängen
+    await expectGermanError(await api.post("/api/library/attach", { data: { id: "gibt-es-nicht" } }), 404, "Nicht im Fundus gefunden.");
+    await expectGermanError(await api.post("/api/library/attach", { data: { id: "../../.env" } }), 400, "Ungültige ID.");
+    await expectGermanError(await api.post("/api/library/attach", { data: { name: "x" } }), 400);
+    await expectGermanError(await api.post("/api/library/attach", { headers: { "content-type": "application/json" }, data: "{kaputt" }), 400);
+    const attached = await api.post("/api/library/attach", { data: { id: doc.id } });
+    expect(attached.status()).toBe(200);
+    const attachment = (await attached.json()) as Record<string, unknown>;
+    expect(attachment).toMatchObject({ kind: "document", name: doc.fileName, sha256: doc.sha256, libraryId: doc.id });
+    expect(String(attachment.storageKey)).toMatch(/^library\//);
+
+    // Fundus-Pfade lassen sich nicht über die Upload-Wege beschreiben oder verarbeiten.
+    await expectGermanError(await api.post("/api/upload/local", { multipart: { key: `library/${doc.id}/x.docx`, file: payload("notiz.txt") } }), 400);
+    await expectGermanError(await api.post("/api/files/process", { data: { key: `library/${doc.id}/x.docx`, name: "x.docx" } }), 400);
+    await expectGermanError(await api.get(`/api/files/library/${doc.id}/x.docx`), 400, "Ungültiger Dateipfad.");
     await api.dispose();
   });
 

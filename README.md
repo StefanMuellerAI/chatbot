@@ -6,7 +6,9 @@ Teilnehmende ohne eigenes ChatGPT- oder Claude-Konto mit aktuellen KI-Modellen a
 - Modelle von **Anthropic (Claude)** und **OpenAI (GPT)** zur Auswahl, Standard: **Claude Sonnet 5.5** auf „Mittel“
 - **Thinking-Effort** einstellbar (Niedrig, Mittel, Hoch, Maximal), Gedankengang einblendbar
 - **Websuche** mit Quellenangaben
-- **Datei-Upload**: PDF, Word, Excel/CSV, PowerPoint, Text, Code und Bilder (auch per Drag & Drop oder Einfügen)
+- **Datei-Upload**: PDF, Word, Excel/CSV, PowerPoint, E-Mails (`.eml`), Text, Code und Bilder (auch per Drag & Drop oder Einfügen)
+- **Fundus**: erfundene, echt wirkende Word-, Excel- und PowerPoint-Dateien und E-Mail-Verläufe aus acht Verwaltungen zum
+  Anhängen – zum Üben, ohne echte Daten der eigenen Behörde (eigener Schalter im Admin, Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md))
 - **Audio-Transkription** (MP3, M4A, WAV …) und **Spracheingabe** per Mikrofon
 - **Bildgenerierung** im Chat (auch mit Claude) und im Bild-Modus, inkl. Bearbeitung hochgeladener Bilder
 - **Artefakte**: HTML-Seiten, Charts, Mermaid-Diagramme, SVG und Dokumente im Seitenpanel mit Vorschau und Download
@@ -74,6 +76,7 @@ Mock-Provider – damit lässt sich die komplette Oberfläche ohne API-Kosten au
 | Befehl | Zweck |
 |---|---|
 | `npm run check` | Typecheck, Lint und Unit-Tests |
+| `npm run library` | Fundus erzeugen (`.library/`); läuft automatisch vor `dev` und `build`, mit `-- --force` neu |
 | `npm run test` | Unit-Tests (Vitest), u. a. Stabilität der Cache-Präfixe |
 | `npm run build` | Produktions-Build (nötig vor den E2E-Tests) |
 | `npm run test:e2e` | Komplette E2E-Suite mit Playwright gegen den Produktions-Build (startet eigene Server) |
@@ -105,11 +108,13 @@ app/                 Seiten (Chat, Login, Admin) und API-Routen
   api/chat           Streaming-Endpunkt (Server-Sent Events) mit Antwort-Cache und Tool-Schleife
   api/files, upload  Direkt-Upload (Vercel Blob), Textextraktion, Auslieferung privater Dateien
   api/transcribe     Audio in Etappen: start (ffmpeg teilt) → chunk (parallel) → finish
+  api/library        Fundus: Katalog, Vorschau, Download, Anhängen (liest .library/ aus dem Deployment)
   api/admin          Modelle, Einstellungen, Vorlagen, Sicherheit, Übersicht
 lib/providers        Adapter für Anthropic (Messages API) und OpenAI (Responses API) + Mock
 lib/chat             System-Prompt, Aufbereitung der Nachrichten, Antwort-Cache, Ablaufsteuerung
 lib/db               Drizzle-Schema, Bootstrap (CREATE TABLE IF NOT EXISTS), Startbelegung
-components/          Chat-Oberfläche, Artefakt-Panel, Admin-Oberfläche, UI-Bausteine
+components/          Chat-Oberfläche, Artefakt-Panel, Fundus-Dialog, Admin-Oberfläche, UI-Bausteine
+library/             Fundus: erfundenes Weltmodell, Inhalte als Daten und der Generator für .docx/.xlsx/.pptx/.eml
 proxy.ts             Schützt alle Seiten und APIs per signiertem Sitzungs-Cookie
 ```
 

@@ -7,7 +7,7 @@ export function conversationToMarkdown(c: Conversation, modelName: (id?: string)
   for (const m of c.messages) {
     if (m.role === "user") {
       lines.push("## Du", "");
-      for (const a of m.attachments ?? []) lines.push(`> 📎 ${a.name}`);
+      for (const a of m.attachments ?? []) lines.push(`> 📎 ${a.name}${a.libraryId ? " (Fundus)" : ""}`);
       if (m.attachments?.length) lines.push("");
       lines.push(m.text, "");
     } else {

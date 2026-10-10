@@ -32,7 +32,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     await expect(chat.page.getByText(message)).toBeVisible();
     await expect(chat.composer).toBeDisabled();
     await expect(chat.composer).toHaveAttribute("placeholder", "Freebie macht gerade Pause.");
-    for (const name of ["Datei anhängen", "Spracheingabe", "Websuche", "Bild-Modus"]) {
+    for (const name of ["Datei anhängen", "Fundus öffnen", "Spracheingabe", "Websuche", "Bild-Modus"]) {
       await expect(chat.page.getByRole("button", { name, exact: true })).toBeDisabled();
     }
     // Auch direkt an der API vorbei an der Oberfläche ist alles gesperrt.
@@ -53,6 +53,46 @@ test.describe("Q · Admin: Einstellungen", () => {
     await chat.page.reload();
     await expect(chat.composer).toBeEnabled();
     await chat.ask(`Wieder da ${uniq()}`);
+  });
+
+  test("Q21/Y01 Fundus aus: kein Datenbank-Symbol, API gesperrt; Upload aus, Fundus an: Symbol bleibt; Pause sperrt den Fundus", async ({ page, browser, baseURL, ip }) => {
+    await openAdmin(page, "Einstellungen");
+    await toggleAndSave(page, "Fundus", false);
+    let chat = await openChat(browser, baseURL!, ip);
+    await expect(chat.page.getByRole("button", { name: "Datei anhängen" })).toBeVisible();
+    await expect(chat.page.getByRole("button", { name: "Fundus öffnen" })).toHaveCount(0);
+    const routes: ["GET" | "POST", string][] = [
+      ["GET", "/api/library"],
+      ["GET", "/api/library/fb-buergeramt-2030"],
+      ["GET", "/api/library/fb-buergeramt-2030/file"],
+      ["POST", "/api/library/attach"],
+    ];
+    for (const [method, url] of routes) {
+      const res = await chat.page.request.fetch(url, { method, data: { id: "fb-buergeramt-2030" } });
+      expect(res.status(), url).toBe(403);
+      expect((await res.json()).error).toBe("Der Fundus ist deaktiviert.");
+    }
+
+    // Nur der Fundus, keine eigenen Dateien: die Büroklammer verschwindet, das Datenbank-Symbol bleibt.
+    await toggleAndSave(page, "Fundus", true);
+    await toggleAndSave(page, "Datei-Upload", false);
+    await toggleAndSave(page, "Audio-Transkription", false);
+    chat = await openChat(browser, baseURL!, `${ip}-2`);
+    await expect(chat.page.getByRole("button", { name: "Datei anhängen" })).toHaveCount(0);
+    await chat.page.getByRole("button", { name: "Fundus öffnen" }).click();
+    const fundus = chat.page.getByRole("dialog", { name: "Fundus" });
+    await fundus.getByRole("listbox", { name: "Dokumente" }).locator('[data-id="fb-buergeramt-2030"]').click();
+    await fundus.getByRole("region", { name: "Vorschau" }).getByRole("button", { name: "Anhängen", exact: true }).click();
+    await expectReady(chat.page, "Buergeramt 2030 Ergebnisse Klausurtagung.pptx", "Fundus · ca.");
+    const answer = await chat.ask(`#zeige-dateien Nur Fundus ${uniq()}`);
+    expect(await chat.diagnosis(answer, "Dateien")).toBe("Buergeramt 2030 Ergebnisse Klausurtagung.pptx");
+
+    await settingSwitch(page, "Freebie pausieren").click();
+    await expect(page.getByRole("status").filter({ hasText: "Freebie ist pausiert." })).toBeVisible();
+    chat = await openChat(browser, baseURL!, `${ip}-3`);
+    await expect(chat.page.getByRole("button", { name: "Fundus öffnen" })).toBeDisabled();
+    expect((await chat.page.request.post("/api/library/attach", { data: { id: "fb-buergeramt-2030" } })).status()).toBe(503);
+    expect((await chat.page.request.get("/api/library")).status()).toBe(503);
   });
 
   test("Q02 Websuche aus: kein Schalter im Chat, keine Suche", async ({ page, browser, baseURL, ip }) => {

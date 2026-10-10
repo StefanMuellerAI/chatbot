@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { MAX_ATTACHMENTS, MAX_MESSAGE_CHARS } from "@/lib/files/limits";
+import { LIBRARY_ID } from "@/lib/library/types";
 
 const Effort = z.enum(["low", "medium", "high", "max"]);
 
@@ -14,6 +15,7 @@ export const AttachmentSchema = z.object({
   tokenEstimate: z.number().optional(),
   preview: z.string().max(2000).optional(),
   native: z.boolean().optional(),
+  libraryId: z.string().regex(LIBRARY_ID).optional(),
 });
 
 export const ChatMessageSchema = z.object({

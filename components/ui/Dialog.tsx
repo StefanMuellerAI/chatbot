@@ -9,6 +9,7 @@ export function Dialog({
   title,
   children,
   className,
+  bodyClassName,
   dismissible = true,
 }: {
   open: boolean;
@@ -16,6 +17,8 @@ export function Dialog({
   title?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Zusätzliche Klassen für den Innenbereich (z. B. weniger Rand auf dem Handy). */
+  bodyClassName?: string;
   dismissible?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -43,7 +46,7 @@ export function Dialog({
       )}
     >
       {open && (
-        <div className="p-6">
+        <div className={cn("p-6", bodyClassName)}>
           {(title || dismissible) && (
             <div className="mb-4 flex items-start justify-between gap-4">
               <h2 id={titleId} className="font-display text-xl font-bold">

@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "npm run library",
     "dev": "next dev",
+    "prebuild": "npm run library",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -13,7 +15,8 @@
     "test:e2e:live": "LIVE=1 playwright test",
     "test:coverage": "node tests/e2e/coverage.mjs",
     "docs:handbuch": "node docs/handbuch/erstellen.mjs",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "library": "tsx --conditions=react-server library/build/cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
@@ -35,6 +38,7 @@
     "mermaid": "^12.1.0",
     "next": "16.4.0",
     "openai": "^7.30.1",
+    "postal-mime": "^4.0.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-markdown": "^10.1.0",
@@ -58,10 +62,14 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.6",
+    "docx": "^9.9.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.4.0",
+    "exceljs": "^4.4.0",
+    "pptxgenjs": "^4.0.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.3"
   },

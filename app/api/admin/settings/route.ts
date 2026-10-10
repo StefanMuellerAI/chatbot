@@ -36,6 +36,7 @@ const Patch = z
         answerCache: z.boolean(),
         showCacheBadge: z.boolean(),
         showCost: z.boolean(),
+        library: z.boolean(),
       })
       .partial()
       .strict(),

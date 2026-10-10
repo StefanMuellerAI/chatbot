@@ -1,15 +1,17 @@
-"use client";
 import {
   Brain,
   ChevronDown,
   Code,
+  Database,
   FileAudio,
   FileSpreadsheet,
   FileText,
   Globe,
   ImageIcon,
   LayoutTemplate,
+  Mail,
   Pencil,
+  Presentation,
   RotateCcw,
   TriangleAlert,
   Workflow,
@@ -70,31 +72,49 @@ export function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?
   );
 }
 
-export function AttachmentChip({ attachment, extra }: { attachment: Pick<Attachment, "name" | "kind" | "mime" | "storageKey" | "tokenEstimate">; extra?: React.ReactNode }) {
+export function AttachmentChip({
+  attachment,
+  extra,
+}: {
+  attachment: Pick<Attachment, "name" | "kind" | "mime" | "storageKey" | "tokenEstimate" | "libraryId">;
+  extra?: React.ReactNode;
+}) {
   const isImage = attachment.kind === "image";
-  const Icon = attachment.kind === "transcript" ? FileAudio : /sheet|excel|csv|spreadsheet/.test(attachment.mime) || /\.(xlsx?|csv|ods)$/i.test(attachment.name) ? FileSpreadsheet : FileText;
+  const Icon =
+    attachment.kind === "transcript"
+      ? FileAudio
+      : attachment.mime === "message/rfc822" || /\.eml$/i.test(attachment.name)
+        ? Mail
+        : /presentation/.test(attachment.mime) || /\.pptx$/i.test(attachment.name)
+          ? Presentation
+          : /sheet|excel|csv|spreadsheet/.test(attachment.mime) || /\.(xlsx?|csv|ods)$/i.test(attachment.name)
+            ? FileSpreadsheet
+            : FileText;
+  const detail = isImage
+    ? "Bild"
+    : attachment.tokenEstimate
+      ? `ca. ${formatNumber(attachment.tokenEstimate)} Tokens`
+      : attachment.kind === "transcript"
+        ? "Transkript"
+        : "Dokument";
   return (
     <div role="group" aria-label={attachment.name} className="flex max-w-64 items-center gap-2 rounded-2xl border border-border bg-surface px-2.5 py-2 text-sm shadow-sm">
       {isImage && attachment.storageKey ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/api/files/${attachment.storageKey}`} alt="" className="h-9 w-9 rounded-lg object-cover" />
       ) : (
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
+        <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
           <Icon className="h-4.5 w-4.5" />
+          {attachment.libraryId && (
+            <span className="absolute -right-1 -bottom-1 grid h-4 w-4 place-items-center rounded-full border border-border bg-surface text-muted">
+              <Database className="h-2.5 w-2.5" aria-hidden />
+            </span>
+          )}
         </span>
       )}
       <span className="min-w-0">
         <span className="block truncate font-medium">{attachment.name}</span>
-        <span className="block text-xs text-muted">
-          {extra ??
-            (isImage
-              ? "Bild"
-              : attachment.tokenEstimate
-                ? `ca. ${formatNumber(attachment.tokenEstimate)} Tokens`
-                : attachment.kind === "transcript"
-                  ? "Transkript"
-                  : "Dokument")}
-        </span>
+        <span className="block text-xs text-muted">{extra ?? (attachment.libraryId ? `Fundus · ${detail}` : detail)}</span>
       </span>
     </div>
   );

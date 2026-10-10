@@ -1,9 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
-import { getDb, schema } from "@/lib/db/client";
-import { estimateTokens, extractText } from "@/lib/files/extract";
+import { extractDocument } from "@/lib/files/process";
 import { categoryOf } from "@/lib/files/limits";
 import { sniffImageMime } from "@/lib/files/sniff";
 import { requireFeature } from "@/lib/guards";
@@ -45,33 +43,10 @@ export async function POST(request: Request) {
       return Response.json(attachment);
     }
 
-    const db = await getDb();
-    const cached = await db.select().from(schema.fileCache).where(eq(schema.fileCache.sha256, sha256)).limit(1);
-    let text: string;
-    let tokens: number;
     const mime = file.contentType || "application/octet-stream";
-    if (cached[0]) {
-      text = cached[0].extractedText;
-      tokens = cached[0].tokenEstimate;
-      // Erneut genutzt: Aufbewahrungsfrist beginnt von vorn.
-      await db.update(schema.fileCache).set({ createdAt: new Date() }).where(eq(schema.fileCache.sha256, sha256));
-    } else {
-      const isPdf = name.toLowerCase().endsWith(".pdf");
-      try {
-        text = await extractText(file.data, name, mime);
-      } catch (err) {
-        // Eingescannte PDFs ohne Textebene: mit „PDF nativ“ kann das Modell sie trotzdem lesen.
-        if (!(isPdf && settings.nativePdf && err instanceof HttpError && err.message.startsWith("In der Datei wurde kein lesbarer Text"))) throw err;
-        text = "[Eingescanntes PDF ohne Textebene – nur für Modelle mit nativer PDF-Verarbeitung lesbar.]";
-      }
-      tokens = estimateTokens(text);
-      await db
-        .insert(schema.fileCache)
-        .values({ sha256, kind: "document", mime, extractedText: text, tokenEstimate: tokens })
-        .onConflictDoNothing();
-    }
+    const { text, tokens, cached } = await extractDocument(file.data, name, mime, { nativePdf: settings.nativePdf });
     await registerFile(key, "document", mime, file.data.length, settings.fileRetentionDays);
-    const headers = { "X-Freebie-Cache": cached[0] ? "hit" : "miss" };
+    const headers = { "X-Freebie-Cache": cached ? "hit" : "miss" };
     const attachment: Attachment = {
       id: randomUUID(),
       kind: "document",
