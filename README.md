@@ -10,7 +10,12 @@ Teilnehmende ohne eigenes ChatGPT- oder Claude-Konto mit aktuellen KI-Modellen a
 - **Audio-Transkription** (MP3, M4A, WAV …) und **Spracheingabe** per Mikrofon
 - **Bildgenerierung** im Chat (auch mit Claude) und im Bild-Modus, inkl. Bearbeitung hochgeladener Bilder
 - **Artefakte**: HTML-Seiten, Charts, Mermaid-Diagramme, SVG und Dokumente im Seitenpanel mit Vorschau und Download
-- **Admin-Bereich**: Modelle, Funktionen, Vorlagen, Hinweistext, Not-Aus, Passwort, Kosten- und Ersparnis-Dashboard
+- **Posteingang**: eigenes Übungs-Postfach je Gast (`name@freebie.example`) – E-Mails an die eigene Gruppe und die
+  Kursleitung, mit Antworten, Weiterleiten, Suche und Adressbuch; wird beim Abmelden geleert
+- **Verbindungen**: im Chat pro Gespräch zuschaltbar – mit der Verbindung „Posteingang“ liest Freebie die eigenen
+  E-Mails und kann im Namen der Person senden (gekennzeichnet „über Freebie“)
+- **Admin-Bereich**: Modelle, Funktionen, Vorlagen, Hinweistext, Begrüßungs-E-Mail, Not-Aus, Termine und Gast-Zugänge,
+  Kosten- und Ersparnis-Dashboard
 - **Caching auf allen Ebenen**: Prompt Caching bei beiden Anbietern, gemeinsamer Antwort-Cache, Datei- und Transkript-Cache
 
 Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
@@ -51,6 +56,12 @@ Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
 - **Ablauf:** Zum Termin-Ende verfallen die Gast-Zugänge sofort. Zehn Minuten vorher erscheint im Chat ein Hinweis
   mit Export-Knopf; danach werden die Gast-Chats vom Gerät gelöscht. Kosten und Anfragen bleiben 90 Tage in der
   Statistik („Nach Termin“ in der Übersicht).
+- **Posteingang:** Jeder Gast hat ein Übungs-Postfach mit der Adresse `benutzername@freebie.example` und bekommt bei
+  der ersten Anmeldung die Begrüßungs-E-Mail (Text im Admin unter **Einstellungen**). Gäste schreiben nur ihrer
+  eigenen Gruppe und der Kursleitung (`kursleitung@freebie.example`); die Kursleitung schreibt allen Gruppen
+  laufender Termine. Es geht keine Mail nach draußen. Beim Abmelden wird das eigene Postfach geleert (Mails an
+  andere bleiben bei ihnen), zum Termin-Ende verschwinden alle Postfächer des Termins. Abschalten lässt sich alles
+  mit dem Schalter **Posteingang**.
 - `APP_PASSWORD` aus früheren Versionen wird nicht mehr verwendet und kann in Vercel gelöscht werden.
 
 Alle Funktionen von Chat und Admin-Bereich beschreibt das Handbuch [docs/Freebie-Handbuch.pdf](docs/Freebie-Handbuch.pdf).
@@ -92,7 +103,7 @@ Freebie-Instanzen mit frischer Datenbank und eine nachgebaute Anthropic-/OpenAI-
 | `admin` | Admin-Bereich, ändert Einstellungen (Rücksetzen nach jedem Test) | Mock, seriell |
 | `api` | alle Routen ohne Browser | Mock, parallel |
 | `provider`, `provider-serial` | echte Claude-/GPT-Adapter gegen die Fake-API inkl. Caching-Vertrag | Fake-API |
-| `belastung` | Neustart, Abbrüche, 500 Chats, 25 Personen über eine IP | Mock |
+| `belastung` | Neustart, Abbrüche, 500 Chats, 25 Personen über eine IP (Chat und Posteingang) | Mock |
 | `chat-webkit`, `chat-firefox` | Chat-Tests in Safari-Engine und Firefox (`E2E_BROWSERS=webkit,firefox`) | Mock |
 
 Einzelne Bereiche: `npx playwright test --project=admin`, einzelne Tests: `-g "Q14"`. Testdateien
@@ -105,15 +116,20 @@ app/                 Seiten (Chat, Login, Admin) und API-Routen
   api/chat           Streaming-Endpunkt (Server-Sent Events) mit Antwort-Cache und Tool-Schleife
   api/files, upload  Direkt-Upload (Vercel Blob), Textextraktion, Auslieferung privater Dateien
   api/transcribe     Audio in Etappen: start (ffmpeg teilt) → chunk (parallel) → finish
-  api/admin          Modelle, Einstellungen, Vorlagen, Sicherheit, Übersicht
+  api/admin          Modelle, Einstellungen, Vorlagen, Sicherheit, Übersicht, Termine
+  api/mail           Posteingang: Liste, Lesen, Senden, Markieren, Löschen, Status (Abfrage alle 15 s), Adressbuch
 lib/providers        Adapter für Anthropic (Messages API) und OpenAI (Responses API) + Mock
+lib/tools            Eigene Werkzeuge für die Tool-Schleife (Bild erzeugen)
+lib/mail             Postfächer in Postgres (eine Zeile je Kopie), Werkzeuge der Verbindung „Posteingang“
 lib/chat             System-Prompt, Aufbereitung der Nachrichten, Antwort-Cache, Ablaufsteuerung
 lib/db               Drizzle-Schema, Bootstrap (CREATE TABLE IF NOT EXISTS), Startbelegung
-components/          Chat-Oberfläche, Artefakt-Panel, Admin-Oberfläche, UI-Bausteine
+components/          Chat-Oberfläche, Posteingang (components/mail), Artefakt-Panel, Admin-Oberfläche, UI-Bausteine
 proxy.ts             Schützt alle Seiten und APIs per signiertem Sitzungs-Cookie
 ```
 
 Der Chatverlauf liegt ausschließlich im Browser (IndexedDB) und lässt sich als JSON exportieren und importieren.
+Die Mails des Posteingangs liegen dagegen auf dem Server (Postgres), weil sie zwischen den Teilnehmenden ausgetauscht
+werden – nur so lange, wie der Termin läuft bzw. bis zum Abmelden.
 
 ## Caching – so spart Freebie Budget
 
@@ -125,7 +141,10 @@ Der Chatverlauf liegt ausschließlich im Browser (IndexedDB) und lässt sich als
    Runde byte-gleich bleibt.
 2. **Antwort-Cache.** Identische Gesprächsverläufe (gleiches Modell, gleiche Vorlage, gleicher Tag) werden aus
    einem gemeinsamen Zwischenspeicher beantwortet – ideal, wenn alle denselben Übungsprompt eingeben.
-   „Neu generieren“ umgeht ihn. Antworten mit generierten Bildern werden nicht gecacht.
+   „Neu generieren“ umgeht ihn. Antworten mit generierten Bildern und Chats mit verbundenem Posteingang (persönliche
+   Inhalte) werden nicht gecacht. Die Werkzeuge des Posteingangs sind immer Teil der Anfrage, ob verbunden oder
+   nicht – so bleibt der Präfix beim Umschalten gleich; der Hinweis aufs Umschalten steht nur in der jeweiligen
+   Nachricht.
 3. **Datei- und Transkript-Cache.** Dateien werden per SHA-256 erkannt und nur einmal ausgelesen bzw. transkribiert.
 
 Die Wirkung zeigt das Admin-Dashboard (Cache-Quote, Ersparnis in USD, Antwort-Cache-Treffer).
@@ -139,3 +158,8 @@ Die Wirkung zeigt das Admin-Dashboard (Cache-Quote, Ersparnis in USD, Antwort-Ca
   Frist gelöscht (täglicher Cron-Job).
 - Artefakte laufen in einem abgeschotteten `iframe` (`sandbox` ohne `allow-same-origin`, eigene CSP).
 - Not-Aus und sofortiger Passwortwechsel (meldet alle Sitzungen ab) im Admin-Bereich.
+- **Posteingang:** ein Übungs-Postfach ohne echten Mailversand. Freebie sieht Mails nur, wenn die Person im Chat die
+  Verbindung einschaltet, und nur das eigene Postfach. Mailtexte gehen als markiertes Material an das Modell, das
+  angewiesen ist, Anweisungen darin nicht zu folgen; gesendet wird nur auf ausdrücklichen Auftrag, höchstens 5 Mails pro Antwort, sichtbar als
+  „über Freebie“. Postfächer werden beim Abmelden und zum Termin-Ende gelöscht. Empfehlung für den Hinweistext:
+  „Bitte keine echten oder vertraulichen Daten in Chats und Mails.“

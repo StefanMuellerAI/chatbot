@@ -1,6 +1,6 @@
 # Plan: Posteingang für Teilnehmende und Verbindung in Freebie
 
-Stand: 10. Oktober 2026, Entscheidungen getroffen (Abschnitt 15) · Grundlage: aktueller Code (Chat und Werkzeug-Schleife in `lib/chat` und `lib/providers`,
+Stand: 10. Oktober 2026, umgesetzt (Abschnitt 13, Abweichungen dort) · Entscheidungen in Abschnitt 15 · Grundlage: aktueller Code (Chat und Werkzeug-Schleife in `lib/chat` und `lib/providers`,
 Gast-Zugänge aus [ZUGANG-PLAN.md](ZUGANG-PLAN.md), E2E-Suite aus [TESTPLAN.md](TESTPLAN.md), geplanter Fundus aus
 [FUNDUS-PLAN.md](FUNDUS-PLAN.md), Handbuch unter [docs/handbuch](docs/handbuch/README.md))
 
@@ -453,12 +453,32 @@ Q22/Q23 und X09, unabhängig davon, welcher Plan zuerst umgesetzt wird. Die E-Ak
 
 ## 13. Umsetzung in Phasen
 
-| Phase | Inhalt | Tests |
-|---|---|---|
-| 1 · Grundlage | Tabelle, Adressen, Speicher (Senden, Liste, Lesen, Löschen, Aufräumen, Adressbuch, Grenzen), API-Routen, Schalter, Begrüßungs-E-Mail, Abmelden löscht | Unit-Tests; Z16, Q22, Q23, U01–U03 |
-| 2 · Posteingang | Umschalter, Ordner, Liste, Lesebereich, Schreiben, Antworten, Weiterleiten, Suche, Abfrage alle 15 Sekunden, Hinweis im Chat, Handy und Tablet | Z01–Z09, Z13–Z15 |
-| 3 · Verbindung | Register der Verbindungen, Menü im Chat, verallgemeinerte Werkzeug-Schleife, Werkzeuge zum Lesen und Senden, Prompt-Abschnitt, Antwort-Cache-Ausnahme, Karten, „Mit Freebie besprechen“, Mock und Fake-API | Z10–Z12, Z17, V05, V07, Unit-Tests |
-| 4 · Abschluss | Doku inkl. Handbuch mit neuen Screenshots, Belastung, Live-Smoke, Stabilitätslauf (3 ×), CI in drei Browsern | W05, X09 |
+| Phase | Inhalt | Tests | Stand |
+|---|---|---|---|
+| 1 · Grundlage | Tabelle, Adressen, Speicher (Senden, Liste, Lesen, Löschen, Aufräumen, Adressbuch, Grenzen), API-Routen, Schalter, Begrüßungs-E-Mail, Abmelden löscht | Unit-Tests; Z16, Q22, Q23, U01–U03 | erledigt |
+| 2 · Posteingang | Umschalter, Ordner, Liste, Lesebereich, Schreiben, Antworten, Weiterleiten, Suche, Abfrage alle 15 Sekunden, Hinweis im Chat, Handy und Tablet | Z01–Z09, Z13–Z15 | erledigt |
+| 3 · Verbindung | Register der Verbindungen, Menü im Chat, verallgemeinerte Werkzeug-Schleife, Werkzeuge zum Lesen und Senden, Prompt-Abschnitt, Antwort-Cache-Ausnahme, Karten, „Mit Freebie besprechen“, Mock und Fake-API | Z10–Z12, Z17, V05, V07, Unit-Tests | erledigt |
+| 4 · Abschluss | Doku inkl. Handbuch mit neuen Screenshots, Belastung, Live-Smoke, Stabilitätslauf (3 ×), CI in drei Browsern | W05, X09 | erledigt; X09 und die CI in WebKit/Firefox laufen nach dem Push |
+
+**Abweichungen bei der Umsetzung**
+
+- **Begrüßungs-E-Mail:** Sie kommt bei der Anmeldung, solange noch keine Begrüßung (gleicher Betreff von der
+  Kursleitung) im Postfach liegt – nicht nur bei leerem Postfach. Sonst bekäme niemand eine Begrüßung, dem die Gruppe
+  schon vor der ersten Anmeldung geschrieben hat. Die Kursleitung bekommt keine.
+- **Meldung bei fremden Adressen:** „„x@freebie.example“ kann nicht zugestellt werden. Du kannst nur deiner Gruppe
+  und der Kursleitung schreiben.“ statt „Unbekannte Adresse …“ – so verrät die Meldung nicht, ob es den Namen in einer
+  anderen Gruppe gibt.
+- **Kopien in einem Schritt:** Statt einer Transaktion legt eine einzige Anweisung alle Kopien an (der
+  Datenbanktreiber auf Vercel kennt keine Transaktionen über mehrere Anweisungen); das Ergebnis ist dasselbe: alle
+  oder keine.
+- **Hinweis zur Verbindung:** in eckigen Klammern wie das Datum, z. B. „[Verbindung: Der Posteingang ist ab dieser
+  Nachricht verbunden.]“.
+- **Kein eigenes `lib/connections`:** Das Register ist der Typ `ConnectionId` (heute nur `mailbox`); die Werkzeuge
+  liegen in `lib/mail/tools.ts`, das Bild-Werkzeug in `lib/tools/image-tool.ts`. Die E-Akte kommt als zweiter Eintrag
+  dazu.
+- **Aufräumjob:** löscht die Mails beendeter Termine jetzt vor den Zugängen, damit die gemeldete Zahl stimmt.
+- **Handy:** „Neue E-Mail“ ist ein runder Knopf unten rechts; das Formular füllt den Bildschirm.
+- **Beim Testen gefunden und behoben:** sieben Fehler, je mit Test (TESTPLAN Abschnitt 6, Nr. 35–41).
 
 ## 14. Bewusst nicht enthalten
 

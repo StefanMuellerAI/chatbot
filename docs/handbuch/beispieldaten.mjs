@@ -42,13 +42,72 @@ section{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:32px}
 </section>
 </body></html>`;
 
-/** Beispiel-Chats im Export-Format von Freebie (werden über „Import“ geladen). */
-export function sampleChats() {
+/** Betreff der Übungsmail der Kursleitung (Posteingang und Beispiel-Chat). */
+export const EXERCISE_SUBJECT = "Übung 1: Beschwerde von Herrn Albers";
+
+/** Beispiel-Mails für den Posteingang (die Kursleitung und Gäste der Gruppe „Vormittag“ schreiben sie über die API). */
+export const EXERCISE_BODY = `Hallo zusammen,
+
+hier eure erste Übung: Herr Albers hat sich über die Wartezeit im Bürgerbüro beschwert (siehe unten). Bitte beantwortet seine Mail mit Hilfe von Freebie – freundlich, sachlich und mit einem konkreten Angebot. Schickt mir eure Antwort bis 11:30 Uhr.
+
+Viele Grüße
+Eure Kursleitung
+
+> Sehr geehrte Damen und Herren,
+> am Dienstag habe ich trotz Termin 50 Minuten im Bürgerbüro gewartet. Niemand hat mir gesagt, warum. So geht man nicht mit Bürgern um.
+> Mit freundlichen Grüßen
+> Jens Albers`;
+
+/** Beispiel-Chats im Export-Format von Freebie (werden über „Import“ geladen); `me` ist der Gast im Screenshot. */
+export function sampleChats(me = "fuchs27") {
+  const exercise = { id: "doku-mail-uebung", folder: "inbox", from: "kursleitung", to: [me], subject: EXERCISE_SUBJECT };
   return {
     app: "freebie",
     version: 1,
     exportedAt: new Date().toISOString(),
     conversations: [
+      {
+        ...conv("doku-posteingang", "Antwort an Herrn Albers", 10 * MIN, [
+          {
+            role: "user",
+            text: `Fasse die E-Mail „${EXERCISE_SUBJECT}“ von der Kursleitung zusammen und schlag mir eine Antwort vor.`,
+            effort: "medium",
+            webSearch: false,
+            connections: ["mailbox"],
+          },
+          {
+            role: "assistant",
+            modelId: "claude-sonnet-5-5",
+            usage: usage(0.0074),
+            stopReason: "end_turn",
+            mails: { read: [exercise], sent: [] },
+            text: `**Worum es geht:** Die Kursleitung bittet euch, die Beschwerde von Herrn Albers zu beantworten – freundlich, sachlich und mit einem konkreten Angebot, bis 11:30 Uhr. Herr Albers hat am Dienstag trotz Termin 50 Minuten gewartet, ohne dass ihm jemand den Grund genannt hat.
+
+**Vorschlag für die Antwort:**
+
+Sehr geehrter Herr Albers,
+
+vielen Dank für Ihre offenen Worte. Es tut uns leid, dass Sie am Dienstag trotz Termin so lange warten mussten – und dass Ihnen niemand den Grund gesagt hat. Wegen einer Krankheitsvertretung waren an diesem Vormittag zwei Schalter nicht besetzt.
+
+Gern bieten wir Ihnen einen neuen Termin ohne Wartezeit an, zum Beispiel am Donnerstag um 9:00 Uhr. Künftig informieren wir Wartende sofort, wenn es zu Verzögerungen kommt.
+
+Mit freundlichen Grüßen
+Team Bürgerservice
+
+Soll ich die Antwort an die Kursleitung schicken?`,
+          },
+          { role: "user", text: "Ja, schick sie bitte an die Kursleitung.", effort: "medium", webSearch: false, connections: ["mailbox"] },
+          {
+            role: "assistant",
+            modelId: "claude-sonnet-5-5",
+            usage: usage(0.0032),
+            stopReason: "end_turn",
+            mails: { read: [], sent: [{ id: "doku-mail-antwort", folder: "sent", from: me, to: ["kursleitung"], subject: `AW: ${EXERCISE_SUBJECT}` }] },
+            text: `Erledigt: Die Antwort ist an **kursleitung@freebie.example** gegangen, Betreff „AW: ${EXERCISE_SUBJECT}“. Sie liegt unter „Gesendet“ und ist als „über Freebie“ gekennzeichnet.`,
+          },
+        ]),
+        connections: ["mailbox"],
+      },
       conv("doku-mail", "E-Mail zur Terminverschiebung", 20 * MIN, [
         { role: "user", text: "Formuliere eine freundliche E-Mail an Frau Becker: Unser Beratungstermin am Donnerstag muss leider auf nächste Woche verschoben werden. Biete Dienstag oder Mittwoch Vormittag an.", effort: "medium", webSearch: false },
         {

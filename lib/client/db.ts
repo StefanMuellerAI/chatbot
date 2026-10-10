@@ -1,6 +1,6 @@
 "use client";
 import Dexie, { type EntityTable } from "dexie";
-import type { ChatMessage, ConnectionId, Effort } from "@/lib/shared/types";
+import type { ChatMessage, ConnectionId, Effort, MailRef } from "@/lib/shared/types";
 
 export interface Conversation {
   id: string;
@@ -171,16 +171,23 @@ function normalizeConversation(v: unknown): Conversation | null {
   const now = Date.now();
   const messages = v.messages
     .filter((m): m is Record<string, unknown> => isRecord(m) && (m.role === "user" || m.role === "assistant"))
-    .map((m) => ({
-      ...m,
-      id: typeof m.id === "string" && m.id ? m.id : crypto.randomUUID(),
-      role: m.role,
-      text: typeof m.text === "string" ? m.text : "",
-      createdAt: typeof m.createdAt === "number" ? m.createdAt : now,
-    })) as ChatMessage[];
+    .map((m) => {
+      const msg: Record<string, unknown> = {
+        ...m,
+        id: typeof m.id === "string" && m.id ? m.id : crypto.randomUUID(),
+        role: m.role,
+        text: typeof m.text === "string" ? m.text : "",
+        createdAt: typeof m.createdAt === "number" ? m.createdAt : now,
+      };
+      // Verbindungen und Mail-Karten nur in gültiger Form übernehmen – sonst stürzt die Anzeige ab.
+      if ("connections" in m) msg.connections = connectionList(m.connections);
+      if ("mails" in m) msg.mails = isRecord(m.mails) ? { read: mailRefs(m.mails.read), sent: mailRefs(m.mails.sent) } : undefined;
+      return msg;
+    }) as unknown as ChatMessage[];
   const updatedAt = typeof v.updatedAt === "number" ? v.updatedAt : now;
   return {
     ...(v as unknown as Conversation),
+    connections: "connections" in v ? connectionList(v.connections) : undefined,
     title: typeof v.title === "string" && v.title.trim() ? v.title : "Importierter Chat",
     modelId: typeof v.modelId === "string" ? v.modelId : "",
     presetId: typeof v.presetId === "string" ? v.presetId : null,
@@ -188,4 +195,27 @@ function normalizeConversation(v: unknown): Conversation | null {
     updatedAt,
     messages,
   };
+}
+
+const CONNECTIONS: readonly ConnectionId[] = ["mailbox"];
+
+function connectionList(v: unknown): ConnectionId[] {
+  return Array.isArray(v) ? CONNECTIONS.filter((c) => v.includes(c)) : [];
+}
+
+function mailRefs(v: unknown): MailRef[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter(isRecord).flatMap((r) =>
+    typeof r.id === "string"
+      ? [
+          {
+            id: r.id,
+            folder: r.folder === "sent" ? ("sent" as const) : ("inbox" as const),
+            from: typeof r.from === "string" ? r.from : "",
+            to: Array.isArray(r.to) ? r.to.filter((x): x is string => typeof x === "string") : [],
+            subject: typeof r.subject === "string" ? r.subject : "",
+          },
+        ]
+      : [],
+  );
 }

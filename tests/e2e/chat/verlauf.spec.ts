@@ -209,11 +209,28 @@ test.describe("E · Verlauf und Seitenleiste", () => {
 
     // Unvollständige Einträge werden ergänzt und bringen nichts zum Absturz.
     const partial = testInfo.outputPath("teilweise.json");
-    writeFileSync(partial, JSON.stringify({ conversations: [{ id: `p-${id}`, messages: [{ role: "user" }, { role: "assistant", text: "ok" }] }] }));
+    writeFileSync(
+      partial,
+      JSON.stringify({
+        conversations: [
+          {
+            id: `p-${id}`,
+            connections: "mailbox",
+            messages: [
+              { role: "user", connections: [42, "mailbox"] },
+              { role: "assistant", text: "ok", mails: { read: [{ id: "m1", subject: 7 }, null], sent: "kaputt" } },
+            ],
+          },
+        ],
+      }),
+    );
     expect(await importFile(page, partial)).toBe("1 Chat importiert.");
     await page.getByRole("searchbox", { name: "Chats durchsuchen" }).fill("importiert");
     await chatButton(page, "Importierter Chat").click();
     await expect(chat.answers).toHaveCount(1);
+    // Verbindungen und Mail-Karten in kaputter Form: bereinigt statt Absturz.
+    await expect(chat.answers.getByRole("navigation", { name: "Gelesene E-Mails" }).getByRole("button")).toHaveCount(1);
+    await expect(chat.answers.getByRole("navigation", { name: "Gesendete E-Mails" })).toHaveCount(0);
   });
 
   test("E08 500 importierte Chats bleiben flüssig", async ({ chat, page }, testInfo) => {

@@ -479,6 +479,18 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 | 33 | Firefox: SVG-Artefakte ohne Größenangabe blieben in der Vorschau unsichtbar | K03 in `chat-firefox` |
 | 34 | Vor dem Laden getipptes oder automatisch ausgefülltes Passwort (Safari, Passwortmanager): Button blieb gesperrt | A04 |
 
+**Beim Testen des Posteingangs gefunden und behoben** (10. Oktober 2026)
+
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 35 | Nach dem Löschen der neuesten Mail meldete der Chat fälschlich „Neue E-Mail von …“ (die ältere rückte nach) | Z03 |
+| 36 | Der Aufräumjob meldete gelöschte Mails fast immer als 0 (sie verschwanden vorher mit den Zugängen) | Z09 |
+| 37 | Hinweis „Übungs-Postfach“: Gelb auf hellem Gelb mit zu wenig Kontrast | Z15 |
+| 38 | „Neue E-Mail“ auf dem Handy nicht im Vollbild (der Browser begrenzt Dialoge) | Z14 |
+| 39 | Alter Link „?ansicht=posteingang“ öffnete bei ausgeschaltetem Posteingang kurz die leere Ansicht | Q22 |
+| 40 | Ordner-Knopf „Posteingang 1“ ohne sauberen Namen für Screenreader | Z01 |
+| 41 | Import: kaputte Felder für Verbindungen und Mail-Karten konnten die Anzeige zum Absturz bringen | E08 |
+
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
@@ -516,9 +528,10 @@ liegt bei dir.
 | 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | erledigt; WebKit und Firefox grün in der CI (lokal nicht installierbar) |
 | 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
 | 8 · Zugänge | Bereich T (Termine, Gruppen, Gast-Zugänge), A/O/S angepasst | erledigt |
+| 9 · Posteingang | Bereich Z, Q22/Q23, V07, W05, X09; V05, A10, E08, N01 und U01 angepasst (`POSTEINGANG-PLAN.md`) | erledigt |
 
-Ergebnis: 207 E2E-Tests in 19 Dateien (plus 6 Live-Smoke-Tests) und 46 Unit-Tests; die komplette Suite läuft lokal in gut 5 Minuten
-(3 Worker) und dreimal hintereinander ohne Wiederholungen grün (621 von 621). In der CI laufen zusätzlich die
+Ergebnis: 258 E2E-Tests in 25 Dateien (plus 8 Live-Smoke-Tests) und 92 Unit-Tests; die komplette Suite läuft lokal in gut 6 Minuten
+(3 Worker) und dreimal hintereinander ohne Wiederholungen grün. In der CI laufen zusätzlich die
 Chat-Tests in WebKit und Firefox.
 
 ## 9. Was automatisiert nicht geht – kurze manuelle Abnahme

@@ -3,7 +3,7 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { request } from "@playwright/test";
-import { patchEvents, patchOverview, sampleChats } from "./beispieldaten.mjs";
+import { EXERCISE_BODY, EXERCISE_SUBJECT, patchEvents, patchOverview, sampleChats } from "./beispieldaten.mjs";
 
 const iso = (min) => new Date(Date.now() + min * 60_000).toISOString();
 let ipCounter = 10;
@@ -157,7 +157,7 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
   await page.getByLabel("Export-Datei für den Import").setInputFiles({
     name: "freebie-chats.json",
     mimeType: "application/json",
-    buffer: Buffer.from(JSON.stringify(sampleChats())),
+    buffer: Buffer.from(JSON.stringify(sampleChats(guest.username))),
   });
   const nav = page.getByRole("navigation", { name: "Chatverlauf" });
   await nav.getByRole("button", { name: "E-Mail zur Terminverschiebung", exact: true }).waitFor();
@@ -254,6 +254,102 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await page.getByRole("button", { name: /Hell/ }).click();
   });
 
+  // ---------------------------------------------------------------- Posteingang
+
+  /** Eigene API-Sitzung, um Beispiel-Mails zu verschicken. */
+  async function mailApi(user) {
+    const c = await request.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ip() } });
+    const r = await c.post("/api/auth/login", { data: user });
+    if (!r.ok()) throw new Error(`Anmeldung für Beispiel-Mails fehlgeschlagen: ${await r.text()}`);
+    return c;
+  }
+  async function sendMail(c, to, subject, body, cc = []) {
+    const r = await c.post("/api/mail", { data: { to, cc, subject, body } });
+    if (!r.ok()) throw new Error(`Beispiel-Mail „${subject}“: ${await r.text()}`);
+  }
+  const g = vormittag.guests;
+  const views = page.getByRole("group", { name: "Ansicht wechseln" });
+
+  await step("Beispiel-Mails", async () => {
+    // Die Übung der Kursleitung an die Gruppe, zwei Mails aus der Gruppe und eine eigene Antwort.
+    const teacher = await mailApi(admin);
+    await sendMail(teacher, g.map((x) => x.username), EXERCISE_SUBJECT, EXERCISE_BODY);
+    const a = await mailApi(g[0]);
+    await sendMail(
+      a,
+      [guest.username, g[2].username],
+      "Treffen zur Abschlussrunde",
+      `Hallo ihr beiden,\n\nwollen wir uns für die Abschlussrunde um 15:30 Uhr in Raum 2.14 treffen? Ich bringe die Folien mit.\n\nViele Grüße\n${g[0].username}`,
+    );
+    const me = await mailApi(guest);
+    await sendMail(
+      me,
+      [g[0].username],
+      "AW: Treffen zur Abschlussrunde",
+      `Passt mir gut, bis dann!\n\n> Hallo ihr beiden,\n> wollen wir uns für die Abschlussrunde um 15:30 Uhr in Raum 2.14 treffen?`,
+    );
+    const b = await mailApi(g[1]);
+    await sendMail(
+      b,
+      [guest.username],
+      "Mein Entwurf an Herrn Albers",
+      `Hallo,\n\nhier mein erster Entwurf für die Übung – magst du kurz drüberschauen? Freebie hat mir beim Ton geholfen.\n\n> Sehr geehrter Herr Albers,\n> es tut uns leid, dass Sie so lange warten mussten …\n\nDanke dir!\n${g[1].username}`,
+      [g[0].username],
+    );
+    await Promise.all([teacher, a, me, b].map((c) => c.dispose()));
+    // Neu laden: die erste Abfrage merkt sich den Stand, sonst erschiene „Neue E-Mail von …“ im Bild.
+    await page.goto("/?ansicht=posteingang");
+    await page.getByRole("heading", { name: "Posteingang", level: 1 }).waitFor();
+  });
+
+  await step("Posteingang", async () => {
+    await page.getByRole("list", { name: "E-Mails" }).getByRole("button", { name: new RegExp(EXERCISE_SUBJECT) }).click();
+    await page.getByRole("region", { name: "Lesebereich" }).getByRole("heading", { name: EXERCISE_SUBJECT }).waitFor();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(500);
+    await shot(page, "c22-posteingang");
+  });
+
+  await step("E-Mail schreiben", async () => {
+    await page.getByRole("button", { name: "Neue E-Mail" }).first().click();
+    const d = page.getByRole("dialog", { name: "Neue E-Mail" });
+    const to = d.getByRole("textbox", { name: "An", exact: true });
+    await to.fill(g[0].username);
+    await to.press("Enter");
+    await d.getByRole("textbox", { name: "Betreff" }).fill("Folien für die Abschlussrunde");
+    await d.getByLabel("Text der E-Mail").fill(`Hallo ${g[0].username},\n\ndanke fürs Mitbringen! Kannst du noch eine Folie mit den Wartezeiten ergänzen? Die Zahlen schicke ich dir gleich.\n\nViele Grüße\n${guest.username}`);
+    await d.getByRole("button", { name: "Adressbuch" }).first().click();
+    await d.getByRole("list", { name: "Adressbuch für „An“" }).waitFor();
+    // Etwas höher, damit der ganze Dialog samt „Senden“ ins Bild passt.
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.waitForTimeout(400);
+    await shot(page, "c23-schreiben");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await d.getByRole("button", { name: "Adressbuch" }).first().click();
+    await d.getByRole("button", { name: "Verwerfen" }).last().click();
+    await d.getByRole("alert").getByRole("button", { name: "Verwerfen" }).click();
+    await d.waitFor({ state: "hidden" });
+  });
+
+  await step("Verbindungen", async () => {
+    await views.getByRole("button", { name: "Chat", exact: true }).click();
+    await page.getByRole("button", { name: "Neuer Chat" }).first().click();
+    await page.getByRole("textbox", { name: "Nachricht" }).fill("Was steht in meinen neuen E-Mails?");
+    await page.getByRole("button", { name: /^Verbindungen/ }).click();
+    await page.getByRole("dialog", { name: "Verbindungen" }).getByRole("switch", { name: "Posteingang" }).click();
+    await page.waitForTimeout(300);
+    await shot(page, "c24-verbindungen");
+    await page.keyboard.press("Escape");
+    await page.getByRole("textbox", { name: "Nachricht" }).fill("");
+  });
+
+  await step("Antwort mit E-Mails", async () => {
+    await open("Antwort an Herrn Albers");
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(400);
+    await shot(page, "c25-mail-antwort");
+  });
+
   const storageState = await ctx.storageState();
   await ctx.close();
 
@@ -267,6 +363,10 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await p.getByRole("button", { name: "Menü öffnen" }).click();
     await p.waitForTimeout(500);
     await shot(p, "c19-mobil-menue");
+    await p.getByRole("group", { name: "Ansicht wechseln" }).getByRole("button", { name: /^Posteingang/ }).click();
+    await p.getByRole("heading", { name: "Posteingang", level: 1 }).waitFor();
+    await p.waitForTimeout(600);
+    await shot(p, "c26-mobil-posteingang");
     await mobile.close();
   });
 
