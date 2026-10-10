@@ -233,7 +233,8 @@ test.describe("Y · Fundus", () => {
       const pending = page.waitForEvent("download");
       await preview(page).getByRole("link", { name: "Herunterladen" }).click();
       const download = await pending;
-      expect(download.suggestedFilename()).toBe(d.fileName);
+      // WebKit ersetzt Leerzeichen im vorgeschlagenen Namen durch „_“; den Header selbst prüft Y21 exakt.
+      expect(download.suggestedFilename().replace(/_/g, " ")).toBe(d.fileName);
       const data = await readDownload(download);
       if (d.type === "word") {
         expect(strFromU8(unzipSync(new Uint8Array(data))["word/document.xml"])).toContain("Kiebitzweg");
