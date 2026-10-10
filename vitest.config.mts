@@ -14,6 +14,7 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/unit/**/*.test.ts"],
+    globalSetup: ["tests/unit/global-setup.ts"],
     env: { PGLITE_DIR: "memory://", FREEBIE_FILES_DIR: "/tmp/freebie-test-files" },
     testTimeout: 30_000,
   },

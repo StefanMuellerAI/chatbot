@@ -61,19 +61,22 @@ Dokumente und Mails verweisen darauf:
 Das macht den Fundus glaubwürdig. Es ermöglicht außerdem Übungen über mehrere Dateien, z. B. „Stimmen die Zahlen der
 Präsentation mit der Excel-Tabelle überein?“. Dafür sind gezielt Widersprüche eingebaut.
 
-| Ebene | Arbeitsname (wird noch geprüft) | Typische Einheiten |
-|---|---|---|
-| Kreisfreie Großstadt | Stadt Falkenbrück | 6 Dezernate; Bürgeramt, Ordnungsamt, Bauaufsicht, Jugendamt, Kämmerei, Personalamt, IT, Vergabestelle, Presseamt |
-| Mittelstadt | Stadt Lindgrabenau | Fachbereiche und Teams statt Dezernate |
-| Kleine Gemeinde | Gemeinde Ellerbach | Hauptamt, Bauamt, Ordnungsamt in kleiner Besetzung |
-| Landkreis | Landkreis Altmoorland | Gesundheitsamt, Jugendamt, Zulassungsstelle, Ausländerbehörde, Jobcenter, Veterinäramt |
-| Landesministerium | Land ohne Namen | Abteilungen, Referate, Stabsstelle |
-| Landesoberbehörde | – | Referate, Projektgruppen |
-| Bundesoberbehörde | – | Abteilungen, Referate, Projektgruppen |
-| Kommunaler IT-Dienstleister | Zweckverband | Teams, Service Desk, Informationssicherheit |
+Umgesetzt mit etwas mehr Gewicht auf Land und Bund (Entscheidung 6): drei kommunale Verwaltungen, ein
+IT-Dienstleister, je zwei Behörden von Land und Bund.
 
-Jeder Name wird vor der Umsetzung gegen das Gemeindeverzeichnis von Destatis und mit einer Websuche geprüft.
-Land und Bund bekommen Fantasienamen ohne Bezug zu echten Ressortzuschnitten.
+| Ebene | Name | Einheiten (Auszug) |
+|---|---|---|
+| Kreisfreie Großstadt | Stadt Falkenbrück | 5 Dezernate mit Hauptamt, Personalamt, IT, Kämmerei, Ordnungsamt, Bürgeramt, Jugendamt, Stadtplanung, Bauaufsicht; Presse |
+| Landkreis | Landkreis Altmoorland (Sitz: Altmoor) | Personal, Finanzen, Gesundheitsamt, Jugendamt, Zulassungsstelle, Ausländerbehörde, Bauaufsicht |
+| Kreisangehörige Gemeinde | Gemeinde Brackenhain | Hauptamt, Bauamt, Ordnungsamt, Kämmerei |
+| Kommunaler IT-Dienstleister | Zweckverband Kommunale IT Altmoor | Service Desk, Rechenzentrum, E-Akte, Informationssicherheit |
+| Landesministerium | Ministerium für Kommunales und Verwaltungsentwicklung (Sitz: Rhedenburg) | Zentralabteilung, Kommunalaufsicht, Verwaltungsmodernisierung mit Referat KI |
+| Landesoberbehörde | Landesamt für Personalgewinnung und Fortbildung | Personalgewinnung, Fortbildung, Digitale Kompetenzen |
+| Bundesministerium | Bundesministerium für Verwaltungsdienste und Bürgerservice | Zentralabteilung, Bürgerservice, Digitale Verwaltung mit Referat KI |
+| Bundesoberbehörde | Bundesamt für zentrale Beschaffung und Liegenschaften | Zentrale Dienste, Beschaffung, Liegenschaften |
+
+Alle Namen wurden per Websuche geprüft. „Ellerbach“ gab es als Gemeinde und wurde ersetzt; Land und Bund tragen
+Fantasienamen ohne Bezug zu echten Ressortzuschnitten.
 
 ### 3.2 Was in den Dateien steckt
 
@@ -304,14 +307,38 @@ Inhalt und nicht nur den Chip.
 
 ## 6. Umsetzung in Phasen
 
-| Phase | Inhalt |
-|---|---|
-| 1 · Grundlage | Weltmodell; Generator für Word, Excel, PowerPoint und E-Mail; feste Prüfsummen; `.eml` auslesen; PowerPoint-Diagramme; **Pilotpaket** mit 15 Dokumenten und 5 Verläufen; Unit-Tests |
-| 2 · Server | Katalog, Vorschau, Download, Anhängen, Schalter, Rückfall in `prepare.ts`; Y21, Q21 |
-| 3 · Oberfläche | Datenbank-Symbol, Dialog mit beiden Reitern, Vorschauen, Mehrfachauswahl, Chips; Y01–Y20 |
-| **Abnahme Pilot** | Du schaust dir Pilotpaket und Dialog an: Optik, Ton und Realismus. Erst danach entsteht die Masse. |
-| 4 · Volle Breite | alle 8 Verwaltungen, ca. 150 Dokumente und 40 Verläufe; Wächter- und Auslesetests laufen über alles |
-| 5 · Abschluss | `TESTPLAN.md`, `coverage.json`, `README.md`, Live-Smoke X08, Stabilitätslauf, CI in drei Browsern |
+| Phase | Inhalt | Stand |
+|---|---|---|
+| 1 · Grundlage | Weltmodell; Generator für Word, Excel, PowerPoint und E-Mail; feste Prüfsummen; `.eml` auslesen; PowerPoint-Diagramme; **Pilotpaket** mit 15 Dokumenten und 5 Verläufen; Unit-Tests | erledigt |
+| 2 · Server | Katalog, Vorschau, Download, Anhängen, Schalter, Rückfall in `prepare.ts`; Y21, Q21 | erledigt |
+| 3 · Oberfläche | Datenbank-Symbol, Dialog mit beiden Reitern, Vorschauen, Mehrfachauswahl, Chips; Y01–Y20 | erledigt |
+| **Abnahme Pilot** | Du schaust dir Pilotpaket und Dialog an: Optik, Ton und Realismus. Erst danach entsteht die Masse. | offen |
+| 4 · Volle Breite | alle 8 Verwaltungen, ca. 150 Dokumente und 40 Verläufe; Wächter- und Auslesetests laufen über alles | nach der Abnahme |
+| 5 · Abschluss | `TESTPLAN.md`, `coverage.json`, `README.md`, Live-Smoke X08, Stabilitätslauf, CI in drei Browsern | Doku und Tests erledigt; Live-Smoke nach dem Deploy |
+
+**Pilotpaket (umgesetzt)**
+
+| Verwaltung | Dokumente | E-Mail-Verlauf |
+|---|---|---|
+| Stadt Falkenbrück | Beschlussvorlage Kita-Ausbau (Word), Budgetüberwachung Jugend (Excel), Bürgeramt 2030 (PowerPoint) | Mitzeichnung der Beschlussvorlage – Kämmerei widerspricht bei Kosten und Frist |
+| Landkreis Altmoorland | Vermerk Rückstände Ausländerbehörde (Word), Fallzahlen Zulassungsstelle (Excel) | – |
+| Gemeinde Brackenhain | Gesprächsnotiz Lärmbeschwerde mit fiktiven Personendaten (Word) | Wütende Bürgerbeschwerde und interner Vorschlag an den Bürgermeister |
+| Zweckverband IT Altmoor | Ticketstatistik mit eingebautem Widerspruch (Excel), Projektstatus E-Akte (PowerPoint) | Störung durch abgelaufenes Zertifikat |
+| Landesministerium (MKV) | Langer KI-Leitfaden als Entwurf (Word) | Presseanfrage – veröffentlichte Antwort weicht vom Fachentwurf ab |
+| Landesamt (LPF) | Fortbildungsplanung mit Budgetabgleich über zwei Blätter (Excel), Personalgewinnung (PowerPoint) | – |
+| Bundesministerium (BMVB) | KI-Assistenz Sachstand (PowerPoint), Personalbedarfsermittlung (Excel) | – |
+| Bundesamt (BZBL) | Vergabevermerk Notebooks (Word), Energiebericht (PowerPoint) | Bieterfrage – Frist im Verlauf passt nicht zum Vergabevermerk |
+
+**Abweichungen bei der Umsetzung**
+
+- **Kein Lesen über `getFile`:** Fundus-Dateien werden nur über die eigenen Routen gelesen (`lib/library/catalog.ts`).
+  `library/`-Schlüssel bleiben für Upload und Dateiauslieferung gesperrt (Y21).
+- **Auslesen verbessert (gilt auch für Uploads):** Zahlen aus Excel-Dateien erscheinen in deutscher Schreibweise
+  (1.234,50 €), Foliennummern werden nicht mehr als Inhalt gelesen, Diagrammtitel und Achseneinheit getrennt.
+- **Generator:** `pptxgenjs` schreibt bei Fettdruck mitten im Absatz ungültiges XML – der Generator korrigiert das beim
+  Neupacken, sonst böte PowerPoint eine Reparatur an.
+- **Barrierefreiheit:** Die Tabellenvorschau ist per Tastatur scrollbar; farbige Typ-Beschriftungen sind im Dunkelmodus
+  durch neutrale Schrift mit farbigem Symbol ersetzt (axe, Y19).
 
 ## 7. Bewusst nicht enthalten (später möglich)
 
@@ -322,21 +349,14 @@ Inhalt und nicht nur den Chip.
 - Outlook-`.msg`-Dateien.
 - Übungsideen je Datei mit „Als Frage übernehmen“.
 
-## 8. Entscheidungen, die ich von dir brauche
+## 8. Entscheidungen
 
-Jeweils mit meiner Empfehlung:
+Getroffen am 10. Oktober 2026: Alle Empfehlungen übernommen, der Schwerpunkt der Verwaltungen etwas in Richtung Land
+und Bund verschoben.
 
-1. **Name in der Oberfläche:** „Fundus“. *Empfehlung: ja*, kurz und selbsterklärend. Alternativen wären
-   „Beispielablage“ oder „Dokumenten-DB“.
-2. **Umfang:** ca. 150 Dokumente und 40 E-Mail-Verläufe aus 8 Verwaltungen, über das Pilotpaket. *Empfehlung: ja*.
-   Mehr geht später jederzeit, weil die Inhalte nur Daten sind.
-3. **Kennzeichnung als erfunden:** in den Dateieigenschaften **und** als dezente Fußzeile „Fiktives
-   Übungsdokument“. *Empfehlung: ja*. Nur die Eigenschaften wären realistischer, aber weitergeleitete Dateien wirkten
-   dann echt.
-4. **E-Mail-Adressen auf `.example`:** *Empfehlung: ja*. Damit landet garantiert keine Antwort bei einer echten
-   Adresse. Echt aussehende `.de`-Adressen wären immersiver, aber jemand kann solche Domains jederzeit registrieren.
-5. **Fundus unabhängig von Uploads**, mit eigenem Schalter, standardmäßig an. *Empfehlung: ja*. So kann die
-   Kursleitung echte Uploads abschalten und nur den Fundus anbieten.
-6. **Schwerpunkt der Verwaltungen:** 4 kommunale (Großstadt, Mittelstadt, Gemeinde, Landkreis), dazu Land, Bund und
-   ein IT-Dienstleister. *Empfehlung: ja*, sofern deine Schulungen vor allem Kommunen erreichen. Sonst verschiebe ich
-   die Gewichtung.
+1. **Name in der Oberfläche:** „Fundus“.
+2. **Umfang:** ca. 150 Dokumente und 40 E-Mail-Verläufe aus 8 Verwaltungen, nach Abnahme des Pilotpakets.
+3. **Kennzeichnung als erfunden:** in den Dateieigenschaften **und** als dezente Fußzeile „Fiktives Übungsdokument“.
+4. **E-Mail-Adressen auf `.example`.**
+5. **Fundus unabhängig von Uploads**, mit eigenem Schalter im Admin (standardmäßig an).
+6. **Schwerpunkt:** drei kommunale Verwaltungen, ein IT-Dienstleister, je zwei Behörden von Land und Bund.

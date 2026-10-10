@@ -39,6 +39,7 @@ const Patch = z
         showCacheBadge: z.boolean(),
         showCost: z.boolean(),
         mailbox: z.boolean(),
+        library: z.boolean(),
       })
       .partial()
       .strict(),

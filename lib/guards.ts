@@ -4,13 +4,14 @@ import { providerConfigured } from "@/lib/models";
 import { type AppSettings, getSettings } from "@/lib/settings";
 import type { FeatureFlags } from "@/lib/shared/types";
 
-type GuardedFeature = "uploads" | "transcription" | "dictation" | "imageGeneration";
+type GuardedFeature = "uploads" | "transcription" | "dictation" | "imageGeneration" | "library";
 
 export const FEATURE_OFF_MESSAGE: Record<GuardedFeature, string> = {
   uploads: "Datei-Uploads sind deaktiviert.",
   transcription: "Die Transkription ist deaktiviert.",
   dictation: "Die Spracheingabe ist deaktiviert.",
   imageGeneration: "Die Bildgenerierung ist deaktiviert.",
+  library: "Der Fundus ist deaktiviert.",
 };
 
 /** Funktionen, die über OpenAI laufen (Bilder, Transkription, Diktat). */

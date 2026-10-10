@@ -14,6 +14,7 @@ const DOCUMENTS: [string, string][] = [
   ["readme.md", "Kaffee kochen"],
   ["daten.json", '"projekt"'],
   ["skript.py", 'print("Hallo aus Python")'],
+  ["mail.eml", "Betreff: Einladung zur Dienstbesprechung – Raum 3.12"],
 ];
 
 test.describe("F · Dateien", () => {
@@ -23,7 +24,7 @@ test.describe("F · Dateien", () => {
     const fc = await chooser;
     expect(fc.isMultiple()).toBe(true);
     const accept = await page.getByLabel("Dateien zum Anhängen").getAttribute("accept");
-    for (const ext of [".pdf", ".docx", ".xlsx", ".pptx", ".csv", ".png", ".jpg", ".mp3", ".m4a"]) expect(accept).toContain(ext);
+    for (const ext of [".pdf", ".docx", ".xlsx", ".pptx", ".eml", ".csv", ".png", ".jpg", ".mp3", ".m4a"]) expect(accept).toContain(ext);
     void chat;
   });
 

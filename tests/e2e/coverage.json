@@ -31,7 +31,8 @@
     "sessionVersion": ["S03", "A11", "A12"],
     "features.mailbox": ["Q22"],
     "mailWelcomeSubject": ["Q23", "Z01"],
-    "mailWelcomeText": ["Q23"]
+    "mailWelcomeText": ["Q23"],
+    "features.library": ["Q21", "Y01"]
   },
   "routes": {
     "GET /api/admin/events": ["T01", "T08", "T17", "U01"],
@@ -80,7 +81,11 @@
     "PUT /api/mail": ["Z03", "Z16"],
     "DELETE /api/mail": ["Z03", "Z11", "Z16"],
     "GET /api/mail/status": ["Z02", "Z16", "W05"],
-    "GET /api/mail/contacts": ["Z05", "Z13", "Z16"]
+    "GET /api/mail/contacts": ["Z05", "Z13", "Z16"],
+    "GET /api/library": ["Y03", "Y11", "Y21"],
+    "GET /api/library/[id]": ["Y06", "Y13", "Y21"],
+    "GET /api/library/[id]/file": ["Y07", "Y21"],
+    "POST /api/library/attach": ["Y08", "Y11", "Y18", "Y21"]
   },
   "elements": {
     "Login: Benutzername und Passwort": ["A03", "A04", "A05", "A06", "T14"],
@@ -184,6 +189,21 @@
     "Eingabe: Verbindungen (Schalter „Posteingang“)": ["Z10", "Z15", "Z17", "V07"],
     "Chat: Trennlinie „Posteingang verbunden/getrennt“": ["Z10"],
     "Antwort: Karten „Gelesene E-Mails“ und „Gesendete E-Mails“": ["Z11", "Z17", "V07"],
-    "Admin Einstellungen: Begrüßungs-E-Mail": ["Q23"]
+    "Admin Einstellungen: Begrüßungs-E-Mail": ["Q23"],
+    "Eingabe: Datenbank-Symbol (Fundus)": ["Y01", "Q21"],
+    "Fundus: Schließen (X, Esc, Klick daneben)": ["Y02"],
+    "Fundus: Reiter Dokumente / E-Mails": ["Y02", "Y19"],
+    "Fundus: Suche": ["Y05", "Y12"],
+    "Fundus: Filter Verwaltung und Organisationseinheit": ["Y03", "Y04"],
+    "Fundus: Typ- und Merkmal-Chips, Filter zurücksetzen": ["Y04"],
+    "Fundus: Liste mit Auswahl (Maus und Tastatur)": ["Y09", "Y19"],
+    "Fundus: Vorschau Word, Excel (Blattreiter), PowerPoint (Notizen)": ["Y06"],
+    "Fundus: Anhängen, Zur Auswahl, Dateien anhängen": ["Y08", "Y09", "Y10"],
+    "Fundus: Herunterladen": ["Y07"],
+    "Fundus: Diese E-Mail anhängen, Ganzen Verlauf anhängen": ["Y14", "Y15"],
+    "Fundus: Anhänge mitnehmen": ["Y16"],
+    "Fundus: Erneut versuchen": ["Y11"],
+    "Fundus: Filter-Knopf und Zurück zur Liste (Handy)": ["Y20"],
+    "Admin: Schalter Fundus": ["Q21"]
   }
 }

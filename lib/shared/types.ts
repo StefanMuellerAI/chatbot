@@ -89,6 +89,8 @@ export interface FeatureFlags {
   showCost: boolean;
   /** Übungs-Posteingang und Verbindung „Posteingang“ im Chat. */
   mailbox: boolean;
+  /** Fundus: erfundene Beispieldateien und E-Mails zum Anhängen. */
+  library: boolean;
 }
 
 export type AttachmentKind = "image" | "document" | "transcript";
@@ -108,6 +110,8 @@ export interface Attachment {
   preview?: string;
   /** PDF nativ an das Modell geben (Layout, Grafiken) statt nur Text. */
   native?: boolean;
+  /** Aus dem Fundus angehängt (ID des Dokuments bzw. der E-Mail). */
+  libraryId?: string;
 }
 
 export interface Citation {

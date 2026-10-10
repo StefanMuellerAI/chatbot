@@ -177,8 +177,8 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| F01 | Büroklammer | Dateiauswahl mit den erlaubten Typen |
-| F02 | Jedes Dokumentformat | Fortschritt → fertig mit Token-Schätzung; der ausgelesene Text enthält die erwarteten Inhalte; das Modell bekommt ihn |
+| F01 | Büroklammer | Dateiauswahl mit den erlaubten Typen (inkl. E-Mail `.eml`) |
+| F02 | Jedes Dokumentformat (inkl. E-Mail mit kodierten Umlauten) | Fortschritt → fertig mit Token-Schätzung; der ausgelesene Text enthält die erwarteten Inhalte; das Modell bekommt ihn |
 | F03 | Bilder | Vorschau, Verkleinerung großer Bilder, Meldung über 5 MB; bei Modellen ohne Bildverständnis ein sichtbarer Hinweis |
 | F04 | Grenzfälle aus 3.3 | jeweils klare deutsche Meldung, nichts hängt |
 | F05 | Mehrere Dateien, Anhang entfernen, fehlerhafte Datei | Entfernen bricht den Upload ab; Fehler-Chip blockiert das Senden nicht; mehr als 20 Dateien → Meldung vorab |
@@ -302,6 +302,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | Q18 | Hinweistext lang/kurz | siehe B |
 | Q19 | Hinweise an das Modell | Abschnitt im System-Prompt, neuer Cache-Schlüssel |
 | Q20 | Speichern | „Gespeichert.“, Fehler sichtbar, zwei Admins gleichzeitig überschreiben sich nicht |
+| Q21 | Funktionsschalter „Fundus“ | aus: kein Datenbank-Symbol, Fundus-API 403; Upload aus, Fundus an: nur das Datenbank-Symbol, Anhängen geht; Pause sperrt Symbol und API (503) |
 | Q22 | Schalter „Posteingang“ aus und wieder an | Umschalter, Verbindung, Werkzeuge (Mock-Diagnose „aus“) und API (403) weg, alter Link führt zum Chat; wieder an: alles da, vorhandene Mails bleiben |
 | Q23 | Begrüßungs-E-Mail ändern bzw. leeren | neue Postfächer bekommen den neuen Text (einmal, auch bei erneuter Anmeldung), leer: keine Begrüßung; zu lang: Meldung |
 
@@ -395,9 +396,41 @@ Termin für eine Stunde mit einem Gast an, chattet als dieser Gast und löscht d
 | X05 | ein Bild in Entwurfsqualität | Bild erscheint |
 | X06 | eine Websuche-Frage und ein kleines Artefakt | Quellen; Artefakt-Panel öffnet sich |
 | X07 | Gast meldet sich über das Formular an; Termin wird gelöscht | nur Chat, kein Admin; nach dem Löschen spätestens nach 15 Sekunden abgemeldet („abgelaufen“) |
+| X08 | eine Fundus-Datei anhängen und befragen | Fundus wird aus dem Deployment gelesen, Anhang bereit, Antwort |
 | X09 | Gast schreibt sich selbst eine Mail, verbindet den Posteingang und fragt Claude Haiku („Niedrig“) nach dem Betreff; meldet sich ab | Antwort nennt den Betreff, Karte „Gelesene E-Mails“; nach erneuter Anmeldung ist das Postfach geleert (übersprungen, wenn der Posteingang ausgeschaltet ist) |
 
 Geschätzte Kosten: unter 0,10 $ pro Lauf.
+
+### Y · Fundus (erfundene Beispieldateien und E-Mails)
+
+Neben der Büroklammer öffnet ein Datenbank-Symbol den Fundus: erfundene Word-, Excel- und PowerPoint-Dateien sowie
+E-Mail-Verläufe aus acht Verwaltungen, die sich wie Uploads anhängen lassen (Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md)).
+Unit-Tests prüfen zusätzlich Weltmodell, Generator (feste Prüfsummen), Auslesbarkeit, Formeln und den
+„Erfunden“-Wächter über alle Dateien (`tests/unit/library.test.ts`, `tests/unit/extract-mail.test.ts`).
+
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| Y01 | Datenbank-Symbol neben der Büroklammer | sichtbar mit Namen und Tooltip, direkt nach der Büroklammer; öffnet den Fundus; fehlt bei ausgeschaltetem Fundus, gesperrt bei Pause (Q21) |
+| Y02 | Dialog schließen per X, Esc und Klick daneben | Fokus zurück auf das Symbol; Reiter und Suche bleiben beim erneuten Öffnen erhalten |
+| Y03 | Katalog | Anzahl je Reiter wie in der API; alle Verwaltungen und ihre Einheiten im Filter; je Typ mindestens 5 Dokumente, mindestens 5 Verläufe, alle Verwaltungsebenen |
+| Y04 | Filter Verwaltung → Einheit (samt Untereinheiten), Typ, Merkmal | Trefferliste und -zahl stimmen; Einheit leert sich beim Wechsel der Verwaltung; „Keine Treffer.“; „Filter zurücksetzen“ |
+| Y05 | Suche nach Titel, Stichwort, Einheit und Person | Groß/klein, ä/ae und ß/ss egal; zusammen mit Filtern |
+| Y06 | Vorschau Word, Excel, PowerPoint | Briefkopf mit Signet, Aktenzeichen, Fiktiv-Hinweis; Tabelle mit formatierten Zahlen und Blattreitern; Folien mit Diagramm und Sprechernotizen; Eckdaten mit Token-Schätzung |
+| Y07 | Herunterladen | richtiger Dateiname; die Datei ist eine gültige Word- bzw. Excel-Datei mit dem erwarteten Inhalt; E-Mails als `message/rfc822` |
+| Y08 | Je ein Word-, Excel- und PowerPoint-Dokument anhängen | Chip „Fundus · ca. n Tokens“, Token-Summe, Fokus im Eingabefeld; das Modell bekommt den Inhalt |
+| Y09 | Mehrfachauswahl und Grenze | „3 Dateien anhängen“; bei 18 Anhängen nur noch 2 wählbar mit Hinweis; zusammen 20 Anhänge |
+| Y10 | Bereits angehängte Datei | als „angehängt“ markiert, nicht wählbar, „Bereits angehängt“; nach dem Entfernen wieder frei |
+| Y11 | Katalog lädt nicht; Entfernen während des Holens; Serverfehler | Meldung mit „Erneut versuchen“; Anfrage wird abgebrochen; Fehler-Chip blockiert das Senden nicht |
+| Y12 | E-Mail-Reiter | Verläufe neueste zuerst; Filter nach Verwaltung; Suche nach Betreff und Absenderadresse |
+| Y13 | Verlauf öffnen | alle Mails mit Von, An, Cc, Datum, Betreff und Anhängen |
+| Y14 | Einzelne E-Mail anhängen | das Modell bekommt Absender, Empfänger, Datum, Betreff und Text |
+| Y15 | Ganzen Verlauf anhängen | eine Datei (jüngste Mail mit Zitatverlauf); das Modell bekommt alle Mails, jüngste zuerst |
+| Y16 | „Anhänge mitnehmen“ an bzw. aus | an: Mail plus Dokumente als eigene Anhänge; aus: nur die Mail, Anhänge werden darin genannt |
+| Y17 | Fundus-Anhänge im Verlauf | bleiben bei „Neu generieren“, im Markdown-Export („(Fundus)“), nach dem Neuladen und beim Bearbeiten |
+| Y18 | Caches | zweites Anhängen aus dem Datei-Cache; gleiche Frage mit gleicher Datei im neuen Chat aus dem Antwort-Cache; ohne Datei-Cache-Eintrag liest der Server die Datei neu aus |
+| Y19 | Nur Tastatur und axe (hell und dunkel) | Reiter mit Pfeiltasten, Liste mit Pfeilen/Pos1/Ende, Leertaste wählt, Enter hängt an; keine schweren axe-Befunde in Liste, allen Vorschauen und E-Mails |
+| Y20 | Handy und Tablet | Handy: Vollbild, Filter einklappbar, Liste → Vorschau → Zurück, kein seitliches Scrollen; Tablet: Liste und Vorschau nebeneinander |
+| Y21 | Fundus-API | 401 ohne Sitzung; ETag/304; Vorschau für Dokument, Verlauf und E-Mail; ungültige IDs und Pfad-Tricks 400, unbekannte 404; Download mit Sandbox-CSP und `nosniff`; Upload-Wege lehnen `library/`-Pfade ab |
 
 ### Z · Posteingang und Verbindung „Posteingang“
 

@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db/client";
 import type { ModelRow } from "@/lib/models";
 import type { Attachment, ChatMessage, Effort, NativeTurn } from "@/lib/shared/types";
 import { sniffImageMime } from "@/lib/files/sniff";
+import { libraryText } from "@/lib/library/catalog";
 import { getFile } from "@/lib/storage";
 
 export type PreparedPart =
@@ -103,7 +104,12 @@ async function attachmentParts(
     const file = await getFile(a.storageKey);
     if (file) return [{ type: "pdf", name: a.name, base64: file.data.toString("base64") }];
   }
-  const text = texts.get(a.sha256);
+  let text = texts.get(a.sha256);
+  // Fundus-Dateien liegen im Deployment: nach dem Aufräumen des Datei-Caches einfach neu auslesen.
+  if (text === undefined && a.libraryId) {
+    text = await libraryText(a.libraryId);
+    if (text !== undefined) texts.set(a.sha256, text);
+  }
   if (text === undefined) {
     return [{ type: "text", text: `[Datei "${a.name}" ist nicht mehr verfügbar. Bitte erneut hochladen.]` }];
   }

@@ -3,7 +3,7 @@
 export const AUDIO_EXTENSIONS = ["mp3", "m4a", "wav", "webm", "ogg", "oga", "mp4", "mpeg", "mpga", "aac", "flac"];
 export const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif"];
 export const DOCUMENT_EXTENSIONS = [
-  "pdf", "docx", "xlsx", "xls", "xlsm", "ods", "csv", "tsv", "pptx",
+  "pdf", "docx", "xlsx", "xls", "xlsm", "ods", "csv", "tsv", "pptx", "eml",
   "txt", "md", "markdown", "json", "xml", "html", "htm", "css", "js", "ts", "tsx", "jsx", "py", "java",
   "c", "cpp", "cs", "go", "rb", "php", "sql", "yaml", "yml", "toml", "ini", "log", "sh", "rtf", "tex",
 ];

@@ -54,6 +54,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showCacheBadge: true,
     showCost: false,
     mailbox: true,
+    library: true,
   },
   imageModel: "gpt-image-2",
   imageDefaultQuality: "medium",
