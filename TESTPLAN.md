@@ -564,8 +564,9 @@ liegt bei dir.
 | 9 · Posteingang | Bereich Z, Q22/Q23, V07, W05, X09; V05, A10, E08, N01 und U01 angepasst (`POSTEINGANG-PLAN.md`) | erledigt |
 
 Ergebnis: 286 E2E-Tests in 26 Dateien (plus 9 Live-Smoke-Tests) und 118 Unit-Tests; die komplette Suite läuft lokal in knapp 7 Minuten
-(3 Worker) und dreimal hintereinander ohne Wiederholungen grün. In der CI laufen zusätzlich die
-Chat-Tests in WebKit und Firefox.
+(3 Worker). Beim dreifachen Lauf ohne Wiederholungen (858 Läufe) scheiterte nur T13 zweimal an einer
+Reihenfolge-Abhängigkeit (das Postfach der Kursleitung teilen sich alle Chat-Tests); im Test behoben und in genau
+dieser Reihenfolge nachgeprüft. In der CI laufen zusätzlich die Chat-Tests in WebKit und Firefox.
 
 ## 9. Was automatisiert nicht geht – kurze manuelle Abnahme
 
