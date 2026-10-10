@@ -791,9 +791,11 @@ function ThreadDetail({
           .filter((d): d is LibraryDocument => Boolean(d))
           .map((d) => ({ id: d.id, name: d.fileName }))
       : [];
-  const attachMail = (index: number) => {
+  /** Eine Mail – oder mit `whole` den ganzen Verlauf: die jüngste Mail und die Anhänge aller Mails. */
+  const attachMail = (index: number, whole = false) => {
     const mail = thread.mails[index];
-    onAttach([{ id: mail.id, name: mail.fileName }, ...docsOf(mail.attachments)]);
+    const docIds = whole ? [...new Set(thread.mails.flatMap((m) => m.attachments))] : mail.attachments;
+    onAttach([{ id: mail.id, name: mail.fileName }, ...docsOf(docIds)]);
   };
   const last = thread.mails[thread.mails.length - 1];
   const org = catalog.orgs.find((o) => o.id === thread.orgId)!;
@@ -812,7 +814,7 @@ function ThreadDetail({
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {thread.mails.length > 1 && (
-            <Button variant="primary" size="sm" onClick={() => attachMail(thread.mails.length - 1)} disabled={attached.has(last.id)}>
+            <Button variant="primary" size="sm" onClick={() => attachMail(thread.mails.length - 1, true)} disabled={attached.has(last.id)}>
               <Paperclip className="h-4 w-4" /> {attached.has(last.id) ? "Verlauf bereits angehängt" : "Ganzen Verlauf anhängen"}
             </Button>
           )}

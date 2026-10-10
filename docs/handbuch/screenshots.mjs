@@ -254,6 +254,78 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await page.getByRole("button", { name: /Hell/ }).click();
   });
 
+  // ---------------------------------------------------------------- Fundus
+
+  const fundus = page.getByRole("dialog", { name: "Fundus" });
+  const vorschau = fundus.getByRole("region", { name: "Vorschau" });
+  const fundusItem = (list, id) => fundus.getByRole("listbox", { name: list }).locator(`[data-id="${id}"]`);
+  const pending = page.getByRole("group", { name: "Anhänge" }).getByRole("button", { name: /entfernen$/ });
+  const clearAttachments = async () => {
+    while (await pending.count()) await pending.first().click();
+  };
+
+  /** Nur den grauen Rahmen um die Datei aufnehmen – so weit er im Vorschaubereich zu sehen ist. */
+  async function previewShot(id, testId, name) {
+    await fundusItem("Dokumente", id).click();
+    const frame = vorschau.getByTestId(testId).locator("xpath=..");
+    await frame.waitFor();
+    await frame.evaluate((el) => el.scrollIntoView({ block: "start" }));
+    await page.waitForTimeout(400);
+    const region = await vorschau.boundingBox();
+    const box = await frame.boundingBox();
+    const top = Math.max(region.y, box.y);
+    const bottom = Math.min(region.y + region.height, box.y + box.height);
+    const clip = { x: box.x, y: top, width: box.width, height: bottom - top };
+    await page.screenshot({ path: path.join(outDir, `${name}.jpg`), type: "jpeg", quality: 86, animations: "disabled", clip });
+    console.log("  ✓", name);
+  }
+
+  await step("Fundus", async () => {
+    await page.getByRole("button", { name: "Neuer Chat" }).first().click();
+    await clearAttachments();
+    // Etwas höher, damit unter den Angaben zur Datei auch der Briefkopf zu sehen ist.
+    await page.setViewportSize({ width: 1280, height: 1050 });
+    await page.getByRole("button", { name: "Fundus öffnen" }).click();
+    await fundusItem("Dokumente", "fb-budgetueberwachung-th51").waitFor();
+    // Zwei Dateien vormerken; die zuletzt angeklickte steht in der Vorschau.
+    for (const id of ["fb-budgetueberwachung-th51", "fb-beschlussvorlage-kita-nordstadt"]) {
+      await fundusItem("Dokumente", id).locator('[data-role="auswahl"]').click();
+    }
+    await vorschau.getByTestId("vorschau-word").waitFor();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(500);
+    await shot(page, "c27-fundus");
+  });
+
+  await step("Fundus-Vorschauen", async () => {
+    await fundus.getByRole("button", { name: "Auswahl aufheben" }).click();
+    await previewShot("fb-budgetueberwachung-th51", "vorschau-excel", "c28-fundus-excel");
+    await previewShot("fb-buergeramt-2030", "vorschau-powerpoint", "c29-fundus-folien");
+  });
+
+  await step("Fundus-E-Mails", async () => {
+    await fundus.getByRole("tab", { name: /^E-Mails/ }).click();
+    await fundusItem("E-Mail-Verläufe", "fb-mitzeichnung-kita-nordstadt").click();
+    await fundus.getByRole("region", { name: "Verlauf" }).getByRole("article").first().waitFor();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(500);
+    await shot(page, "c30-fundus-mails");
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  await step("Fundus im Chat", async () => {
+    // Ganzer Verlauf mit „Anhänge mitnehmen“: die jüngste Mail und die Beschlussvorlage aus der ersten.
+    await fundus.getByRole("button", { name: "Ganzen Verlauf anhängen" }).click();
+    await fundus.waitFor({ state: "hidden" });
+    await page.waitForFunction(() => document.querySelector('button[aria-label="Senden"]')?.disabled === false, null, { timeout: 60_000 });
+    await page.getByRole("textbox", { name: "Nachricht" }).fill("Was muss in der Beschlussvorlage nach den Rückmeldungen aus der Mitzeichnung geändert werden?");
+    await page.waitForTimeout(500);
+    // Nur das Eingabefeld – die ganze Seite zeigt schon „Anhänge“ in Kapitel 2.8.
+    await shot(page.getByRole("group", { name: "Anhänge" }).locator("xpath=.."), "c31-fundus-chat");
+    await page.getByRole("textbox", { name: "Nachricht" }).fill("");
+    await clearAttachments();
+  });
+
   // ---------------------------------------------------------------- Posteingang
 
   /** Eigene API-Sitzung, um Beispiel-Mails zu verschicken. */

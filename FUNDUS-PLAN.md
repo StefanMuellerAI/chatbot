@@ -190,7 +190,8 @@ Senden ────────────── POST /api/chat ─────
   ```
 - **Ganzer Verlauf:** „Ganzen Verlauf anhängen“ nimmt die jüngste Mail des Verlaufs. Sie zitiert die früheren Mails
   wie in Outlook und ist damit eine einzige Datei.
-- **Anhänge mitnehmen:** Die Option hängt die Fundus-Dokumente aus der Mail zusätzlich als eigene Anhänge an.
+- **Anhänge mitnehmen:** Die Option hängt die Fundus-Dokumente aus der Mail zusätzlich als eigene Anhänge an, beim
+  ganzen Verlauf die Dokumente aller Mails des Verlaufs.
 - **PowerPoint-Diagramme:** Diagramme wurden bisher nicht ausgelesen. Künftig liest der PowerPoint-Leser auch
   Reihen, Kategorien und Werte. Das gilt auch für Uploads.
 
@@ -275,7 +276,7 @@ Inhalt und nicht nur den Chip.
 | Y13 | Verlauf öffnen | alle Mails in Reihenfolge mit Von, An, Cc, Datum und Betreff; Anhänge sichtbar |
 | Y14 | Einzelne E-Mail anhängen | Chip mit Mail-Symbol; das Modell bekommt Absender, Empfänger, Datum, Betreff und Text |
 | Y15 | Ganzen Verlauf anhängen | Das Modell bekommt alle Mails des Verlaufs in Reihenfolge |
-| Y16 | „Anhänge mitnehmen“ an bzw. aus | an: Mail plus enthaltene Dokumente als eigene Anhänge; aus: nur die Mail, die Anhänge werden darin namentlich genannt |
+| Y16 | „Anhänge mitnehmen“ an bzw. aus | an: Mail plus enthaltene Dokumente als eigene Anhänge (beim ganzen Verlauf die Dokumente aller Mails); aus: nur die Mail, die Anhänge werden darin namentlich genannt |
 | Y17 | Fundus-Anhänge im weiteren Verlauf | Sie bleiben nach dem Neuladen, beim Bearbeiten und beim Neu-Generieren erhalten und stehen im Markdown-Export |
 | Y18 | Caches | Das zweite Anhängen kommt aus dem Datei-Cache. Dieselbe erste Frage mit derselben Fundus-Datei kommt in einem neuen Chat aus dem Antwort-Cache. Ist der Datei-Cache nach dem Aufräumjob leer, wird die Datei trotzdem beantwortet. |
 | Y19 | Nur Tastatur, Screenreader, axe | Reiter mit Pfeiltasten, Liste mit Pfeilen und Leertaste, Enter hängt an; Namen und Zustände stimmen; keine schweren axe-Befunde in beiden Reitern und der Vorschau, hell und dunkel |
@@ -314,7 +315,7 @@ Inhalt und nicht nur den Chip.
 | 3 · Oberfläche | Datenbank-Symbol, Dialog mit beiden Reitern, Vorschauen, Mehrfachauswahl, Chips; Y01–Y20 | erledigt |
 | **Abnahme Pilot** | Du schaust dir Pilotpaket und Dialog an: Optik, Ton und Realismus. Erst danach entsteht die Masse. | offen |
 | 4 · Volle Breite | alle 8 Verwaltungen, ca. 150 Dokumente und 40 Verläufe; Wächter- und Auslesetests laufen über alles | nach der Abnahme |
-| 5 · Abschluss | `TESTPLAN.md`, `coverage.json`, `README.md`, Live-Smoke X08, Stabilitätslauf, CI in drei Browsern | Doku und Tests erledigt; Live-Smoke nach dem Deploy |
+| 5 · Abschluss | `TESTPLAN.md`, `coverage.json`, `README.md`, Handbuch (Kapitel 2.9 mit Screenshots), Live-Smoke X08, Stabilitätslauf, CI in drei Browsern | Doku und Tests erledigt; Live-Smoke nach dem Deploy |
 
 **Pilotpaket (umgesetzt)**
 

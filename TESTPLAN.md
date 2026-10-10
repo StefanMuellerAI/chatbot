@@ -425,7 +425,7 @@ Unit-Tests prüfen zusätzlich Weltmodell, Generator (feste Prüfsummen), Ausles
 | Y13 | Verlauf öffnen | alle Mails mit Von, An, Cc, Datum, Betreff und Anhängen |
 | Y14 | Einzelne E-Mail anhängen | das Modell bekommt Absender, Empfänger, Datum, Betreff und Text |
 | Y15 | Ganzen Verlauf anhängen | eine Datei (jüngste Mail mit Zitatverlauf); das Modell bekommt alle Mails, jüngste zuerst |
-| Y16 | „Anhänge mitnehmen“ an bzw. aus | an: Mail plus Dokumente als eigene Anhänge; aus: nur die Mail, Anhänge werden darin genannt |
+| Y16 | „Anhänge mitnehmen“ an bzw. aus | an: Mail plus Dokumente als eigene Anhänge (beim ganzen Verlauf die Dokumente aller Mails); aus: nur die Mail, Anhänge werden darin genannt |
 | Y17 | Fundus-Anhänge im Verlauf | bleiben bei „Neu generieren“, im Markdown-Export („(Fundus)“), nach dem Neuladen und beim Bearbeiten |
 | Y18 | Caches | zweites Anhängen aus dem Datei-Cache; gleiche Frage mit gleicher Datei im neuen Chat aus dem Antwort-Cache; ohne Datei-Cache-Eintrag liest der Server die Datei neu aus |
 | Y19 | Nur Tastatur und axe (hell und dunkel) | Reiter mit Pfeiltasten, Liste mit Pfeilen/Pos1/Ende, Leertaste wählt, Enter hängt an; keine schweren axe-Befunde in Liste, allen Vorschauen und E-Mails |

@@ -438,7 +438,7 @@ test.describe("Y · Fundus", () => {
     expect([...order].sort((x, y) => x - y)).toEqual(order);
   });
 
-  test("Y16 „Anhänge mitnehmen“ hängt die Dokumente der Mail mit an – oder nennt sie nur", async ({ chat, page }) => {
+  test("Y16 „Anhänge mitnehmen“ hängt die Dokumente der Mail (beim ganzen Verlauf: aller Mails) mit an – oder nennt sie nur", async ({ chat, page }) => {
     const catalog = await catalogOf(page);
     const t = thread(catalog, IDS.mitzeichnung);
     const word = doc(catalog, IDS.word);
@@ -457,6 +457,16 @@ test.describe("Y · Fundus", () => {
     await expect(attachments(page).getByRole("group")).toHaveCount(1);
     const answer = await chat.ask(`#zeige-dateien Welche Anlagen gibt es? ${uniq()}`);
     await expect(answer.locator("pre")).toContainText(`Anhänge: ${word.fileName} (`);
+
+    // Ganzer Verlauf: die Dokumente aller Mails, auch wenn die jüngste selbst keine hat.
+    const last = t.mails.at(-1)!;
+    expect(last.attachments).toEqual([]);
+    await fundusButton(page).click();
+    await threadView(page).getByRole("checkbox", { name: "Anhänge mitnehmen" }).check();
+    await threadView(page).getByRole("button", { name: "Ganzen Verlauf anhängen" }).click();
+    await expectReady(page, last.fileName, "Fundus · ca.");
+    await expectReady(page, word.fileName, "Fundus · ca.");
+    await expect(attachments(page).getByRole("group")).toHaveCount(2);
   });
 
   test("Y17 Fundus-Anhänge bleiben im Verlauf: Neu generieren, Export, Neuladen, Bearbeiten", async ({ chat, page }) => {
