@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "test:e2e:live": "LIVE=1 playwright test",
     "test:coverage": "node tests/e2e/coverage.mjs",
+    "docs:handbuch": "node docs/handbuch/erstellen.mjs",
     "check": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {

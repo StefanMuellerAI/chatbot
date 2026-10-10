@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Freebie – Handbuch für Chat und Admin-Bereich</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===================================================== Deckblatt -->
+<section class="cover">
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <div class="inner">
+    <div class="logo"><div class="mark"><img src="icon.png" alt=""></div><div><div class="word">Freebie</div><div class="by">by StefanAI</div></div></div>
+    <div class="title">
+      <div class="kicker">Handbuch für Kolleginnen und Kollegen</div>
+      <h1>Freebie<br><span>Chat &amp; Admin-Bereich</span></h1>
+      <div class="sub">Alle Funktionen des KI-Assistenten für unsere Schulungen – für Teilnehmende im Chat und für die Kursleitung im Admin-Bereich.</div>
+      <div class="chips"><span class="chip">Anmelden &amp; Chatten</span><span class="chip">Dateien, Bilder, Artefakte</span><span class="chip">Termine &amp; Gast-Zugänge</span><span class="chip">Kosten &amp; Einstellungen</span></div>
+    </div>
+    <div class="foot"><div>Stand: <span id="stand"></span> · freebie.stefanai.de</div><img src="stefanai-logo.png" alt="StefanAI"></div>
+  </div>
+</section>
+
+<!-- ===================================================== Inhalt -->
+<section class="toc">
+  <h1>Inhalt</h1>
+  <ol id="toc"></ol>
+
+</section>
+
+<!-- ===================================================== Teil 1 -->
+<section class="part" id="teil-1">
+  <div class="kicker">Teil 1</div>
+  <h1>Freebie auf einen Blick</h1>
+  <p>Was Freebie ist, wer was darf – und wie ein Schulungstag mit Freebie abläuft.</p>
+</section>
+<div class="box tip">
+    <span class="t">Zu diesem Handbuch</span>
+    <p>Es beschreibt alle Funktionen von Freebie – zuerst den Chat, wie ihn Gäste und Kursleitung sehen, dann den Admin-Bereich für die Kursleitung. Alle Screenshots zeigen <strong>Beispieldaten</strong> (Termine, Chats, Kosten). Beschriftungen von Knöpfen und Feldern stehen so in Anführungszeichen, wie sie in Freebie erscheinen, z. B. <span class="ui">Neuer Chat</span>.</p>
+  </div>
+
+<h2 id="k1-1"><span class="num">1.1</span>Was ist Freebie?</h2>
+<p>Freebie ist der KI-Assistent für unsere Schulungen. Teilnehmende können damit Fragen stellen, Dateien auswerten lassen, im Web recherchieren, Bilder erzeugen und kleine Webseiten oder Diagramme bauen – mit Modellen von Anthropic (Claude) und OpenAI (GPT). Freebie läuft im Browser unter <strong>freebie.stefanai.de</strong>, auf dem Rechner genauso wie auf Tablet und Handy. Eine Installation ist nicht nötig.</p>
+<p>Freebie ist eine <strong>Spiel- und Übungsumgebung</strong>. Alle Eingaben gehen zur Verarbeitung an Anthropic und OpenAI in den USA. Deshalb weist Freebie beim ersten Start und unter jedem Eingabefeld darauf hin, keine personenbezogenen oder vertraulichen Daten einzugeben.</p>
+
+<h2 id="k1-2"><span class="num">1.2</span>Zwei Rollen: Kursleitung und Gäste</h2>
+<table>
+  <thead><tr><th style="width: 24%"></th><th>Kursleitung (Admin)</th><th>Gast (Teilnehmende)</th></tr></thead>
+  <tbody>
+    <tr><td>Zugang</td><td>Ein fester Admin-Zugang: Benutzername (Standard <code>admin</code>) und Passwort aus der Vercel-Umgebung</td><td>Eigene Zugangsdaten pro Person, von der Kursleitung pro Termin erzeugt, z. B. <code>fuchs27</code> / <code>sonne482</code></td></tr>
+    <tr><td>Chat</td><td>Ja</td><td>Ja</td></tr>
+    <tr><td>Admin-Bereich</td><td>Ja, ohne zweite Anmeldung</td><td>Nein</td></tr>
+    <tr><td>Gültigkeit</td><td>Sitzung 12 Stunden, danach neu anmelden</td><td>Nur während des Termins (Anmeldung ab 30 Minuten vor Beginn); mit dem Ende verfällt der Zugang sofort</td></tr>
+    <tr><td>Chats auf dem Gerät</td><td>Bleiben erhalten</td><td>Werden beim Abmelden und zum Termin-Ende vom Gerät gelöscht (Export vorher möglich)</td></tr>
+  </tbody>
+</table>
+
+<h2 id="k1-3"><span class="num">1.3</span>Ein Schulungstag in sechs Schritten</h2>
+<ol class="steps">
+  <li><strong>Termin anlegen.</strong> Im Admin-Bereich unter <span class="ui">Termine</span> einen Termin mit Datum, Beginn und Ende anlegen (höchstens 24 Stunden). → Kapitel 3.3</li>
+  <li><strong>Gruppen und Gäste erzeugen.</strong> Pro Gruppe die Anzahl der Gäste angeben – Freebie erzeugt sofort einfache Zugangsdaten.</li>
+  <li><strong>Zugangsdaten verteilen.</strong> Kärtchen drucken und ausschneiden oder die Liste als CSV für Excel herunterladen.</li>
+  <li><strong>Gäste melden sich an.</strong> Ab 30 Minuten vor Beginn mit Benutzername und Passwort auf freebie.stefanai.de. → Kapitel 2.1</li>
+  <li><strong>Während der Schulung</strong> zeigt die Übersicht Anfragen und Kosten; bei Bedarf hilft der <span class="ui">Not-Aus</span> (alle pausieren) oder <span class="ui">Jetzt beenden</span>.</li>
+  <li><strong>Nach dem Termin</strong> verfallen alle Gast-Zugänge automatisch. Zehn Minuten vorher werden die Gäste gewarnt und können ihre Chats exportieren. Kosten und Anfragen bleiben 90 Tage in der Statistik.</li>
+</ol>
+
+<div class="box warn">
+  <span class="t">Datenschutz in einem Satz</span>
+  <p>Chats liegen nur im Browser des jeweiligen Geräts, nicht auf dem Server. Was Teilnehmende eingeben, hochladen oder einsprechen, geht zur Verarbeitung an Anthropic bzw. OpenAI in den USA – deshalb keine personenbezogenen, vertraulichen oder geschäftskritischen Daten eingeben (Details in Kapitel 4.3).</p>
+</div>
+
+<!-- ===================================================== Teil 2 -->
+<section class="part" id="teil-2">
+  <div class="kicker">Teil 2</div>
+  <h1>Der Chat</h1>
+  <p>Anmelden, Fragen stellen, Dateien und Bilder, Artefakte, Chats verwalten – alles, was Gäste und Kursleitung im Chat tun können.</p>
+</section>
+
+<h2 id="k2-1"><span class="num">2.1</span>Anmelden</h2>
+<div class="pair">
+  <figure><img src="shots/c01-login.jpg"><figcaption><b>Anmeldeseite.</b> Benutzername und Passwort aus der Schulung.</figcaption></figure>
+  <figure><img src="shots/c21-abgelaufen.jpg"><figcaption><b>Hinweis nach Ablauf</b> des Gast-Zugangs.</figcaption></figure>
+</div>
+<p>Auf <strong>freebie.stefanai.de</strong> erscheint die Seite <span class="ui">Willkommen bei Freebie</span>. Dort <span class="ui">Benutzername</span> und <span class="ui">Passwort</span> eingeben und <span class="ui">Los geht's</span> klicken oder <span class="key">Enter</span> drücken. Groß- und Kleinschreibung sowie Leerzeichen im Benutzernamen spielen keine Rolle. Unter dem Formular steht der Hinweis <span class="ui">Spielumgebung</span>.</p>
+<ul>
+  <li><strong>Gäste</strong> kommen direkt in den Chat – frühestens 30 Minuten vor Beginn ihres Termins.</li>
+  <li><strong>Die Kursleitung</strong> meldet sich mit dem Admin-Zugang an. Wer über <code>/admin</code> kommt, landet danach im Admin-Bereich, sonst im Chat.</li>
+  <li>Wer schon angemeldet ist, kommt von der Anmeldeseite direkt in den Chat.</li>
+</ul>
+<h4>Meldungen bei der Anmeldung</h4>
+<table class="plain">
+  <thead><tr><th style="width: 52%">Meldung</th><th>Bedeutung</th></tr></thead>
+  <tbody>
+    <tr><td><span class="ui" style="white-space: normal">Benutzername oder Passwort stimmt nicht.</span></td><td>Tippfehler im Namen oder Passwort. Freebie verrät absichtlich nicht, welches von beiden falsch ist.</td></tr>
+    <tr><td><span class="ui" style="white-space: normal">Dein Termin beginnt am 14. November um 9:00 Uhr. Die Anmeldung ist ab 30 Minuten vorher möglich.</span></td><td>Der Termin hat noch nicht begonnen (Beispieldatum).</td></tr>
+    <tr><td><span class="ui">Dein Zugang ist abgelaufen.</span></td><td>Der Termin ist vorbei oder der Zugang wurde gelöscht. Die Gast-Chats auf diesem Gerät werden dabei gelöscht.</td></tr>
+    <tr><td><span class="ui" style="white-space: normal">Deine Sitzung ist beendet. Bitte melde dich erneut an.</span></td><td>Die Sitzung ist nach 12 Stunden abgelaufen oder der Termin wurde verschoben. Der Zugang besteht weiter, die Chats bleiben.</td></tr>
+    <tr><td><span class="ui" style="white-space: normal">Zu viele Anmeldeversuche. Bitte warte ein paar Minuten.</span></td><td>Login-Bremse: mehr als 50 Fehlversuche in 10 Minuten von derselben Internetadresse (z. B. dem Schulungs-WLAN).</td></tr>
+    <tr><td><span class="ui" style="white-space: normal">Zu viele Fehlversuche für diesen Benutzernamen. Bitte warte ein paar Minuten.</span></td><td>Mehr als 10 Fehlversuche in 10 Minuten für diesen Namen. Nach spätestens 10 Minuten geht es wieder.</td></tr>
+    <tr><td><span class="ui" style="white-space: normal">Der Admin-Bereich ist nur für die Kursleitung. Bitte mit dem Admin-Zugang anmelden.</span></td><td>Jemand hat <code>/admin</code> ohne Admin-Sitzung aufgerufen.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="k2-2"><span class="num">2.2</span>Der Hinweis „Spielumgebung“</h2>
+<figure class="w80"><img src="shots/c02-hinweis.jpg"><figcaption><b>Wichtiger Hinweis</b> beim ersten Start – er lässt sich nur mit „Verstanden“ schließen.</figcaption></figure>
+<p>Beim ersten Start erscheint der Dialog <span class="ui">Wichtiger Hinweis</span>. Er lässt sich nur mit <span class="ui">Verstanden</span> schließen. Der Hinweis gilt <strong>pro Konto</strong>: Am gemeinsam genutzten Schulungsrechner bestätigt jeder Gast ihn selbst. Ändert die Kursleitung den Text, erscheint er bei allen erneut.</p>
+<p>Unter dem Eingabefeld steht dauerhaft die Kurzform (<em>„Spielumgebung – bitte keine vertraulichen oder personenbezogenen Daten eingeben.“</em>). Der Link <span class="ui">Mehr</span> öffnet den vollständigen Text noch einmal.</p>
+
+<h2 id="k2-3"><span class="num">2.3</span>Die Oberfläche im Überblick</h2>
+<figure><img src="shots/c03-start.jpg"><figcaption><b>Startseite eines neuen Chats</b> mit Vorlagen und Beispielfragen.</figcaption></figure>
+<div class="cols">
+  <div>
+    <h4>Links: die Seitenleiste</h4>
+    <ul>
+      <li><span class="ui">Neuer Chat</span> und <span class="ui">Chats durchsuchen</span></li>
+      <li>Liste der eigenen Chats, sortiert nach „Heute“, „Gestern“, „Letzte 7 Tage“, „Älter“</li>
+      <li>Farbschema <span class="ui">Hell</span> / <span class="ui">System</span> / <span class="ui">Dunkel</span></li>
+      <li>Bei Gästen: <span class="ui">Angemeldet als … · gültig bis … Uhr</span></li>
+      <li><span class="ui">Export</span>, <span class="ui">Import</span>, <span class="ui">Admin</span> (nur Kursleitung), <span class="ui">Abmelden</span></li>
+    </ul>
+  </div>
+  <div>
+    <h4>Rechts: der Chat</h4>
+    <ul>
+      <li>Oben die <strong>Modellauswahl</strong>, im laufenden Chat Export, Drucken und <span class="ui">Artefakte</span></li>
+      <li>In der Mitte das Gespräch bzw. auf der Startseite Vorlagen und Beispielfragen</li>
+      <li>Unten das <strong>Eingabefeld</strong> mit Büroklammer, Mikrofon, <span class="ui">Websuche</span>, Denktiefe und <span class="ui">Bild</span></li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="k2-4"><span class="num">2.4</span>Fragen stellen</h2>
+<p>Die Frage in das Feld <span class="ui">Frag Freebie etwas …</span> schreiben und mit <span class="key">Enter</span> oder dem Pfeil-Knopf <span class="ui">Senden</span> abschicken. <span class="key">Umschalt</span> + <span class="key">Enter</span> macht eine neue Zeile. Freebie schreibt die Antwort live; solange sie läuft, wird aus dem Senden-Knopf <span class="ui">Antwort stoppen</span>.</p>
+<ul>
+  <li><strong>Beispielfragen</strong> auf der Startseite setzen ihren Text ins Eingabefeld – abgeschickt wird erst mit Enter.</li>
+  <li>Eine Nachricht darf bis zu 400.000 Zeichen lang sein; für lange Texte besser eine Datei anhängen. Ein Chat fasst bis zu 500 Nachrichten – danach einen neuen Chat beginnen.</li>
+  <li>Nach der ersten Nachricht bekommt der Chat automatisch einen kurzen Titel.</li>
+  <li>Jede Nachricht bekommt das aktuelle Datum mit. Fragen wie „Was ist heute los?“ beantwortet Freebie daher mit dem richtigen Datum.</li>
+</ul>
+
+<h3>Vorlagen</h3>
+<p>Unter <span class="ui">Mit einer Vorlage starten</span> stehen Assistenten mit einer festen Rolle, z. B. <span class="ui">E-Mail-Profi</span>, <span class="ui">Excel-Erklärer</span>, <span class="ui">Präsentations-Coach</span>, <span class="ui">Webseiten-Baukasten</span> und <span class="ui">Ideen-Sparring</span>. Ein Klick wählt die Vorlage (die Kachel wird hervorgehoben), ein zweiter hebt die Wahl wieder auf. Hat die Vorlage ein empfohlenes Modell, stellt Freebie es automatisch ein. Die Vorlage gilt für den ganzen Chat und steht als farbiges Abzeichen neben dem Modellnamen. Welche Vorlagen es gibt, bestimmt die Kursleitung (Kapitel 3.6).</p>
+
+<h2 id="k2-5"><span class="num">2.5</span>Modell wählen</h2>
+<figure><img src="shots/c04-modelle.jpg"><figcaption><b>Modellauswahl</b> oben links – gruppiert nach Anbieter, mit Beschreibung und Kennzeichnung „Standard“.</figcaption></figure>
+<p>Oben links steht das aktuelle Modell mit einem farbigen Punkt (orange = Anthropic, grün = OpenAI). Ein Klick öffnet die Liste <span class="ui">Modell wählen</span>. Sie zeigt nur Modelle, die die Kursleitung aktiviert hat. Das Modell lässt sich auch mitten im Gespräch wechseln. Freebie meldet dann <span class="ui" style="white-space: normal">Modell gewechselt – für dieses Gespräch startet der Cache neu.</span> Das ist kein Fehler: Die nächste Antwort kostet nur etwas mehr.</p>
+<table>
+  <thead><tr><th>Modell</th><th>Wofür</th><th>Kosten</th></tr></thead>
+  <tbody>
+    <tr><td>Claude Sonnet 5.5 <span class="muted small">(Standard)</span></td><td>Der Allrounder für Texte, Analysen und Code</td><td>mittel</td></tr>
+    <tr><td>Claude Opus 5.5</td><td>Anspruchsvolle Aufgaben, lange Dokumente, knifflige Analysen</td><td>hoch</td></tr>
+    <tr><td>Claude Haiku 5.5</td><td>Schnell und günstig für einfache Aufgaben</td><td>sehr niedrig</td></tr>
+    <tr><td>GPT-6.1 Sol</td><td>OpenAIs ausgewogenes Modell zwischen Intelligenz und Kosten</td><td>mittel</td></tr>
+    <tr><td>GPT-6 Astra</td><td>OpenAIs Flaggschiff für komplexe Aufgaben</td><td>sehr hoch</td></tr>
+    <tr><td>GPT-6 Luna</td><td>OpenAIs schnelles und günstiges Modell</td><td>sehr niedrig</td></tr>
+  </tbody>
+</table>
+<p class="small muted">Startbelegung – die Kursleitung kann Modelle ergänzen, umbenennen oder abschalten (Kapitel 3.4).</p>
+
+<h2 id="k2-6"><span class="num">2.6</span>Denktiefe und Websuche</h2>
+<figure><img src="shots/c05-denktiefe.jpg"><figcaption><b>Denktiefe</b> im Eingabefeld – die Stufe gilt für die nächste Nachricht.</figcaption></figure>
+<p>Der Knopf mit dem Gehirn-Symbol zeigt die <strong>Denktiefe</strong>, also wie gründlich das Modell vor der Antwort nachdenkt. Mehr Denktiefe heißt bessere Antworten bei kniffligen Aufgaben, aber längere Wartezeit und höhere Kosten. Die Stufe lässt sich jederzeit ändern, auch mitten im Gespräch.</p>
+<table>
+  <thead><tr><th>Stufe</th><th>Erklärung im Menü</th><th>Gut für</th></tr></thead>
+  <tbody>
+    <tr><td>Niedrig</td><td>Schnell und sparsam</td><td>Kurze Fragen, Umformulieren, Übersetzen</td></tr>
+    <tr><td>Mittel</td><td>Ausgewogen (Standard)</td><td>Die meisten Aufgaben</td></tr>
+    <tr><td>Hoch</td><td>Gründlich nachdenken</td><td>Analysen, Rechenaufgaben, längere Texte</td></tr>
+    <tr><td>Maximal</td><td>Maximale Denktiefe, dauert länger</td><td>Sehr schwierige Probleme</td></tr>
+  </tbody>
+</table>
+<p>Der Knopf <span class="ui">Websuche</span> (Globus) erlaubt dem Modell, im Internet zu recherchieren. Er ist bei jedem neuen Chat <strong>eingeschaltet</strong> (farbig hinterlegt). Das Modell entscheidet selbst, ob eine Suche nötig ist; während der Suche steht <span class="ui">Suche im Web …</span> über der Antwort. Die gefundenen <strong>Quellen</strong> erscheinen nummeriert unter der Antwort und öffnen sich in einem neuen Tab. Ein Klick schaltet die Websuche für den Chat aus – dann antwortet das Modell nur aus seinem Wissen. Jede Suche kostet etwa 0,01 $.</p>
+<figure><img src="shots/c08-quellen.jpg"><figcaption><b>Antwort mit Websuche</b> – die Quellen stehen unter der Antwort (Beispielquellen).</figcaption></figure>
+
+<h2 id="k2-7"><span class="num">2.7</span>Mit Antworten arbeiten</h2>
+<figure><img src="shots/c06-antwort.jpg"><figcaption><b>Eine Antwort</b> mit Gedankengang, Formatierung und Aktionsleiste darunter.</figcaption></figure>
+<p>Antworten sind formatiert: Überschriften, Listen, Tabellen, Formeln und Code mit Syntaxfarben. Links öffnen sich in einem neuen Tab. Unter jeder Antwort stehen:</p>
+<ul>
+  <li><span class="ui">Kopieren</span> – kopiert die ganze Antwort. Codeblöcke haben zusätzlich ein eigenes <span class="ui">Kopieren</span>.</li>
+  <li><span class="ui">Neu generieren</span> – nur an der letzten Antwort: erzeugt sie neu, ohne Antwort-Cache, mit demselben Modell.</li>
+  <li>Der <strong>Name des Modells</strong>, das geantwortet hat.</li>
+  <li><span class="ui">aus dem Cache</span> (gelb mit Blitz) – die Antwort kam aus dem gemeinsamen Antwort-Cache und hat nichts gekostet (siehe unten).</li>
+  <li>Falls die Kursleitung es eingeschaltet hat: die <strong>geschätzten Kosten</strong> der Antwort.</li>
+</ul>
+<div class="pair">
+  <figure><img src="shots/c07-gedankengang.jpg"><figcaption><b>Gedankengang</b> aufgeklappt.</figcaption></figure>
+  <figure><img src="shots/c12-cache.jpg"><figcaption><b>„aus dem Cache“</b> – kostenlose Antwort.</figcaption></figure>
+</div>
+<h4>Gedankengang</h4>
+<p>Modelle mit Denktiefe zeigen über der Antwort den aufklappbaren Bereich <span class="ui">Gedankengang</span> – eine Zusammenfassung, wie das Modell vorgegangen ist. Während es nachdenkt, steht dort <span class="ui">Freebie denkt nach …</span>.</p>
+<h4>Eigene Nachricht bearbeiten</h4>
+<p>Beim Überfahren der eigenen Nachricht erscheinen <span class="ui">Kopieren</span> und <span class="ui">Bearbeiten</span>. „Bearbeiten“ holt Text und Anhänge zurück ins Eingabefeld; ein Balken zeigt <em>„Du bearbeitest eine frühere Nachricht. Beim Senden wird das Gespräch ab dort neu fortgesetzt.“</em> Beim Senden ersetzt Freebie alles ab dieser Nachricht. <span class="ui">Abbrechen</span> verwirft die Bearbeitung.</p>
+<h4>Antwort-Cache</h4>
+<p>Fragen mehrere Personen <strong>exakt dasselbe</strong> – z. B. wenn alle denselben Übungsprompt eingeben –, liefert Freebie die gespeicherte Antwort sofort und ohne Kosten. „Exakt dasselbe“ heißt: gleicher Verlauf, gleiches Modell, gleiche Vorlage, Denktiefe, Websuche und Dateien, am selben Tag. Wer eine eigene, frische Antwort möchte, klickt <span class="ui">Neu generieren</span>.</p>
+<h4>Wenn etwas schiefgeht</h4>
+<ul>
+  <li><strong>Gestoppt:</strong> Der bisherige Text bleibt mit dem Vermerk <em>(Abgebrochen)</em> stehen.</li>
+  <li><strong>Unterbrochen</strong> (Verbindung, Zeitlimit, Seite neu geladen): Eine rote Box nennt den Grund; meist hilft <span class="ui">Neu generieren</span>.</li>
+  <li><strong>Abgelehnt:</strong> <em>„Das Modell hat diese Anfrage aus Sicherheitsgründen abgelehnt …“</em> – umformulieren oder ein anderes Modell wählen. Bei Claude springt teils automatisch ein <span class="ui">Ersatzmodell</span> ein; das steht dann unter der Antwort.</li>
+  <li><strong>Anbieter überlastet:</strong> <em>„Der Anbieter ist gerade überlastet …“</em> – kurz warten und erneut versuchen.</li>
+</ul>
+
+<h2 id="k2-8"><span class="num">2.8</span>Dateien anhängen</h2>
+<figure><img src="shots/c14-anhaenge.jpg"><figcaption><b>Drei Anhänge</b> (PDF, CSV, Foto) – fertig verarbeitet, mit geschätzter Größe in Tokens.</figcaption></figure>
+<p>Über die <strong>Büroklammer</strong> (<span class="ui">Datei anhängen</span>), per <strong>Drag &amp; Drop</strong> in den Chat oder per <strong>Einfügen</strong> aus der Zwischenablage (z. B. ein Screenshot) lassen sich bis zu <strong>20 Dateien pro Nachricht</strong> anhängen. Jede Datei erscheint als Kärtchen mit Fortschritt (<span class="ui">Lade hoch …</span>, <span class="ui">Text wird ausgelesen …</span>) und danach mit der Größe, z. B. <span class="ui">ca. 1.234 Tokens</span>. Das kleine X entfernt einen Anhang wieder. Senden geht erst, wenn alle Anhänge fertig sind.</p>
+<table>
+  <thead><tr><th>Art</th><th>Formate</th><th>Größe</th><th>Was Freebie damit macht</th></tr></thead>
+  <tbody>
+    <tr><td>Dokumente</td><td>PDF, Word (.docx), Excel (.xlsx, .xls, .xlsm), .ods, CSV, TSV, PowerPoint (.pptx)</td><td class="nowrap">bis 50 MB</td><td>Liest den Text aus: PDF Seite für Seite, Word mit Überschriften und Tabellen, jedes Tabellenblatt als Tabelle, Folientexte samt Sprechernotizen</td></tr>
+    <tr><td>Text und Code</td><td>txt, md, json, xml, html, css, js, py, sql, yaml u. v. m.</td><td class="nowrap">bis 50 MB</td><td>Übergibt den Inhalt als Text</td></tr>
+    <tr><td>Bilder</td><td>PNG, JPG, WEBP, GIF</td><td class="nowrap">bis 20 MB</td><td>Verkleinert große Bilder und gibt sie dem Modell zum Ansehen; Bilder lassen sich auch als Vorlage für neue Bilder nutzen</td></tr>
+    <tr><td>Audio und Video</td><td>MP3, M4A, WAV, WEBM, OGG, MP4, AAC, FLAC u. a.</td><td class="nowrap">bis 300 MB</td><td>Transkribiert die Tonspur (in 10-Minuten-Abschnitten) – das Modell bekommt das Transkript</td></tr>
+  </tbody>
+</table>
+<div class="box tip">
+  <span class="t">Gut zu wissen</span>
+  <ul>
+    <li>Alte Formate wie <code>.doc</code> und <code>.ppt</code> gehen nicht – vorher als .docx/.pptx oder PDF speichern.</li>
+    <li>Eingescannte PDFs ohne Textebene enthalten keinen lesbaren Text. Besser die Seiten als Bilder hochladen – oder die Kursleitung schaltet „PDFs nativ“ ein.</li>
+    <li>Dieselbe Datei verarbeitet Freebie nur einmal; beim zweiten Mal geht es sofort (bei Audio steht dann <span class="ui">Aus dem Cache</span>).</li>
+    <li>Kann das gewählte Modell keine Bilder sehen, meldet Freebie das und schlägt ein anderes Modell vor.</li>
+  </ul>
+</div>
+
+<h3>Spracheingabe (Diktat)</h3>
+<p>Der <strong>Mikrofon-Knopf</strong> (<span class="ui">Spracheingabe</span>) nimmt gesprochenen Text auf. Beim ersten Mal fragt der Browser nach dem Mikrofon. Während der Aufnahme ist der Knopf rot und zeigt Pegel und Zeit; ein zweiter Klick beendet sie. Nach <span class="ui">Transkribiere …</span> steht der erkannte Text im Eingabefeld – zum Prüfen und Ergänzen, abgeschickt wird erst mit Enter. Eine Aufnahme dauert höchstens 10 Minuten.</p>
+
+<h2 id="k2-9"><span class="num">2.9</span>Bilder erzeugen</h2>
+<div class="pair">
+  <figure><img src="shots/c15-bildmodus.jpg"><figcaption><b>Dialog „Bild-Modus“.</b></figcaption></figure>
+  <figure><img src="shots/c16-bild.jpg"><figcaption><b>Ergebnis im Chat</b> (im Testmodus ein Platzhalterbild).</figcaption></figure>
+</div>
+<p>Der Knopf <span class="ui">Bild</span> öffnet den <strong>Bild-Modus</strong>. In <span class="ui">Bildbeschreibung</span> das Bild möglichst genau beschreiben – Motiv, Stil, Stimmung, Farben, Perspektive –, dann <span class="ui">Format</span> (Quadratisch, Querformat, Hochformat) und <span class="ui">Qualität</span> (Entwurf, Standard, Hoch) wählen und <span class="ui">Bild erzeugen</span> klicken (oder <span class="key">Strg</span> + <span class="key">Enter</span>). Das Bild erscheint als Antwort im Chat. Ein Klick öffnet es groß in einem neuen Tab, <span class="ui">Herunterladen</span> speichert es.</p>
+<p>Bilder entstehen auch <strong>im normalen Chat</strong>, wenn man ausdrücklich darum bittet („Erstelle ein Bild von …“) – mit jedem Modell, auch mit Claude. Hochgeladene oder schon erzeugte Bilder kann Freebie als Vorlage nutzen („Mach den Hintergrund blau“). Bilder erzeugt immer das Bildmodell von OpenAI.</p>
+<div class="box tip"><span class="t">Kosten</span><p>Ein Entwurf kostet unter 0,01 $, ein Bild in Standardqualität etwa 0,04–0,05 $, in hoher Qualität etwa 0,20 $.</p></div>
+
+<h2 id="k2-10"><span class="num">2.10</span>Artefakte: Webseiten, Diagramme, Grafiken</h2>
+<figure><img src="shots/c09-artefakt.jpg"><figcaption><b>Ein Artefakt</b> (Webseite) im Seitenpanel – mit Vorschau, Code, Kopieren, Download und „In neuem Tab öffnen“.</figcaption></figure>
+<p>Bittet man um eine Webseite, ein Diagramm, eine Grafik oder ein längeres Dokument, liefert Freebie ein <strong>Artefakt</strong>: In der Antwort steht ein Kärtchen (<span class="ui">· Klicken zum Öffnen</span>), der Inhalt erscheint rechts im Seitenpanel. Neue Artefakte öffnen sich automatisch.</p>
+<table>
+  <thead><tr><th>Typ</th><th>Beispiele</th><th>Download</th></tr></thead>
+  <tbody>
+    <tr><td>Webseite (HTML)</td><td>Landingpages, Prototypen, kleine Spiele, Diagramme mit Chart.js</td><td>.html</td></tr>
+    <tr><td>Diagramm (Mermaid)</td><td>Abläufe, Organigramme, Zeitstrahlen, Mindmaps</td><td>.mmd und als Grafik (SVG)</td></tr>
+    <tr><td>Grafik (SVG)</td><td>Icons, einfache Grafiken</td><td>.svg</td></tr>
+    <tr><td>Dokument (Markdown)</td><td>Längere Texte, Anleitungen</td><td>.md</td></tr>
+    <tr><td>Code</td><td>Programme und Skripte, z. B. Python</td><td>passende Endung</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li>Reiter <span class="ui">Vorschau</span> und <span class="ui">Code</span>; dazu <span class="ui">Kopieren</span>, der Download-Knopf (z. B. <span class="ui">HTML</span>) und – bei Webseiten und Grafiken – „In neuem Tab öffnen“.</li>
+  <li><strong>Versionen:</strong> Bittet man um Änderungen („Mach die Überschrift größer“), entsteht eine neue Version. Über die Auswahl <span class="ui">Version 1</span>, <span class="ui">Version 2</span> … lassen sich ältere Stände ansehen.</li>
+  <li>Oben rechts im Chat öffnet <span class="ui">Artefakte (n)</span> das Panel wieder; das X oder <span class="key">Esc</span> schließt es.</li>
+  <li>Die Vorschau läuft abgeschottet – sie hat keinen Zugriff auf Konto, Cookies oder andere Daten.</li>
+</ul>
+<div class="pair">
+  <figure><img src="shots/c11-diagramm.jpg"><figcaption><b>Diagramm</b> (Mermaid) mit SVG-Download.</figcaption></figure>
+  <figure><img src="shots/c10-artefakt-code.jpg"><figcaption><b>Reiter „Code“</b> mit dem Quelltext.</figcaption></figure>
+</div>
+
+<h2 id="k2-11"><span class="num">2.11</span>Chats verwalten</h2>
+<div class="cols" style="grid-template-columns: 1.75fr 0.65fr; align-items: start">
+  <ul>
+    <li><span class="ui">Neuer Chat</span> beginnt ein neues Gespräch. Ein Klick in der Liste öffnet einen früheren Chat; das Papierkorb-Symbol daneben löscht ihn (mit Rückfrage).</li>
+    <li><span class="ui">Chats durchsuchen</span> durchsucht Titel <strong>und</strong> Nachrichtentexte.</li>
+    <li><strong>Farbschema:</strong> <span class="ui">Hell</span>, <span class="ui">Dunkel</span> oder <span class="ui">System</span> (wie das Betriebssystem).</li>
+    <li><span class="ui">Export</span> lädt alle Chats als Datei <code>freebie-chats-JJJJ-MM-TT.json</code> herunter; <span class="ui">Import</span> lädt eine solche Datei wieder – auch auf einem anderen Gerät oder in einem anderen Konto.</li>
+    <li>Oben rechts im Chat: <span class="ui">Chat als Markdown exportieren</span> (eine <code>.md</code>-Datei zum Weiterverwenden, z. B. in Word) und <span class="ui">Drucken oder als PDF speichern</span>.</li>
+  </ul>
+  <figure style="margin-top: 0"><img src="shots/c13-suche.jpg"><figcaption><b>Suche</b> in der Seitenleiste.</figcaption></figure>
+</div>
+<figure class="w70"><img src="shots/c17-dunkel.jpg"><figcaption><b>Dunkles Farbschema.</b></figcaption></figure>
+<div class="box warn">
+  <span class="t">Wo liegen meine Chats?</span>
+  <p>Nur im Browser des Geräts, nicht auf dem Server. Wer den Browser-Speicher löscht oder das Gerät wechselt, sieht seine Chats nicht mehr – außer über Export und Import. Hochgeladene Dateien und erzeugte Bilder löscht der Server nach einigen Tagen (Standard 7). Ältere Chats zeigen sie dann nicht mehr an.</p>
+</div>
+
+<h2 id="k2-12"><span class="num">2.12</span>Als Gast: Ablauf des Zugangs</h2>
+<figure><img src="shots/c20-warnung.jpg"><figcaption><b>Warnung zehn Minuten vor dem Ende</b> – mit „Chats exportieren“.</figcaption></figure>
+<ul>
+  <li>Unten in der Seitenleiste steht, bis wann der Zugang gilt: <span class="ui">Angemeldet als hai35 · gültig bis 13:55 Uhr</span>.</li>
+  <li><strong>Zehn Minuten vor dem Ende</strong> erscheint oben ein gelber Balken: <em>„Dein Zugang endet um … Uhr. Danach werden deine Chats von diesem Gerät gelöscht – wenn du sie behalten möchtest, jetzt exportieren.“</em> Der Knopf <span class="ui">Chats exportieren</span> speichert alle Chats als Datei.</li>
+  <li><strong>Zum Ende</strong> wechselt Freebie von selbst zur Anmeldeseite (<span class="ui">Dein Zugang ist abgelaufen.</span>) und löscht die Chats des Gasts auf diesem Gerät. Die Zugangsdaten gelten danach nicht mehr.</li>
+  <li>Verlängert oder verkürzt die Kursleitung den Termin, übernimmt der Chat die neue Uhrzeit ohne Neuladen.</li>
+  <li><span class="ui">Abmelden</span> fragt bei Gästen nach: <em>„Beim Abmelden werden deine Chats von diesem Gerät gelöscht. Wenn du sie behalten möchtest, vorher „Export“ wählen. Jetzt abmelden?“</em></li>
+  <li>Meldet sich am selben Rechner ein anderer Gast an, sind die Chats des vorigen Gasts weg – niemand sieht die Chats anderer.</li>
+</ul>
+
+<h2 id="k2-13"><span class="num">2.13</span>Auf Handy und Tablet</h2>
+<div class="cols" style="grid-template-columns: 1fr 1fr 1.25fr; align-items: start">
+  <figure><img src="shots/c18-mobil.jpg"><figcaption><b>Chat</b> auf dem Handy.</figcaption></figure>
+  <figure><img src="shots/c19-mobil-menue.jpg"><figcaption><b>Seitenleiste</b> über das Menü.</figcaption></figure>
+  <div>
+    <p>Auf kleinen Bildschirmen ist die Seitenleiste eingeklappt. Das Menü-Symbol oben links öffnet sie; das X, ein Tipp daneben oder die Wahl eines Chats schließt sie. Oben rechts gibt es einen eigenen Knopf für <span class="ui">Neuer Chat</span>.</p>
+    <p>Knöpfe zeigen nur Symbole ohne Text (Websuche, Bild, Kopieren, Neu generieren). Kopieren und Bearbeiten an eigenen Nachrichten sind immer sichtbar. Artefakte füllen den ganzen Bildschirm. Fotos lassen sich direkt aus der Kamera anhängen.</p>
+  </div>
+</div>
+
+<!-- ===================================================== Teil 3 -->
+<section class="part" id="teil-3">
+  <div class="kicker">Teil 3</div>
+  <h1>Der Admin-Bereich</h1>
+  <p>Für die Kursleitung: Kosten im Blick behalten, Termine und Gast-Zugänge verwalten, Modelle, Einstellungen und Vorlagen pflegen.</p>
+</section>
+
+<h2 id="k3-1"><span class="num">3.1</span>Zugang und Aufbau</h2>
+<p>Die Kursleitung meldet sich auf der normalen Anmeldeseite mit dem Admin-Zugang an. Im Chat führt der Link <span class="ui">Admin</span> unten in der Seitenleiste ohne zweite Anmeldung in den Admin-Bereich; dort führt <span class="ui">Zum Chat</span> zurück. <span class="ui">Abmelden</span> beendet beides. Gäste haben keinen Zugriff – sie landen auf der Anmeldeseite.</p>
+<p>Oben stehen sechs Reiter: <span class="ui">Übersicht</span>, <span class="ui">Termine</span>, <span class="ui">Modelle</span>, <span class="ui">Einstellungen</span>, <span class="ui">Vorlagen</span>, <span class="ui">Sicherheit</span>. Jeder Wechsel lädt die Daten frisch.</p>
+
+<h2 id="k3-2"><span class="num">3.2</span>Übersicht: Kosten und Systemstatus</h2>
+<figure class="tall"><img src="shots/a01-uebersicht.jpg"><figcaption><b>Übersicht</b> (Beispielzahlen).</figcaption></figure>
+<h4>Kennzahlen „Heute“, „7 Tage“, „30 Tage“</h4>
+<table class="plain">
+  <tbody>
+    <tr><td style="width: 30%"><strong>Kosten (geschätzt)</strong></td><td>Geschätzte API-Kosten in US-Dollar, berechnet aus den Token-Preisen der Modelle, Websuchen, Bildern und Transkription. Die Abrechnung der Anbieter kann leicht abweichen.</td></tr>
+    <tr><td><strong>Gespart</strong></td><td>Ersparnis durch Prompt-Caching (wiederverwendete Gesprächsteile) plus Treffer im Antwort-Cache.</td></tr>
+    <tr><td><strong>Anfragen</strong></td><td>Chat-Anfragen, einschließlich Cache-Treffern.</td></tr>
+    <tr><td><strong>Cache-Quote</strong></td><td>Anteil der Eingabe, die aus dem günstigen Prompt-Cache kam. Höher ist besser.</td></tr>
+    <tr><td><strong>Antwort-Cache</strong></td><td>Wie oft eine Antwort kostenlos aus dem Antwort-Cache kam.</td></tr>
+  </tbody>
+</table>
+<p class="small muted">„Heute“ umfasst die letzten 24 Stunden, das Tagesdiagramm rechnet nach Kalendertagen.</p>
+<ul>
+  <li><strong>Kosten pro Tag:</strong> Säulendiagramm der letzten 14 Tage mit der Zahl aktiver Sitzungen. Beim Überfahren (oder mit der Tastatur) zeigt jede Säule Kosten, Ersparnis und Anfragen; <span class="ui">Als Tabelle anzeigen</span> zeigt dieselben Zahlen als Tabelle.</li>
+  <li><strong>Nach Modell:</strong> Anfragen, Kosten, Ersparnis und Cache-Quote je Modell (30 Tage).</li>
+  <li><strong>Nach Funktion:</strong> Chat-Antworten, Chat-Titel, Bilder, Transkription und Diktat (in Minuten) mit Kosten.</li>
+  <li><strong>Nach Termin:</strong> Anfragen, Kosten, Ersparnis und Sitzungen der Gäste je Termin der letzten 90 Tage; ein Klick auf den Termin klappt die Gruppen auf. Darüber die Summen für <span class="ui">Gäste</span> und <span class="ui">Kursleitung</span>. Gelöschte Termine und Gruppen bleiben als „Gelöschter Termin“ bzw. „Gelöschte Gruppe“ in der Statistik.</li>
+</ul>
+<figure><img src="shots/a02-nach-termin.jpg"><figcaption><b>Nach Termin</b> – ein Termin mit aufgeklappten Gruppen.</figcaption></figure>
+<h4>Systemstatus</h4>
+<p>Der Systemstatus prüft die Einrichtung. Grüner Haken = in Ordnung, gelbes Dreieck = Warnung, rotes X = Fehler. Im Normalbetrieb sind alle Punkte grün.</p>
+<table>
+  <thead><tr><th style="width: 26%">Prüfpunkt</th><th>Wenn alles stimmt</th><th>Wenn nicht – was tun?</th></tr></thead>
+  <tbody>
+    <tr><td>Anthropic-API-Schlüssel</td><td>Claude-Modelle verfügbar</td><td><code>ANTHROPIC_API_KEY</code> in Vercel setzen</td></tr>
+    <tr><td>OpenAI-API-Schlüssel</td><td>GPT, Bilder und Transkription verfügbar</td><td><code>OPENAI_API_KEY</code> in Vercel setzen</td></tr>
+    <tr><td>Datenbank</td><td>Neon Postgres verbunden</td><td>Datenbank in Vercel verbinden – sonst gehen Einstellungen beim Neustart verloren</td></tr>
+    <tr><td>Dateispeicher</td><td>Vercel Blob (privat)</td><td>Privaten Blob-Store in Vercel verbinden und neu deployen</td></tr>
+    <tr><td>SESSION_SECRET</td><td>Gesetzt</td><td>Zufälligen Wert mit mindestens 32 Zeichen setzen</td></tr>
+    <tr><td>Aufräumjob (CRON_SECRET)</td><td>Täglicher Cron aktiv</td><td><code>CRON_SECRET</code> setzen – sonst werden alte Dateien nicht gelöscht</td></tr>
+    <tr><td>Admin-Zugang</td><td>Benutzername „admin“</td><td><code>ADMIN_PASSWORD</code> in Vercel setzen</td></tr>
+    <tr><td>Termine</td><td>„1 Termin läuft gerade“</td><td>Gelb, wenn gerade kein Termin läuft – dann können sich keine Gäste anmelden</td></tr>
+  </tbody>
+</table>
+<p>Ist Freebie pausiert (Not-Aus), steht oben ein Banner: <em>„Freebie ist pausiert (Not-Aus aktiv). Teilnehmende können gerade nicht chatten.“</em></p>
+
+<h2 id="k3-3"><span class="num">3.3</span>Termine: Gruppen und Gast-Zugänge</h2>
+<figure class="tall2"><img src="shots/a04-termine.jpg"><figcaption><b>Reiter „Termine“</b> mit zwei laufenden Terminen (Beispieldaten, Passwörter verdeckt).</figcaption></figure>
+<p>Hier legt die Kursleitung Termine an und erzeugt die Zugänge für die Gäste. Die Filter <span class="ui">Läuft</span>, <span class="ui">Geplant</span> und <span class="ui">Vorbei</span> (mit Anzahl) sortieren die Termine; voreingestellt ist „Läuft“.</p>
+
+<h3>Termin anlegen und bearbeiten</h3>
+<div class="pair">
+  <figure><img src="shots/a05-termin-dialog.jpg"><figcaption><b>Termin anlegen.</b></figcaption></figure>
+  <figure><img src="shots/a06-gruppe-dialog.jpg"><figcaption><b>Gruppe hinzufügen.</b></figcaption></figure>
+</div>
+<ol class="steps">
+  <li><span class="ui">Termin anlegen</span> klicken, <span class="ui">Name</span> (z. B. „KI-Grundlagen Köln“), <span class="ui">Datum</span>, <span class="ui">von</span> und <span class="ui">bis</span> eintragen, <span class="ui">Speichern</span>.</li>
+  <li>Liegt „bis“ vor „von“, endet der Termin am Folgetag – Freebie zeigt dann <em>„Das Ende liegt am Folgetag.“</em> Ein Termin dauert höchstens <strong>24 Stunden</strong>.</li>
+  <li>Mit <span class="ui">Gruppe hinzufügen</span> einen <span class="ui">Name der Gruppe</span> und die <span class="ui">Anzahl der Gäste</span> (0 bis 200) angeben, <span class="ui">Anlegen</span>. Freebie erzeugt die Zugänge sofort.</li>
+</ol>
+<p><span class="ui">Bearbeiten</span> ändert Name und Zeiten. Das wirkt <strong>sofort</strong>: Wird ein laufender Termin verlängert, bleiben die Gäste angemeldet und sehen die neue Uhrzeit. Wird er verkürzt oder verschoben, gilt die neue Zeit für alle Sitzungen und Anmeldungen. Vergangene Termine lassen sich nicht mehr ändern.</p>
+
+<h3>Die Terminkarte</h3>
+<p>Jede Karte zeigt Name, Status (<span class="ui">läuft</span>, <span class="ui">geplant</span>, <span class="ui">vorbei</span>), Zeitraum und Kennzahlen, z. B. <em>„2 Gruppen · 14 Gäste · 13 angemeldet · 186 Anfragen · 1,84 $“</em> („angemeldet“ = mindestens einmal angemeldet). Knöpfe:</p>
+<table class="plain">
+  <tbody>
+    <tr><td style="width: 26%"><span class="ui">Drucken</span></td><td>Öffnet die Druckansicht mit Kärtchen für alle Gruppen in einem neuen Tab.</td></tr>
+    <tr><td><span class="ui">CSV</span></td><td>Lädt die Zugangsdaten aller Gruppen als Excel-taugliche CSV-Datei herunter (Spalten Benutzername, Passwort, Gruppe, Termin, Gültig bis).</td></tr>
+    <tr><td><span class="ui">Bearbeiten</span></td><td>Name und Zeiten ändern.</td></tr>
+    <tr><td><span class="ui">Jetzt beenden</span></td><td>Nur bei laufenden Terminen. Nach Rückfrage werden alle Gäste <strong>sofort</strong> abgemeldet und ihre Zugänge gelöscht; der Termin wandert unter „Vorbei“ mit dem Vermerk „(vorzeitig beendet)“.</td></tr>
+    <tr><td>Papierkorb</td><td>Löscht den Termin; alle Gäste sind sofort abgemeldet. Bei vergangenen Terminen entfernt er den Termin aus der Statistik.</td></tr>
+  </tbody>
+</table>
+
+<h3>Gruppen und Gäste</h3>
+<figure><img src="shots/a07-gruppe.jpg"><figcaption><b>Gruppe</b> mit sichtbaren Passwörtern und den Aktionen je Gast.</figcaption></figure>
+<p>Jede Gruppe zeigt ihre Gäste mit <span class="ui">Benutzername</span>, <span class="ui">Passwort</span> und <span class="ui">Zuletzt angemeldet</span> („08:45 Uhr“ oder „noch nicht“). Die Symbole oben rechts in der Gruppe:</p>
+<ul>
+  <li><strong>Auge</strong> – Passwörter zeigen bzw. verbergen (verdeckt als „••••••••“).</li>
+  <li><strong>Drucker</strong> und <strong>CSV</strong> – nur für diese Gruppe.</li>
+  <li><strong>Stift</strong> – Gruppe umbenennen. <strong>Papierkorb</strong> – Gruppe mit allen Gästen löschen; ihre Sitzungen enden sofort.</li>
+</ul>
+<p>Je Gast: das <strong>Schlüssel-Symbol</strong> erzeugt ein neues Passwort (das alte gilt dann nicht mehr; eine laufende Sitzung bleibt), der <strong>Papierkorb</strong> löscht den Zugang (die Sitzung endet sofort). Unter der Liste legt <span class="ui">Weitere Gäste für „…“</span> mit <span class="ui">Hinzufügen</span> zusätzliche Zugänge an (1 bis 200 je Vorgang).</p>
+
+<h3>Zugangsdaten drucken</h3>
+<figure><img src="shots/a09-druck.jpg"><figcaption><b>Druckansicht</b> – Kärtchen zum Ausschneiden, drei pro Zeile.</figcaption></figure>
+<p>Die Druckansicht zeigt pro Gast ein Kärtchen mit Termin, Gruppe, Benutzername, Passwort, der Adresse zum Anmelden und der Gültigkeit. <span class="ui">Drucken</span> öffnet den Druckdialog; die Kopfzeile wird nicht mitgedruckt.</p>
+<div class="box tip">
+  <span class="t">So sehen die Zugangsdaten aus</span>
+  <p>Benutzername: ein Tier- oder Naturwort plus zwei Ziffern (z. B. <code>fuchs27</code>), Passwort: ein Alltagswort plus drei Ziffern (z. B. <code>sonne482</code>). Nur Kleinbuchstaben ohne Umlaute; die Ziffern 0 und 1 kommen nicht vor, damit nichts mit o oder l verwechselt wird. Mit dem Termin-Ende löscht Freebie alle Zugangsdaten samt Passwörtern.</p>
+</div>
+<figure><img src="shots/a08-geplant.jpg"><figcaption><b>Filter „Geplant“</b> – ein Termin in drei Tagen; die Zugänge existieren schon und können vorab verteilt werden.</figcaption></figure>
+
+<h2 id="k3-4"><span class="num">3.4</span>Modelle</h2>
+<figure class="tall2"><img src="shots/a10-modelle.jpg"><figcaption><b>Reiter „Modelle“.</b></figcaption></figure>
+<p>Hier steht, welche Modelle Teilnehmende auswählen können. Jede Zeile zeigt Name, ggf. <span class="ui">Standard</span> oder <span class="ui">deaktiviert</span>, die API-ID und die Preise. Aktionen je Modell:</p>
+<ul>
+  <li><span class="ui">Test</span> – schickt eine Mini-Anfrage und zeigt z. B. <em>„Antwort: „OK“ (850 ms)“</em> oder die Fehlermeldung des Anbieters.</li>
+  <li><strong>Stern</strong> – als Standardmodell setzen (es gibt immer genau eines; es muss aktiv sein).</li>
+  <li><span class="ui">Deaktivieren</span> / <span class="ui">Aktivieren</span> – blendet das Modell im Chat aus bzw. ein.</li>
+  <li><strong>Stift</strong> – bearbeiten; <strong>Papierkorb</strong> – löschen (nicht beim Standardmodell und nicht beim Modell für Chat-Titel).</li>
+</ul>
+<p><span class="ui">Claude-Modelle abrufen</span> und <span class="ui">OpenAI-Modelle abrufen</span> listen die beim Anbieter verfügbaren Modelle; ein Klick übernimmt eines mit Standardwerten (Preise danach ergänzen). <span class="ui">Modell anlegen</span> legt eines von Hand an.</p>
+<div class="cols" style="grid-template-columns: 0.9fr 1.1fr; align-items: start">
+  <figure><img src="shots/a11-modell-dialog.jpg"><figcaption><b>Modell bearbeiten.</b></figcaption></figure>
+  <div>
+    <h4>Felder im Dialog</h4>
+    <ul class="small">
+      <li><span class="ui">Anbieter</span> und <span class="ui">Interne ID</span> – nach dem Anlegen fest.</li>
+      <li><span class="ui">API-Modell-ID</span> – der Name beim Anbieter, z. B. <code>claude-sonnet-5-5</code>.</li>
+      <li><span class="ui">Anzeigename</span> und <span class="ui">Beschreibung</span> – so erscheint das Modell in der Auswahl.</li>
+      <li><span class="ui">Reihenfolge</span> und <span class="ui">Max. Output-Tokens</span>.</li>
+      <li>Vier <strong>Preise</strong> in $ pro 1 Mio. Tokens – Grundlage der Kostenschätzung.</li>
+    </ul>
+    <h4>Fähigkeiten</h4>
+    <ul class="small">
+      <li><span class="ui">Bilder verstehen</span> – Bild-Uploads gehen an das Modell.</li>
+      <li><span class="ui">PDF nativ</span> – PDFs mit Layout statt nur Text.</li>
+      <li><span class="ui">Websuche</span> – der Websuche-Knopf erscheint.</li>
+      <li><span class="ui">Werkzeuge</span> – das Modell kann Bilder erzeugen.</li>
+      <li><span class="ui">Denkt nach (Effort)</span> – die Denktiefe erscheint; unter <span class="ui">Effort-Stufen</span> steht, welche Stufen angeboten werden, dazu die <span class="ui">Standard-Stufe</span>.</li>
+      <li><span class="ui">Effort-Wechsel ohne Cache-Verlust</span>, <span class="ui">Refusal-Fallback</span>, <span class="ui">Web-Tool-Version (Claude)</span> – technische Feinheiten, die Startwerte passen.</li>
+      <li><span class="ui">Aktiv</span> und <span class="ui">Standardmodell</span>.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="k3-5"><span class="num">3.5</span>Einstellungen</h2>
+<figure class="tall"><img src="shots/a12-einstellungen.jpg"><figcaption><b>Reiter „Einstellungen“</b> mit den Standardwerten.</figcaption></figure>
+<p>Alle Änderungen außer dem Not-Aus übernimmt erst der Knopf <span class="ui">Einstellungen speichern</span> unten rechts. Solange etwas offen ist, steht dort <span class="ui">Ungespeicherte Änderungen</span>, danach <span class="ui">Gespeichert.</span> Gespeichert werden nur die geänderten Felder – zwei Admins überschreiben sich also nicht gegenseitig.</p>
+<h4>Not-Aus</h4>
+<p><span class="ui">Freebie pausieren</span> wirkt <strong>sofort</strong> (ohne Speichern-Knopf): Alle Teilnehmenden sehen oben im Chat die <span class="ui">Meldung während der Pause</span> und können nichts mehr senden oder hochladen. Ein zweiter Klick schaltet Freebie wieder frei.</p>
+<h4>Funktionen</h4>
+<table>
+  <thead><tr><th style="width: 30%">Schalter</th><th>Wirkung</th><th class="nowrap">Standard</th></tr></thead>
+  <tbody>
+    <tr><td>Websuche</td><td>Modelle dürfen im Web recherchieren (wird pro Suche abgerechnet)</td><td>an</td></tr>
+    <tr><td>Datei-Upload</td><td>PDF, Word, Excel, PowerPoint, Text und Bilder anhängen</td><td>an</td></tr>
+    <tr><td>Audio-Transkription</td><td>MP3 &amp; Co. hochladen und transkribieren</td><td>an</td></tr>
+    <tr><td>Spracheingabe</td><td>Mikrofon-Knopf im Eingabefeld</td><td>an</td></tr>
+    <tr><td>Bildgenerierung</td><td>Bild-Modus und Bilder im Chat für alle Modelle</td><td>an</td></tr>
+    <tr><td>Artefakte</td><td>Webseiten, Diagramme und Grafiken im Seitenpanel (aus: als normaler Codeblock)</td><td>an</td></tr>
+    <tr><td>Antwort-Cache</td><td>Identische Anfragen kommen kostenlos aus dem Zwischenspeicher</td><td>an</td></tr>
+    <tr><td>Cache-Hinweis anzeigen</td><td>Kennzeichnet solche Antworten mit „aus dem Cache“</td><td>an</td></tr>
+    <tr><td>Kosten pro Antwort anzeigen</td><td>Zeigt Teilnehmenden die geschätzten Kosten jeder Antwort</td><td>aus</td></tr>
+  </tbody>
+</table>
+<h4>Caching</h4>
+<table class="plain">
+  <tbody>
+    <tr><td style="width: 34%"><strong>Claude Prompt-Cache (TTL)</strong></td><td>5 Minuten (Standard) reichen bei laufender Nutzung; 1 Stunde lohnt sich bei Übungen mit langen Pausen – das Schreiben in den Cache kostet dann das Doppelte.</td></tr>
+    <tr><td><strong>Antwort-Cache gültig (Stunden)</strong></td><td>Wie lange identische Anfragen kostenlos aus dem Cache kommen (1–720, Standard 24).</td></tr>
+    <tr><td><strong>Dateien aufbewahren (Tage)</strong></td><td>Danach löscht der tägliche Aufräumjob Uploads und erzeugte Bilder (1–90, Standard 7).</td></tr>
+  </tbody>
+</table>
+<h4>Modelle für Zusatzfunktionen</h4>
+<table class="plain">
+  <tbody>
+    <tr><td style="width: 34%"><strong>Bildmodell (OpenAI)</strong></td><td>Standard <code>gpt-image-2</code>. Dazu <strong>Bildqualität</strong> und <strong>Bildformat</strong> als Vorauswahl im Bild-Modus.</td></tr>
+    <tr><td><strong>Transkriptionsmodelle</strong></td><td>Für Audio-Dateien und für die Spracheingabe, Standard <code>gpt-transcribe</code>.</td></tr>
+    <tr><td><strong>Modell für Chat-Titel</strong></td><td>Ein schnelles, günstiges Modell (Standard Claude Haiku 5.5).</td></tr>
+    <tr><td><strong>PDFs nativ an das Modell schicken</strong></td><td>Layout und Grafiken bleiben erhalten (gut bei eingescannten PDFs und Präsentationen), kostet aber deutlich mehr. Standard aus.</td></tr>
+  </tbody>
+</table>
+<h4>Hinweis „Spielumgebung“ und Hinweise an das Modell</h4>
+<p><span class="ui">Vollständiger Text</span> erscheint auf der Anmeldeseite und im Dialog beim ersten Start; <span class="ui">Kurzform (Fußzeile)</span> unter dem Eingabefeld. Eine Änderung am vollständigen Text lässt den Dialog bei allen erneut erscheinen.</p>
+<p><span class="ui">Hinweise an das Modell</span> hängt einen eigenen Text an die Anweisungen für alle Chats an – z. B. <em>„Heute ist die Schulung „KI im Vertrieb“ für die Firma Muster GmbH. Beispiele bitte aus dem Vertriebsalltag wählen.“</em> So passen die Antworten zum Kurs. Änderungen starten den Prompt-Cache neu.</p>
+
+<h2 id="k3-6"><span class="num">3.6</span>Vorlagen</h2>
+<figure class="tall2"><img src="shots/a13-vorlagen.jpg"><figcaption><b>Reiter „Vorlagen“.</b></figcaption></figure>
+<p>Vorlagen geben dem Modell eine Rolle; Teilnehmende wählen sie auf der Startseite eines neuen Chats (Kapitel 2.4). <span class="ui">Vorlage anlegen</span> legt eine neue an, Stift und Papierkorb bearbeiten bzw. löschen.</p>
+<div class="cols" style="grid-template-columns: 1fr 1fr; align-items: start">
+  <figure><img src="shots/a14-vorlage-dialog.jpg"><figcaption><b>Vorlage bearbeiten.</b></figcaption></figure>
+  <div>
+    <ul class="small">
+      <li><span class="ui">Name</span> – erscheint auf der Kachel.</li>
+      <li><span class="ui">ID</span> – wird beim Anlegen aus dem Namen gebildet, danach fest.</li>
+      <li><span class="ui">Symbol</span> – Funken, E-Mail, Tabelle, Präsentation, Webseite oder Idee.</li>
+      <li><span class="ui">Reihenfolge</span> – Position auf der Startseite.</li>
+      <li><span class="ui">Kurzbeschreibung</span> – Text auf der Kachel.</li>
+      <li><span class="ui">Anweisung an das Modell</span> – die eigentliche Rolle, z. B. Tonfall, Aufbau, Regeln (bis 8.000 Zeichen).</li>
+      <li><span class="ui">Empfohlenes Modell (optional)</span> – wird beim Wählen der Vorlage automatisch eingestellt.</li>
+      <li><span class="ui">Aktiv</span> – nur aktive Vorlagen erscheinen im Chat.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="k3-7"><span class="num">3.7</span>Sicherheit</h2>
+<figure class="w60"><img src="shots/a15-sicherheit.jpg"><figcaption><b>Reiter „Sicherheit“.</b></figcaption></figure>
+<ul>
+  <li><strong>Zugänge:</strong> Erklärt den Admin-Zugang. Das Admin-Passwort steht in der Vercel-Umgebung (<code>ADMIN_PASSWORD</code>) und lässt sich nur dort ändern.</li>
+  <li><span class="ui">Alle abmelden</span> meldet nach Rückfrage <strong>alle Gäste und alle anderen Admin-Sitzungen</strong> sofort ab – die eigene Sitzung bleibt. Gäste können sich während ihres Termins mit denselben Daten wieder anmelden; ihre Chats bleiben erhalten. Sinnvoll, wenn Zugangsdaten in falsche Hände geraten sind.</li>
+  <li><span class="ui">Cache leeren</span> löscht nach Rückfrage alle gespeicherten Antworten im Antwort-Cache. Danach werden identische Anfragen wieder neu beantwortet.</li>
+</ul>
+
+<!-- ===================================================== Teil 4 -->
+<section class="part" id="teil-4">
+  <div class="kicker">Teil 4</div>
+  <h1>Regeln, Fristen &amp; Hilfe</h1>
+  <p>Was automatisch passiert, wohin die Daten gehen – und eine Checkliste für den Schulungstag.</p>
+</section>
+
+<h2 id="k4-1"><span class="num">4.1</span>Termine und Zugänge</h2>
+<table class="plain">
+  <tbody>
+    <tr><td style="width: 34%"><strong>Länge eines Termins</strong></td><td>Höchstens 24 Stunden, auch über Mitternacht. Das Ende muss in der Zukunft liegen.</td></tr>
+    <tr><td><strong>Anmeldung der Gäste</strong></td><td>Ab 30 Minuten vor Beginn bis zum Ende des Termins.</td></tr>
+    <tr><td><strong>Zum Ende</strong></td><td>Alle Gast-Zugänge verfallen sofort, Zugangsdaten und Passwörter werden gelöscht. Dasselbe gilt für „Jetzt beenden“ und für gelöschte Termine, Gruppen oder Gäste – spätestens nach etwa 15 Sekunden überall.</td></tr>
+    <tr><td><strong>Sitzung</strong></td><td>12 Stunden für Kursleitung und Gäste; bei Gästen gilt zusätzlich das Termin-Ende.</td></tr>
+    <tr><td><strong>Anzahl der Gäste</strong></td><td>0–200 beim Anlegen einer Gruppe, 1–200 je weiterem Vorgang, insgesamt unbegrenzt. Benutzernamen sind über alle Gäste eindeutig.</td></tr>
+    <tr><td><strong>Login-Bremse</strong></td><td>Höchstens 50 Fehlversuche je 10 Minuten von einer Internetadresse (eine ganze Gruppe im Schulungs-WLAN ist kein Problem) und 10 je Benutzername. Versuche mit dem Admin-Namen zählen getrennt – Tippfehler der Gruppe sperren die Kursleitung nicht aus.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="k4-2"><span class="num">4.2</span>Aufbewahrung und Löschung</h2>
+<table>
+  <thead><tr><th style="width: 30%">Was</th><th>Wo</th><th>Wie lange</th></tr></thead>
+  <tbody>
+    <tr><td>Chats</td><td>Nur im Browser des Geräts</td><td>Gäste: bis zum Abmelden bzw. Termin-Ende. Kursleitung: bis zum Löschen im Browser.</td></tr>
+    <tr><td>Uploads und erzeugte Bilder</td><td>Privater Dateispeicher (Vercel Blob), nur mit Anmeldung abrufbar</td><td>Standard 7 Tage (Einstellung „Dateien aufbewahren“)</td></tr>
+    <tr><td>Ausgelesene Texte, Transkripte</td><td>Datenbank</td><td>Gleiche Frist; bei erneuter Nutzung derselben Datei beginnt sie neu</td></tr>
+    <tr><td>Antwort-Cache</td><td>Datenbank, für alle gemeinsam</td><td>Standard 24 Stunden; jederzeit leerbar (Sicherheit)</td></tr>
+    <tr><td>Gast-Zugänge</td><td>Datenbank</td><td>Bis zum Termin-Ende</td></tr>
+    <tr><td>Termine mit Kosten</td><td>Datenbank (Statistik)</td><td>90 Tage nach dem Ende</td></tr>
+    <tr><td>Statistik</td><td>Datenbank</td><td>Enthält keine Gesprächsinhalte – nur Kosten, Tokens und eine anonyme Sitzungskennung</td></tr>
+  </tbody>
+</table>
+<p class="small muted">Der Aufräumjob läuft täglich in der Nacht (03:17 Uhr UTC).</p>
+
+<h2 id="k4-3"><span class="num">4.3</span>Was an welchen Anbieter geht</h2>
+<ul>
+  <li><strong>Anthropic</strong> (Claude-Modelle): Nachrichten, ausgelesene Dateiinhalte, Bilder und – bei „PDFs nativ“ – die PDF-Datei; die Websuche für Claude führt Anthropic aus. Standardmäßig erzeugt auch Claude Haiku die Chat-Titel.</li>
+  <li><strong>OpenAI</strong> (GPT-Modelle): dasselbe für GPT-Chats. <strong>Immer über OpenAI</strong>, egal welches Chatmodell gewählt ist: Bilder erzeugen und bearbeiten, Audio-Transkription und Spracheingabe.</li>
+  <li><strong>Vercel</strong> (USA): Betrieb der Anwendung, Datenbank und Dateispeicher.</li>
+  <li>Die Anweisungen an die Modelle sind für alle gleich und enthalten keine Namen. Hinzu kommen nur die „Hinweise an das Modell“ der Kursleitung und die gewählte Vorlage.</li>
+</ul>
+
+<h2 id="k4-4"><span class="num">4.4</span>Checkliste für den Schulungstag</h2>
+<div class="cols">
+  <div class="card">
+    <h4>Vorher</h4>
+    <ul class="small">
+      <li>Systemstatus in der Übersicht prüfen – alles grün?</li>
+      <li>Termin mit Gruppen anlegen, Kärtchen drucken oder CSV verschicken.</li>
+      <li>Bei Bedarf „Hinweise an das Modell“ mit dem Kurskontext füllen und passende Vorlagen aktivieren.</li>
+      <li>Kurz testen: als Gast anmelden (ab 30 Minuten vor Beginn), eine Frage stellen.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Währenddessen</h4>
+    <ul class="small">
+      <li>Gäste melden sich mit ihren Kärtchen an und bestätigen den Hinweis.</li>
+      <li>Bei vergessenem Passwort: im Termin das Schlüssel-Symbol beim Gast – neues Passwort.</li>
+      <li>Bei Problemen: „Freebie pausieren“ (Not-Aus) oder einzelne Zugänge löschen.</li>
+      <li>Termin dauert länger? Unter „Bearbeiten“ das Ende verschieben – niemand fliegt raus.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Zum Ende</h4>
+    <ul class="small">
+      <li>Gäste an den Export erinnern – Freebie warnt zehn Minuten vorher selbst.</li>
+      <li>Zum Termin-Ende verfallen alle Zugänge automatisch; „Jetzt beenden“ beendet sofort.</li>
+      <li>„Hinweise an das Modell“ für den nächsten Kurs leeren oder anpassen.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>Danach</h4>
+    <ul class="small">
+      <li>Kosten des Termins unter „Übersicht → Nach Termin“ ansehen.</li>
+      <li>Nichts aufzuräumen: Zugänge, Dateien und Termine löscht Freebie selbst nach den Fristen.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="k4-5"><span class="num">4.5</span>Häufige Fragen</h2>
+<h4>Ein Gast hat sein Passwort vergessen.</h4>
+<p>Admin → Termine → Gruppe → Schlüssel-Symbol beim Gast. Das neue Passwort steht sofort in der Liste (Auge-Symbol zum Anzeigen).</p>
+<h4>Ein Gast kommt nicht rein: „Zu viele Fehlversuche für diesen Benutzernamen“.</h4>
+<p>Nach spätestens 10 Minuten geht es wieder. Schneller: dem Gast einen neuen Zugang geben (<span class="ui">Weitere Gäste</span> → <span class="ui">Hinzufügen</span>).</p>
+<h4>Gäste sehen „Dein Termin beginnt am …“.</h4>
+<p>Der Termin hat noch nicht begonnen – die Anmeldung geht ab 30 Minuten vorher. Notfalls den Beginn im Termin früher setzen.</p>
+<h4>Wie bekommt ein Gast seine Chats mit nach Hause?</h4>
+<p>Über <span class="ui">Export</span> unten in der Seitenleiste (oder <span class="ui">Chats exportieren</span> in der Warnung vor dem Ende). Einzelne Chats gehen als Markdown oder per <span class="ui">Drucken oder als PDF speichern</span>.</p>
+<h4>Warum kostet eine Antwort nichts?</h4>
+<p>Sie kam aus dem Antwort-Cache, weil jemand am selben Tag exakt dieselbe Frage gestellt hat. „Neu generieren“ erzeugt eine frische Antwort.</p>
+<h4>Ein Modell fehlt in der Auswahl.</h4>
+<p>Es ist deaktiviert, oder für den Anbieter ist kein API-Schlüssel hinterlegt (Systemstatus prüfen). Mit <span class="ui">Test</span> unter „Modelle“ lässt sich die Verbindung prüfen.</p>
+<h4>Kann ich als Kursleitung auch einfach chatten?</h4>
+<p>Ja – mit dem Admin-Zugang im Chat. Die Chats der Kursleitung bleiben im Browser erhalten und zählen in der Statistik unter „Kursleitung“.</p>
+
+<script src="inhalt.js"></script>
+</body>
+</html>
