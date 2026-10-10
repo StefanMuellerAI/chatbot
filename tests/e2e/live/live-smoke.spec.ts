@@ -1,29 +1,52 @@
-import type { Locator, Page } from "@playwright/test";
-import { expect, noticeKey, test, uniq } from "../support/fixtures";
+import { request as playwrightRequest, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import { expect, inMinutes, noticeKey, test, uniq } from "../support/fixtures";
 import { attach, expectReady, payload } from "../support/files";
 
 // X: Live-Smoke gegen die echte Installation (Standard: https://freebie.stefanai.de).
-// Ändert keine Einstellungen. Kosten pro Lauf deutlich unter 0,10 $.
+// Ändert keine Einstellungen. Legt einen Termin für eine Stunde mit einem Gast an und löscht ihn am Ende
+// wieder (die Kosten bleiben in der Statistik). Kosten pro Lauf deutlich unter 0,10 $.
 //
-//   LIVE=1 LIVE_PASSWORD=… LIVE_ADMIN_PASSWORD=… npx playwright test
-//
-// Ohne LIVE_ADMIN_PASSWORD wird der Systemstatus übersprungen.
+//   LIVE=1 LIVE_ADMIN_PASSWORD=… [LIVE_ADMIN_USERNAME=admin] npx playwright test
 
-const PASSWORD = process.env.LIVE_PASSWORD ?? "";
-const ADMIN_PASSWORD = process.env.LIVE_ADMIN_PASSWORD ?? "";
+const ADMIN = { username: process.env.LIVE_ADMIN_USERNAME ?? "admin", password: process.env.LIVE_ADMIN_PASSWORD ?? "" };
 const ANSWER_TIMEOUT = 120_000;
 
 test.describe.configure({ mode: "serial", timeout: 240_000 });
-test.skip(!PASSWORD, "LIVE_PASSWORD fehlt – Live-Smoke übersprungen.");
+test.skip(!ADMIN.password, "LIVE_ADMIN_PASSWORD fehlt – Live-Smoke übersprungen.");
+
+let admin: APIRequestContext;
+let eventId = "";
+let guest = { username: "", password: "" };
+
+test.beforeAll(async ({}, testInfo) => {
+  if (!ADMIN.password) return;
+  admin = await playwrightRequest.newContext({ baseURL: testInfo.project.use.baseURL });
+  const res = await admin.post("/api/auth/login", { data: ADMIN });
+  expect(res.status(), await res.text()).toBe(200);
+  const event = await admin.post("/api/admin/events", { data: { name: `Live-Smoke ${uniq()}`, startsAt: inMinutes(-5), endsAt: inMinutes(60) } });
+  expect(event.status(), await event.text()).toBe(200);
+  eventId = ((await event.json()) as { id: string }).id;
+  const group = await admin.post("/api/admin/events/groups", { data: { eventId, name: "Smoke", count: 1 } });
+  expect(group.status(), await group.text()).toBe(200);
+  guest = ((await group.json()) as { guests: { username: string; password: string }[] }).guests[0];
+});
+
+test.afterAll(async () => {
+  if (!admin) return;
+  // Gäste sind damit sofort abgemeldet und gelöscht; X07 hat den Termin evtl. schon entfernt.
+  if (eventId) await admin.delete(`/api/admin/events?id=${eventId}`);
+  await admin.dispose();
+});
 
 async function login(page: Page) {
-  const res = await page.request.post("/api/auth/login", { data: { password: PASSWORD } });
+  const res = await page.request.post("/api/auth/login", { data: guest });
   expect(res.status(), await res.text()).toBe(200);
+  const { key: account } = (await res.json()) as { key: string };
   const config = await (await page.request.get("/api/config")).json();
   await page.addInitScript((k) => {
-      // Nur im Hauptfenster: in den abgeschotteten Artefakt-iframes ist localStorage gesperrt.
-      if (window === window.top) localStorage.setItem(k, "1");
-    }, noticeKey(config.notice.full));
+    // Nur im Hauptfenster: in den abgeschotteten Artefakt-iframes ist localStorage gesperrt.
+    if (window === window.top) localStorage.setItem(k, "1");
+  }, noticeKey(config.notice.full, account));
   await page.goto("/");
   await expect(page.getByRole("textbox", { name: "Nachricht" })).toBeVisible();
 }
@@ -55,8 +78,7 @@ async function ask(page: Page, text: string): Promise<Locator> {
 const newChat = (page: Page) => page.getByRole("button", { name: "Neuer Chat" }).first().click();
 
 test("X01 Systemstatus im Admin ist vollständig grün (inkl. Blob-Speicher)", async ({ page }) => {
-  test.skip(!ADMIN_PASSWORD, "LIVE_ADMIN_PASSWORD fehlt.");
-  const res = await page.request.post("/api/admin/login", { data: { password: ADMIN_PASSWORD } });
+  const res = await page.request.post("/api/auth/login", { data: ADMIN });
   expect(res.status(), await res.text()).toBe(200);
   const { status } = await (await page.request.get("/api/admin/overview")).json();
   expect(status).toMatchObject({
@@ -68,9 +90,11 @@ test("X01 Systemstatus im Admin ist vollständig grün (inkl. Blob-Speicher)", a
     mock: false,
     cronSecret: true,
     sessionSecret: true,
+    adminPassword: true,
     paused: false,
   });
-  expect(status.appPassword).not.toBe("missing");
+  // Der Smoke-Termin läuft gerade.
+  expect(status.runningEvents).toBeGreaterThanOrEqual(1);
   await page.goto("/admin");
   await expect(page.getByRole("heading", { name: "Systemstatus" })).toBeVisible();
   await expect(page.getByText(/Vercel Blob/)).toBeVisible();
@@ -130,4 +154,28 @@ test("X06 Websuche mit Quellen und ein kleines Artefakt", async ({ page }) => {
   await page.getByRole("button", { name: "Websuche" }).click();
   await ask(page, `Erstelle als Artefakt ein kleines SVG mit einem blauen Quadrat. Sonst nichts. (Smoke ${uniq()})`);
   await expect(page.getByRole("region", { name: /^Artefakt:/ })).toBeVisible();
+});
+
+test("X07 Gast-Zugang: Anmeldung über das Formular, nur Chat; Termin gelöscht – sofort abgemeldet", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Benutzername").fill(guest.username);
+  await page.getByLabel("Passwort").fill(guest.password);
+  await page.getByLabel("Passwort").press("Enter");
+  await expect(page).toHaveURL(/\/$/);
+  const notice = page.getByRole("dialog", { name: "Wichtiger Hinweis" });
+  await notice.getByRole("button", { name: "Verstanden" }).click();
+  await expect(page.getByText(`Angemeldet als ${guest.username}`)).toContainText("gültig bis");
+  await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
+  expect((await page.request.get("/api/admin/overview")).status()).toBe(403);
+
+  const res = await admin.delete(`/api/admin/events?id=${eventId}`);
+  expect(res.status(), await res.text()).toBe(200);
+  eventId = "";
+  // Andere Server-Instanzen merken es spätestens nach 15 Sekunden.
+  await expect(async () => {
+    await page.reload();
+    await expect(page).toHaveURL(/\/login/, { timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+  await expect(page.getByText("Dein Zugang ist abgelaufen.")).toBeVisible();
+  expect((await page.request.get("/api/config")).status()).toBe(401);
 });

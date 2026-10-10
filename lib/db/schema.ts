@@ -67,8 +67,12 @@ export const usageLog = pgTable(
     costUsd: doublePrecision("cost_usd").notNull().default(0),
     savedUsd: doublePrecision("saved_usd").notNull().default(0),
     answerCacheHit: boolean("answer_cache_hit").notNull().default(false),
+    /** "admin" oder "guest"; bei Gästen zusätzlich Termin und Gruppe (für die Statistik). */
+    role: text("role"),
+    eventId: text("event_id"),
+    groupId: text("group_id"),
   },
-  (t) => [index("usage_log_ts_idx").on(t.ts)],
+  (t) => [index("usage_log_ts_idx").on(t.ts), index("usage_log_event_idx").on(t.eventId)],
 );
 
 export const fileCache = pgTable("file_cache", {
@@ -135,4 +139,43 @@ export const loginAttempts = pgTable("login_attempts", {
   ipHash: text("ip_hash").primaryKey(),
   windowStart: timestamp("window_start", { withTimezone: true }).notNull().defaultNow(),
   count: integer("count").notNull().default(0),
+});
+
+/** Schulungstermine (höchstens 24 Stunden). Gäste gelten nur während ihres Termins. */
+export const events = pgTable("events", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+  endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+  /** Gesetzt bei „Jetzt beenden“ – gilt dann als Ende. */
+  endedEarlyAt: timestamp("ended_early_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const eventGroups = pgTable("event_groups", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id")
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  /** Anzahl der je erzeugten Gäste – bleibt für die Statistik, wenn die Zugänge gelöscht sind. */
+  guestTotal: integer("guest_total").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const guests = pgTable("guests", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id")
+    .notNull()
+    .references(() => events.id, { onDelete: "cascade" }),
+  groupId: text("group_id")
+    .notNull()
+    .references(() => eventGroups.id, { onDelete: "cascade" }),
+  username: text("username").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  /** Verschlüsselte Kopie nur für Druck und Export; wird mit dem Termin-Ende gelöscht. */
+  passwordEnc: text("password_enc").notNull(),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

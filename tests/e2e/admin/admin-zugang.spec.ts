@@ -1,7 +1,7 @@
 import { expectAccessible } from "../support/a11y";
-import { expect, openAdmin, openChat, test, uniq } from "../support/fixtures";
+import { createGuest, expect, openAdmin, openChat, test, uniq } from "../support/fixtures";
 import { attach, expectReady } from "../support/files";
-import { PASSWORDS } from "../support/servers.mjs";
+import { ADMIN, PASSWORDS } from "../support/servers.mjs";
 
 interface Overview {
   periods: { requests: number; cacheHits: number }[];
@@ -11,42 +11,57 @@ interface Overview {
 }
 
 test.describe("O · Admin: Zugang und Übersicht", () => {
-  test("O01 Anmeldung: falsches Passwort, Enter, Cookie, Abmelden und Zum Chat", async ({ page, context }) => {
+  test("O01/T15 Admin meldet sich über die gemeinsame Login-Seite an: Admin-Bereich und Chat ohne zweite Anmeldung", async ({ page, context }) => {
     await page.goto("/admin");
-    await expect(page.getByRole("heading", { name: "Admin-Bereich" })).toBeVisible();
-    const field = page.getByLabel("Admin-Passwort");
-    const submit = page.getByRole("button", { name: "Anmelden" });
-    await expect(submit).toBeDisabled();
-    await field.fill("falsch");
-    await submit.click();
-    await expect(page.locator("form").getByRole("alert")).toHaveText("Das Admin-Passwort stimmt nicht.");
-    await field.fill(PASSWORDS.admin);
-    await field.press("Enter");
+    await expect(page).toHaveURL(/\/login\?weiter=admin$/);
+    await expect(page.getByText("Der Admin-Bereich ist nur für die Kursleitung. Bitte mit dem Admin-Zugang anmelden.")).toBeVisible();
+    await page.getByLabel("Benutzername").fill(ADMIN.username);
+    await page.getByLabel("Passwort").fill("falsch");
+    await page.getByRole("button", { name: "Los geht's" }).click();
+    await expect(page.locator("form").getByRole("alert")).toHaveText("Benutzername oder Passwort stimmt nicht.");
+    await page.getByLabel("Passwort").fill(PASSWORDS.admin);
+    await page.getByLabel("Passwort").press("Enter");
+    await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByRole("tablist", { name: "Admin-Bereiche" })).toBeVisible();
-    for (const tab of ["Übersicht", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
+    for (const tab of ["Übersicht", "Termine", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
       await expect(page.getByRole("tab", { name: tab })).toBeVisible();
     }
     await expect(page.getByRole("tab", { name: "Übersicht" })).toHaveAttribute("aria-selected", "true");
 
-    const cookie = (await context.cookies()).find((c) => c.name === "freebie_admin")!;
+    const cookie = (await context.cookies()).find((c) => c.name === "freebie_session")!;
     expect(cookie.httpOnly).toBe(true);
-    expect(cookie.sameSite).toBe("Strict");
+    expect(cookie.sameSite).toBe("Lax");
     const hours = (cookie.expires * 1000 - Date.now()) / 3_600_000;
-    expect(hours).toBeGreaterThan(1.9);
-    expect(hours).toBeLessThan(2.1);
+    expect(hours).toBeGreaterThan(11.9);
+    expect(hours).toBeLessThan(12.1);
+
+    // Zum Chat ohne zweite Anmeldung; dort führt „Admin“ zurück.
+    await page.getByRole("link", { name: "Zum Chat" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await page.getByRole("dialog", { name: "Wichtiger Hinweis" }).getByRole("button", { name: "Verstanden" }).click();
+    await expect(page.getByRole("textbox", { name: "Nachricht" })).toBeVisible();
+    await page.getByRole("navigation", { name: "Chatverlauf" }).waitFor({ state: "attached" });
+    await page.getByRole("link", { name: "Admin" }).click();
+    await expect(page.getByRole("tablist", { name: "Admin-Bereiche" })).toBeVisible();
 
     await page.getByRole("button", { name: "Abmelden" }).click();
-    await expect(page.getByLabel("Admin-Passwort")).toBeVisible();
-    expect((await page.request.get("/api/admin/overview")).status()).toBe(401);
-    await page.getByRole("link", { name: "Zurück zum Chat" }).click();
     await expect(page).toHaveURL(/\/login$/);
+    expect((await page.request.get("/api/admin/overview")).status()).toBe(401);
+    expect((await page.request.get("/api/config")).status()).toBe(401);
   });
 
-  test("O01 Teilnehmer-Zugang öffnet den Admin-Bereich nicht", async ({ page }) => {
-    await page.request.post("/api/auth/login", { data: { password: PASSWORDS.app } });
-    expect((await page.request.get("/api/admin/settings")).status()).toBe(401);
+  test("O01/T09 Gäste haben keinen Zugang zum Admin-Bereich", async ({ chat, page }) => {
+    await expect(page.getByRole("link", { name: "Admin" })).toHaveCount(0);
+    const res = await page.request.get("/api/admin/settings");
+    expect(res.status()).toBe(403);
+    expect(await res.json()).toEqual({ error: "Dieser Bereich ist nur für die Kursleitung." });
+    expect((await page.request.post("/api/admin/security", { data: { action: "clear-answer-cache" } })).status()).toBe(403);
     await page.goto("/admin");
-    await expect(page.getByLabel("Admin-Passwort")).toBeVisible();
+    await expect(page).toHaveURL(/\/login\?weiter=admin$/);
+    await expect(page.getByLabel("Benutzername")).toBeVisible();
+    // Ohne Admin-Anmeldung geht es zurück in den eigenen Chat.
+    await page.goto("/");
+    await expect(chat.composer).toBeVisible();
   });
 
   test("O02 Kennzahlen spiegeln Chats, Cache-Treffer, Bilder und Transkription", async ({ page, browser, baseURL, ip, admin }) => {
@@ -100,7 +115,9 @@ test.describe("O · Admin: Zugang und Übersicht", () => {
     await expect(card.getByRole("button", { name: "Als Tabelle anzeigen" })).toBeVisible();
   });
 
-  test("O04 Systemstatus zeigt die Umgebung des Test-Servers", async ({ page }) => {
+  test("O04 Systemstatus zeigt die Umgebung des Test-Servers", async ({ page, baseURL }) => {
+    // Legt bei Bedarf den E2E-Testtermin an, damit sicher ein Termin läuft.
+    await createGuest(baseURL!);
     await openAdmin(page);
     await expect(page.getByText("Testmodus aktiv (FREEBIE_MOCK=1)")).toBeVisible();
     const status = page.getByRole("heading", { name: "Systemstatus" }).locator("xpath=ancestor::section[1]");
@@ -111,21 +128,25 @@ test.describe("O · Admin: Zugang und Übersicht", () => {
     await expect(item("Dateispeicher")).toContainText("Lokaler Speicher (Entwicklung)");
     await expect(item("SESSION_SECRET")).toContainText("Gesetzt");
     await expect(item("Aufräumjob (CRON_SECRET)")).toContainText("Täglicher Cron aktiv");
-    await expect(item("Teilnehmer-Passwort")).toContainText("Aus APP_PASSWORD");
+    await expect(item("Admin-Zugang")).toContainText("Benutzername „admin“ (ADMIN_USERNAME/ADMIN_PASSWORD)");
+    // Der E2E-Testtermin läuft immer (andere Tests legen zeitweise weitere an).
+    await expect(item("Termine")).toContainText(/läuft gerade|laufen gerade/);
   });
 
   for (const scheme of ["light", "dark"] as const) {
-    test(`N02/N03 Admin-Bereich ${scheme === "light" ? "hell" : "dunkel"}: barrierearm, Screenshot je Bereich`, async ({ page }, testInfo) => {
+    test(`N02/N03 Admin-Bereich ${scheme === "light" ? "hell" : "dunkel"}: barrierearm, Screenshot je Bereich`, async ({ page, baseURL }, testInfo) => {
       await page.emulateMedia({ colorScheme: scheme });
       await page.goto("/admin");
       await expectAccessible(page, testInfo, `admin-login-${scheme}`);
+      // Der E2E-Testtermin sorgt dafür, dass „Termine“ eine Karte mit Gruppe zeigt.
+      await createGuest(baseURL!);
       await openAdmin(page);
       const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       const [r, g, b] = background.match(/\d+/g)!.map(Number);
       // Hell: heller Hintergrund, dunkel: dunkler Hintergrund.
       if (scheme === "dark") expect(r + g + b).toBeLessThan(150);
       else expect(r + g + b).toBeGreaterThan(600);
-      for (const tab of ["Übersicht", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
+      for (const tab of ["Übersicht", "Termine", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
         await page.getByRole("tab", { name: tab }).click();
         await expect(page.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
         await expectAccessible(page, testInfo, `admin-${tab.toLowerCase()}-${scheme}`);

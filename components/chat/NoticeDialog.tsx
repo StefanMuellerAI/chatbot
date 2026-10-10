@@ -10,10 +10,13 @@ function hash(text: string): string {
   return String(h);
 }
 
-/** Hinweis „Spielumgebung“ beim ersten Start (und erneut, wenn sich der Text ändert). */
-export function NoticeDialog({ text, forceOpen, onClose }: { text: string; forceOpen?: boolean; onClose?: () => void }) {
+/**
+ * Hinweis „Spielumgebung“ beim ersten Start (und erneut, wenn sich der Text ändert) – pro Konto,
+ * damit am gemeinsamen Schulungsrechner jeder Gast ihn selbst bestätigt.
+ */
+export function NoticeDialog({ text, accountKey, forceOpen, onClose }: { text: string; accountKey: string; forceOpen?: boolean; onClose?: () => void }) {
   const [dismissed, setDismissed] = useState(false);
-  const key = `freebie-notice-${hash(text)}`;
+  const key = `freebie-notice-${hash(text)}-${accountKey}`;
   const acknowledged = useSyncExternalStore(
     () => () => {},
     () => {

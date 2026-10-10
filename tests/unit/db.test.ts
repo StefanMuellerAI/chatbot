@@ -28,14 +28,13 @@ describe("Datenbank (PGlite im Speicher)", () => {
   it("führt Funktionsschalter einzeln zusammen", async () => {
     await updateSettings({ features: { webSearch: false } as never });
     await updateSettings({ features: { artifacts: false } as never });
-    await updateSettings({ appPasswordHash: null, noticeShort: "Kurz" });
+    await updateSettings({ noticeShort: "Kurz" });
     const s = await getSettings({ fresh: true });
     expect(s.features.webSearch).toBe(false);
     expect(s.features.artifacts).toBe(false);
     expect(s.features.showCost).toBe(true);
     expect(s.paused).toBe(true);
     expect(s.noticeShort).toBe("Kurz");
-    expect(s.appPasswordHash).toBeNull();
   });
 
   it("liefert gespeicherte Antworten bis zum Ablauf und überschreibt sie nicht", async () => {

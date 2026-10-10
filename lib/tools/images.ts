@@ -1,3 +1,4 @@
+import type { usageTag } from "@/lib/auth/session";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { toFile } from "openai";
@@ -11,7 +12,7 @@ import { IMAGE_PRICES, logUsage } from "@/lib/usage";
 
 export async function generateImage(
   input: ImageToolInput,
-  ctx: { sessionHash: string; settings: AppSettings },
+  ctx: { sessionHash: string; tag?: ReturnType<typeof usageTag>; settings: AppSettings },
 ): Promise<{ ok: true; image: GeneratedImage } | { ok: false; error: string }> {
   try {
     const id = randomUUID();
@@ -61,6 +62,7 @@ export async function generateImage(
     const cost = IMAGE_PRICES[input.quality]?.[input.size] ?? 0.05;
     await logUsage({
       sessionHash: ctx.sessionHash,
+      ...ctx.tag,
       modelId: ctx.settings.imageModel,
       feature: "image",
       units: 1,

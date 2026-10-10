@@ -6,7 +6,8 @@ import { getDb, schema } from "@/lib/db/client";
 import { ZodError } from "zod";
 import { HttpError, isProviderError, providerErrorMessage } from "@/lib/errors";
 import { getSettings } from "@/lib/settings";
-import { ADMIN_COOKIE, USER_COOKIE, verifyAdmin, verifyUser } from "./tokens";
+import { guestWindow } from "@/lib/events/store";
+import { SESSION_COOKIE, verifySession, type Role } from "./tokens";
 
 export { HttpError };
 
@@ -14,15 +15,71 @@ export interface UserSession {
   sid: string;
   /** Kurzer, nicht umkehrbarer Hash der Sitzungs-ID für Statistiken. */
   sessionHash: string;
+  role: Role;
+  username: string;
+  /** Ablauf der Sitzung (bei Gästen spätestens das Termin-Ende). */
+  expiresAt: Date;
+  /** Nur Gäste: Ende des Termins – danach verfällt der Zugang. */
+  accessUntil?: Date;
+  guestId?: string;
+  eventId?: string;
+  groupId?: string;
 }
 
+/** Gültige Sitzung (Admin oder Gast) – Gäste nur, solange es sie und ihren Termin gibt. */
 export async function getUserSession(): Promise<UserSession | null> {
   const jar = await cookies();
-  const claims = await verifyUser(jar.get(USER_COOKIE)?.value);
+  const claims = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!claims) return null;
-  const settings = await getSettings();
-  if (claims.v !== settings.sessionVersion) return null;
-  return { sid: claims.sid, sessionHash: hashId(claims.sid) };
+  if (!(await versionCurrent(claims.v))) return null;
+  let accessUntil: Date | undefined;
+  if (claims.role === "guest") {
+    const access = await guestWindow(claims.gid!);
+    const now = Date.now();
+    if (!access || now < access.from || now >= access.until) return null;
+    accessUntil = new Date(access.until);
+  }
+  return {
+    sid: claims.sid,
+    sessionHash: hashId(claims.sid),
+    role: claims.role,
+    username: claims.name,
+    expiresAt: new Date(claims.exp * 1000),
+    accessUntil,
+    guestId: claims.gid,
+    eventId: claims.eid,
+    groupId: claims.grp,
+  };
+}
+
+export type SessionEnd =
+  /** Der Gast-Zugang ist verfallen (Termin vorbei, Gast oder Termin gelöscht) – lokale Chats weg. */
+  | { reason: "abgelaufen"; guestKey: string }
+  /** Nur die Sitzung ist abgelaufen oder der Termin wurde verschoben – neu anmelden, Chats bleiben. */
+  | { reason: "sitzung" };
+
+/**
+ * Warum die (echte, aber nicht mehr gültige) Sitzung im Cookie endete. Null, wenn es keine gab
+ * oder alle abgemeldet wurden.
+ */
+export async function sessionEnd(): Promise<SessionEnd | null> {
+  const jar = await cookies();
+  const claims = await verifySession(jar.get(SESSION_COOKIE)?.value, { allowExpired: true });
+  if (!claims || !(await versionCurrent(claims.v))) return null;
+  if (claims.role === "guest") {
+    const access = await guestWindow(claims.gid!);
+    if (!access || Date.now() >= access.until) return { reason: "abgelaufen", guestKey: claims.gid! };
+  }
+  return { reason: "sitzung" };
+}
+
+/**
+ * Passt die Sitzungsversion („Alle abmelden“)? Weicht sie vom zwischengespeicherten Stand ab,
+ * wird frisch nachgesehen – eine gerade auf einer anderen Instanz erhöhte Version gilt sofort.
+ */
+async function versionCurrent(v: number): Promise<boolean> {
+  if (v === (await getSettings()).sessionVersion) return true;
+  return v === (await getSettings({ fresh: true })).sessionVersion;
 }
 
 export async function requireUser(): Promise<UserSession> {
@@ -31,16 +88,15 @@ export async function requireUser(): Promise<UserSession> {
   return session;
 }
 
-export async function isAdmin(): Promise<boolean> {
-  const jar = await cookies();
-  const claims = await verifyAdmin(jar.get(ADMIN_COOKIE)?.value);
-  if (!claims) return false;
-  const settings = await getSettings();
-  return claims.v === settings.sessionVersion;
+export async function requireAdmin(): Promise<UserSession> {
+  const session = await requireUser();
+  if (session.role !== "admin") throw new HttpError(403, "Dieser Bereich ist nur für die Kursleitung.");
+  return session;
 }
 
-export async function requireAdmin(): Promise<void> {
-  if (!(await isAdmin())) throw new HttpError(401, "Admin-Anmeldung erforderlich.");
+/** Zuordnung für die Statistik (Rolle, bei Gästen Termin und Gruppe). */
+export function usageTag(session: UserSession): { role: Role; eventId: string | null; groupId: string | null } {
+  return { role: session.role, eventId: session.eventId ?? null, groupId: session.groupId ?? null };
 }
 
 export function hashId(value: string): string {
@@ -59,37 +115,47 @@ export function errorResponse(err: unknown): Response {
   return Response.json({ error: "Es ist ein interner Fehler aufgetreten. Bitte erneut versuchen." }, { status: 500 });
 }
 
-const MAX_ATTEMPTS = 50;
+/** Fehlversuche je 10 Minuten: pro IP großzügig (Schulungsgruppe hinter einer IP), pro Name streng. */
+const MAX_PER_IP = 50;
+const MAX_PER_NAME = 10;
 
-/**
- * Brute-Force-Schutz für Logins: höchstens 50 Fehlversuche pro 10 Minuten, IP und Bereich
- * (Teilnehmende und Admin zählen getrennt).
- * Gezählt wird atomar VOR der Passwortprüfung (parallele Anfragen werden mitgezählt);
- * eine erfolgreiche Anmeldung erstattet ihren Versuch zurück. Der Wert ist großzügig,
- * weil eine ganze Schulungsgruppe oft über dieselbe IP-Adresse kommt: 25 gleichzeitige
- * Anmeldungen plus 25 Tippfehler sperren noch niemanden aus.
- */
-export async function consumeLoginAttempt(request: Request, scope: "user" | "admin"): Promise<() => Promise<void>> {
-  const ipHash = hashId(`${scope}:${clientIp(request)}`);
+async function countAttempt(key: string): Promise<{ count: number; refund: () => Promise<void> }> {
+  const keyHash = hashId(key);
   const db = await getDb();
   const res = (await db.execute(sql`
-    INSERT INTO login_attempts (ip_hash, window_start, count) VALUES (${ipHash}, now(), 1)
+    INSERT INTO login_attempts (ip_hash, window_start, count) VALUES (${keyHash}, now(), 1)
     ON CONFLICT (ip_hash) DO UPDATE SET
       count = CASE WHEN login_attempts.window_start < now() - interval '10 minutes' THEN 1 ELSE login_attempts.count + 1 END,
       window_start = CASE WHEN login_attempts.window_start < now() - interval '10 minutes' THEN now() ELSE login_attempts.window_start END
     RETURNING count
   `)) as unknown as { rows?: { count: number }[] } | { count: number }[];
   const rows = Array.isArray(res) ? res : (res.rows ?? []);
-  const count = Number(rows[0]?.count ?? 0);
   const refund = async () => {
     await db
       .update(schema.loginAttempts)
       .set({ count: sql`greatest(${schema.loginAttempts.count} - 1, 0)` })
-      .where(eq(schema.loginAttempts.ipHash, ipHash));
+      .where(eq(schema.loginAttempts.ipHash, keyHash));
   };
-  if (count > MAX_ATTEMPTS) {
-    throw new HttpError(429, "Zu viele Anmeldeversuche. Bitte warte ein paar Minuten.");
-  }
+  return { count: Number(rows[0]?.count ?? 0), refund };
+}
+
+/**
+ * Brute-Force-Schutz: höchstens 50 Fehlversuche pro 10 Minuten und IP – 25 gleichzeitige
+ * Anmeldungen plus 25 Tippfehler einer Schulungsgruppe sperren noch niemanden aus – und
+ * höchstens 10 pro Benutzername (gezieltes Raten bei einem Konto). Gezählt wird atomar VOR der
+ * Passwortprüfung; eine erfolgreiche Anmeldung erstattet ihre Versuche zurück. Die Sperre gilt
+ * unabhängig davon, ob es den Namen gibt (verrät also nichts).
+ */
+export async function consumeLoginAttempt(request: Request, username: string, adminName: boolean): Promise<() => Promise<void>> {
+  // Versuche mit dem Admin-Namen zählen getrennt: Tippfehler der Gruppe sperren die Kursleitung nicht aus.
+  const ip = await countAttempt(`${adminName ? "admin" : "login"}:${clientIp(request)}`);
+  const name = await countAttempt(`name:${username}`);
+  const refund = async () => {
+    await ip.refund();
+    await name.refund();
+  };
+  if (ip.count > MAX_PER_IP) throw new HttpError(429, "Zu viele Anmeldeversuche. Bitte warte ein paar Minuten.");
+  if (name.count > MAX_PER_NAME) throw new HttpError(429, "Zu viele Fehlversuche für diesen Benutzernamen. Bitte warte ein paar Minuten.");
   return refund;
 }
 

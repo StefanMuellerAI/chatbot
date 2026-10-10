@@ -62,8 +62,7 @@ const Patch = z
 export async function GET() {
   try {
     await requireAdmin();
-    const { appPasswordHash, sessionVersion, ...rest } = await getSettings();
-    return Response.json({ ...rest, appPasswordSet: Boolean(appPasswordHash), sessionVersion });
+    return Response.json(await getSettings());
   } catch (err) {
     return errorResponse(err);
   }

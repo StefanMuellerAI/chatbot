@@ -2,12 +2,15 @@
 import { Download, LogOut, MessageSquarePlus, Monitor, Moon, Search, Settings, Sun, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import { exportAll, importAll, type Conversation } from "@/lib/client/db";
+import { downloadExport, forgetCurrentGuest, importAll, type Conversation } from "@/lib/client/db";
+import { formatTime } from "@/lib/events/window";
+import type { AccountInfo } from "@/lib/shared/types";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/components/ui/cn";
 import type { Theme } from "@/components/ui/theme";
 
 export function Sidebar({
+  account,
   conversations,
   activeId,
   onSelect,
@@ -18,6 +21,7 @@ export function Sidebar({
   onTheme,
   onClose,
 }: {
+  account: AccountInfo;
   conversations: Conversation[];
   activeId: string | null;
   onSelect: (id: string) => void;
@@ -126,17 +130,15 @@ export function Sidebar({
             </button>
           ))}
         </div>
+        {account.role === "guest" && (
+          <p className="mb-2 px-1 text-xs text-white/65">
+            Angemeldet als <span className="font-semibold text-white/85">{account.username}</span>
+            {account.validUntil && <> · gültig bis {formatTime(new Date(account.validUntil))} Uhr</>}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-1">
           <SideAction
-            onClick={async () => {
-              const json = await exportAll();
-              const url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = `freebie-chats-${new Date().toISOString().slice(0, 10)}.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
+            onClick={() => void downloadExport()}
             label="Alle Chats exportieren"
           >
             <Download className="h-4 w-4" /> Export
@@ -162,13 +164,23 @@ export function Sidebar({
               }
             }}
           />
-          <Link href="/admin" prefetch={false} className="flex items-center gap-2 rounded-xl px-3 py-2 text-white/70 hover:bg-white/8 hover:text-white">
-            <Settings className="h-4 w-4" /> Admin
-          </Link>
+          {account.role === "admin" && (
+            <Link href="/admin" prefetch={false} className="flex items-center gap-2 rounded-xl px-3 py-2 text-white/70 hover:bg-white/8 hover:text-white">
+              <Settings className="h-4 w-4" /> Admin
+            </Link>
+          )}
           <SideAction
             onClick={async () => {
+              // Gast-Chats bleiben nicht auf (oft gemeinsam genutzten) Schulungsrechnern liegen.
+              if (
+                account.role === "guest" &&
+                !confirm("Beim Abmelden werden deine Chats von diesem Gerät gelöscht. Wenn du sie behalten möchtest, vorher „Export“ wählen. Jetzt abmelden?")
+              ) {
+                return;
+              }
               try {
                 await fetch("/api/auth/logout", { method: "POST" });
+                await forgetCurrentGuest();
                 window.location.replace(`${window.location.origin}/login`);
               } catch {
                 alert("Abmelden hat nicht geklappt – bitte die Internetverbindung prüfen und erneut versuchen.");

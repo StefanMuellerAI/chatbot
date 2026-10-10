@@ -1,7 +1,8 @@
 "use client";
-import { CircleCheck, CircleX, TriangleAlert } from "lucide-react";
-import { useState } from "react";
-import type { OverviewData } from "@/lib/admin";
+import { ChevronRight, CircleCheck, CircleX, TriangleAlert } from "lucide-react";
+import { Fragment, useState } from "react";
+import type { EventUsage, OverviewData } from "@/lib/admin";
+import { formatRange } from "@/lib/events/format";
 import { cn } from "@/components/ui/cn";
 import { Card } from "./fields";
 
@@ -39,7 +40,17 @@ export function OverviewTab({ data, modelNames }: { data: OverviewData; modelNam
     { ok: s.storage === "blob", warn: true, label: "Dateispeicher", hint: storageHint(s) },
     { ok: s.sessionSecret, warn: true, label: "SESSION_SECRET", hint: s.sessionSecret ? "Gesetzt" : "Fehlt oder zu kurz – zufälligen Wert mit mindestens 16 (besser 32) Zeichen setzen" },
     { ok: s.cronSecret, warn: true, label: "Aufräumjob (CRON_SECRET)", hint: s.cronSecret ? "Täglicher Cron aktiv" : "Ohne CRON_SECRET werden alte Dateien nicht gelöscht" },
-    { ok: s.appPassword !== "missing", label: "Teilnehmer-Passwort", hint: s.appPassword === "admin" ? "Im Admin-Bereich gesetzt" : s.appPassword === "env" ? "Aus APP_PASSWORD" : "Kein Passwort gesetzt" },
+    {
+      ok: s.adminPassword,
+      label: "Admin-Zugang",
+      hint: s.adminPassword ? `Benutzername „${s.adminUsername}“ (ADMIN_USERNAME/ADMIN_PASSWORD)` : "ADMIN_PASSWORD in Vercel setzen",
+    },
+    {
+      ok: s.runningEvents > 0,
+      warn: true,
+      label: "Termine",
+      hint: s.runningEvents === 1 ? "1 Termin läuft gerade" : s.runningEvents > 1 ? `${s.runningEvents} Termine laufen gerade` : "Gerade läuft kein Termin – Gäste können sich nicht anmelden",
+    },
   ];
 
   return (
@@ -131,6 +142,10 @@ export function OverviewTab({ data, modelNames }: { data: OverviewData; modelNam
         </Card>
       </div>
 
+      <Card title="Nach Termin" description="Anfragen und Kosten der Gäste je Termin, letzte 90 Tage">
+        <EventUsageTable byRole={data.byRole} byEvent={data.byEvent} />
+      </Card>
+
       <Card title="Systemstatus">
         <ul className="grid gap-2 sm:grid-cols-2">
           {checks.map((c) => (
@@ -150,6 +165,96 @@ export function OverviewTab({ data, modelNames }: { data: OverviewData; modelNam
           ))}
         </ul>
       </Card>
+    </div>
+  );
+}
+
+/** Nutzung je Termin, per Klick nach Gruppe aufgeschlüsselt; darüber die Summen nach Rolle. */
+function EventUsageTable({ byRole, byEvent }: { byRole: OverviewData["byRole"]; byEvent: EventUsage[] }) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const role = (r: "admin" | "guest") => byRole.find((x) => x.role === r) ?? { requests: 0, costUsd: 0 };
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const eventName = (e: EventUsage) => e.name ?? "Gelöschter Termin";
+  return (
+    <div>
+      <dl className="mb-4 grid gap-2 text-sm sm:grid-cols-2">
+        {(
+          [
+            ["guest", "Gäste"],
+            ["admin", "Kursleitung"],
+          ] as const
+        ).map(([r, label]) => (
+          <div key={r} className="flex justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-2">
+            <dt className="text-muted">{label} (30 Tage)</dt>
+            <dd className="tabular-nums">
+              {int(role(r).requests)} Anfragen · {usd(role(r).costUsd)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {byEvent.length === 0 ? (
+        <p className="text-sm text-muted">Noch keine Anfragen aus Terminen.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-muted uppercase">
+                <th className="pb-2 font-semibold">Termin</th>
+                <th className="pb-2 text-right font-semibold">Anfragen</th>
+                <th className="pb-2 text-right font-semibold">Kosten</th>
+                <th className="pb-2 text-right font-semibold">Gespart</th>
+                <th className="pb-2 text-right font-semibold">Sitzungen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {byEvent.map((e) => {
+                const expanded = open.has(e.id);
+                return (
+                  <Fragment key={e.id}>
+                    <tr className="border-t border-border">
+                      <td className="py-2">
+                        <button
+                          type="button"
+                          onClick={() => toggle(e.id)}
+                          aria-expanded={expanded}
+                          aria-label={`Gruppen von „${eventName(e)}“ ${expanded ? "ausblenden" : "anzeigen"}`}
+                          className="flex items-start gap-1.5 text-left hover:text-primary"
+                        >
+                          <ChevronRight className={cn("mt-0.5 h-4 w-4 shrink-0 transition-transform", expanded && "rotate-90")} />
+                          <span>
+                            <span className="block font-medium">{eventName(e)}</span>
+                            {e.startsAt && e.endsAt && <span className="block text-xs text-muted">{formatRange(e.startsAt, e.endsAt)}</span>}
+                          </span>
+                        </button>
+                      </td>
+                      <td className="py-2 text-right tabular-nums">{int(e.requests)}</td>
+                      <td className="py-2 text-right tabular-nums">{usd(e.costUsd)}</td>
+                      <td className="py-2 text-right tabular-nums text-success">{usd(e.savedUsd)}</td>
+                      <td className="py-2 text-right tabular-nums">{int(e.sessions)}</td>
+                    </tr>
+                    {expanded &&
+                      e.groups.map((g) => (
+                        <tr key={`${e.id}-${g.id ?? "ohne"}`} className="text-muted">
+                          <td className="py-1.5 pl-8">{g.id === null ? "Ohne Gruppe" : g.name === null ? "Gelöschte Gruppe" : `Gruppe „${g.name}“`}</td>
+                          <td className="py-1.5 text-right tabular-nums">{int(g.requests)}</td>
+                          <td className="py-1.5 text-right tabular-nums">{usd(g.costUsd)}</td>
+                          <td className="py-1.5 text-right tabular-nums">{usd(g.savedUsd)}</td>
+                          <td className="py-1.5 text-right tabular-nums">{int(g.sessions)}</td>
+                        </tr>
+                      ))}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

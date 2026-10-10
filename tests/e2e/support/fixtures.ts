@@ -11,15 +11,15 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-import { PASSWORDS, SERVERS } from "./servers.mjs";
+import { ADMIN, SERVERS, TEST_EVENT } from "./servers.mjs";
 
 export { expect };
 
-/** Gleicher Hash wie in NoticeDialog.tsx – damit der Hinweis vorab als gelesen gilt. */
-export function noticeKey(text: string): string {
+/** Gleicher Schlüssel wie in NoticeDialog.tsx (pro Konto) – damit der Hinweis vorab als gelesen gilt. */
+export function noticeKey(text: string, accountKey: string): string {
   let h = 0;
   for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) | 0;
-  return `freebie-notice-${h}`;
+  return `freebie-notice-${h}-${accountKey}`;
 }
 
 /** Unbehandelte Fehler im Browser während des laufenden Tests (Kriterium „sauber“). */
@@ -49,6 +49,8 @@ export function ipFor(id: string): string {
 export const uniq = () => Math.random().toString(36).slice(2, 8);
 
 export class ChatPage {
+  /** Zugangsdaten des angemeldeten Gastes (falls über die Fixtures angelegt). */
+  guest: Guest | null = null;
   constructor(public readonly page: Page) {}
 
   get composer() {
@@ -107,22 +109,114 @@ export class ChatPage {
   }
 }
 
-/** Meldet einen Browser-Kontext als Teilnehmer an und markiert den Hinweis als gelesen. */
-export async function loginUser(page: Page, opts: { acknowledgeNotice?: boolean } = {}) {
-  const res = await page.request.post("/api/auth/login", { data: { password: PASSWORDS.app } });
+/** Zeitpunkt in so vielen Minuten (ISO). */
+export const inMinutes = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
+
+export interface Guest {
+  id: string;
+  username: string;
+  password: string;
+}
+
+// ---------------------------------------------------------------- Gäste für die Tests
+
+/** Admin-Zugang je Worker und Server für Hilfsaufgaben (Gäste anlegen). */
+const helpers = new Map<string, Promise<APIRequestContext>>();
+/** Gruppe im Test-Termin je Server (wird bei Bedarf neu angelegt). */
+const testGroups = new Map<string, Promise<string>>();
+
+async function helperLogin(baseURL: string): Promise<APIRequestContext> {
+  const api = await playwrightRequest.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ipFor(`helfer-${process.pid}`) } });
+  const res = await api.post("/api/auth/login", { data: ADMIN });
+  expect(res.status(), await res.text()).toBe(200);
+  return api;
+}
+
+/** Admin-Aufruf mit erneuter Anmeldung, falls ein Test alle Sitzungen beendet hat. */
+async function helperCall<T>(baseURL: string, method: "GET" | "POST", url: string, data?: unknown): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    if (!helpers.has(baseURL)) helpers.set(baseURL, helperLogin(baseURL));
+    const api = await helpers.get(baseURL)!;
+    const res = await api.fetch(url, { method, data });
+    if (res.status() === 401 && attempt === 0) {
+      helpers.delete(baseURL);
+      continue;
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok()) throw new Error(`${method} ${url}: ${res.status()} ${JSON.stringify(body)}`);
+    return body as T;
+  }
+}
+
+interface EventListItem {
+  id: string;
+  name: string;
+  status: string;
+  groups: { id: string; name: string }[];
+}
+
+async function findOrCreateTestGroup(baseURL: string): Promise<string> {
+  const { events } = await helperCall<{ events: EventListItem[] }>(baseURL, "GET", "/api/admin/events");
+  let event = events.find((e) => e.name === TEST_EVENT && e.status === "laeuft");
+  if (!event) {
+    const startsAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    const endsAt = new Date(Date.now() + 23 * 60 * 60_000).toISOString();
+    const { id } = await helperCall<{ id: string }>(baseURL, "POST", "/api/admin/events", { name: TEST_EVENT, startsAt, endsAt });
+    event = { id, name: TEST_EVENT, status: "laeuft", groups: [] };
+  }
+  const group = event.groups.find((g) => g.name === "E2E");
+  if (group) return group.id;
+  return (await helperCall<{ id: string }>(baseURL, "POST", "/api/admin/events/groups", { eventId: event.id, name: "E2E", count: 0 })).id;
+}
+
+/** Neuer Gast im laufenden Test-Termin des Servers (eigene Identität pro Test). */
+export async function createGuest(baseURL: string): Promise<Guest> {
+  for (let attempt = 0; ; attempt++) {
+    if (!testGroups.has(baseURL)) testGroups.set(baseURL, findOrCreateTestGroup(baseURL));
+    try {
+      const groupId = await testGroups.get(baseURL)!;
+      const { guests } = await helperCall<{ guests: Guest[] }>(baseURL, "POST", "/api/admin/events/guests", { groupId, count: 1 });
+      return guests[0];
+    } catch (err) {
+      // Termin oder Gruppe von einem Test gelöscht: neu anlegen.
+      testGroups.delete(baseURL);
+      if (attempt > 0) throw err;
+    }
+  }
+}
+
+const currentBaseURL = () => String(test.info().project.use.baseURL);
+
+/** Meldet einen Browser-Kontext an (als neuer Gast oder mit gegebenen Zugangsdaten) und bestätigt den Hinweis. */
+export async function loginUser(
+  page: Page,
+  opts: { acknowledgeNotice?: boolean; baseURL?: string; guest?: { username: string; password: string } } = {},
+): Promise<Guest | null> {
+  const guest = opts.guest ?? (await createGuest(opts.baseURL ?? currentBaseURL()));
+  const res = await page.request.post("/api/auth/login", { data: { username: guest.username, password: guest.password } });
   expect(res.status(), await res.text()).toBe(200);
   if (opts.acknowledgeNotice !== false) {
+    const { key: account } = (await res.json()) as { key: string };
     const config = await (await page.request.get("/api/config")).json();
-    const key = noticeKey(config.notice.full);
+    const key = noticeKey(config.notice.full, account);
     await page.addInitScript((k) => {
       // Nur im Hauptfenster: in den abgeschotteten Artefakt-iframes ist localStorage gesperrt.
       if (window === window.top) localStorage.setItem(k, "1");
     }, key);
   }
+  return "id" in guest ? (guest as Guest) : null;
 }
 
+/** Von openChat geöffnete Browser-Kontexte – werden nach jedem Test geschlossen. */
+const extraContexts: BrowserContext[] = [];
+
 /** Zweiter Browser-Kontext als Teilnehmerin bzw. Teilnehmer – z. B. um Admin-Änderungen im Chat zu prüfen. */
-export async function openChat(browser: Browser, baseURL: string, ip: string, opts: { acknowledgeNotice?: boolean } = {}): Promise<ChatPage> {
+export async function openChat(
+  browser: Browser,
+  baseURL: string,
+  ip: string,
+  opts: { acknowledgeNotice?: boolean; guest?: { id?: string; username: string; password: string } } = {},
+): Promise<ChatPage> {
   const context = await browser.newContext({
     baseURL,
     viewport: { width: 1280, height: 860 },
@@ -131,9 +225,11 @@ export async function openChat(browser: Browser, baseURL: string, ip: string, op
     extraHTTPHeaders: { "x-forwarded-for": ip },
   });
   trackErrors(context);
+  extraContexts.push(context);
   const page = await context.newPage();
-  await loginUser(page, opts);
+  const guest = await loginUser(page, { ...opts, baseURL });
   const chat = new ChatPage(page);
+  chat.guest = guest ?? (opts.guest?.id ? (opts.guest as Guest) : null);
   if (opts.acknowledgeNotice === false) await page.goto("/");
   else await chat.open();
   return chat;
@@ -141,7 +237,7 @@ export async function openChat(browser: Browser, baseURL: string, ip: string, op
 
 /** Öffnet den Admin-Bereich angemeldet (Anmeldung über die API, Ansicht im Browser). */
 export async function openAdmin(page: Page, tab?: string) {
-  const res = await page.request.post("/api/admin/login", { data: { password: PASSWORDS.admin } });
+  const res = await page.request.post("/api/auth/login", { data: ADMIN });
   expect(res.status(), await res.text()).toBe(200);
   await page.goto("/admin");
   await expect(page.getByRole("tablist", { name: "Admin-Bereiche" })).toBeVisible();
@@ -154,7 +250,7 @@ export class AdminApi {
 
   static async create(baseURL: string, ip: string): Promise<AdminApi> {
     const api = await playwrightRequest.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ip } });
-    const res = await api.post("/api/admin/login", { data: { password: PASSWORDS.admin } });
+    const res = await api.post("/api/auth/login", { data: ADMIN });
     expect(res.status(), await res.text()).toBe(200);
     return new AdminApi(api);
   }
@@ -184,6 +280,13 @@ export class AdminApi {
   security(action: string, extra: Record<string, unknown> = {}) {
     return this.json("POST", "/api/admin/security", { action, ...extra });
   }
+  /** Termin von jetzt + start bis jetzt + end Minuten; liefert die ID. */
+  async createEvent(name: string, start = -5, end = 120): Promise<string> {
+    return (await this.json<{ id: string }>("POST", "/api/admin/events", { name, startsAt: inMinutes(start), endsAt: inMinutes(end) })).id;
+  }
+  createGroup(eventId: string, name: string, count: number) {
+    return this.json<{ id: string; guests: Guest[] }>("POST", "/api/admin/events/groups", { eventId, name, count });
+  }
 
   /** Zustand direkt nach dem Serverstart (einmal pro Lauf gesichert). */
   async snapshot(file: string): Promise<Snapshot> {
@@ -203,11 +306,12 @@ export class AdminApi {
       await this.json(exists ? "PUT" : "POST", "/api/admin/models", m);
     }
     const settings = { ...snap.settings };
-    delete settings.appPasswordSet;
     delete settings.sessionVersion;
     await this.updateSettings(settings);
     for (const m of models) if (!snap.models.some((s) => s.id === m.id)) await this.json("DELETE", `/api/admin/models?id=${m.id}`);
-    if ((await this.settings()).appPasswordSet) await this.security("reset-password");
+    // Termine aus den Tests entfernen – nur der gemeinsame Test-Termin bleibt.
+    const { events } = await this.json<{ events: { id: string; name: string }[] }>("GET", "/api/admin/events");
+    for (const e of events) if (e.name !== TEST_EVENT) await this.json("DELETE", `/api/admin/events?id=${e.id}`);
 
     const presets = await this.presets();
     for (const p of presets) if (!snap.presets.some((s) => s.id === p.id)) await this.json("DELETE", `/api/admin/presets?id=${p.id}`);
@@ -238,6 +342,8 @@ interface Fixtures {
   admin: AdminApi;
   /** Auf seriellen Servern: Zustand nach jedem Test zurücksetzen (läuft automatisch). */
   serverReset: void;
+  /** Schließt die zusätzlichen Chat-Fenster eines Tests (läuft automatisch). */
+  closeChats: void;
 }
 
 export const test = base.extend<Fixtures>({
@@ -252,8 +358,9 @@ export const test = base.extend<Fixtures>({
     expect(browserErrors, "unbehandelte Fehler im Browser").toEqual([]);
   },
   chat: async ({ page }, use) => {
-    await loginUser(page);
+    const guest = await loginUser(page);
     const chat = new ChatPage(page);
+    chat.guest = guest;
     await chat.open();
     await use(chat);
   },
@@ -275,6 +382,13 @@ export const test = base.extend<Fixtures>({
       const after = await AdminApi.create(baseURL!, ip);
       await after.restore(snap);
       await after.api.dispose();
+    },
+    { auto: true },
+  ],
+  closeChats: [
+    async ({}, use) => {
+      await use();
+      for (const context of extraContexts.splice(0)) await context.close().catch(() => {});
     },
     { auto: true },
   ],

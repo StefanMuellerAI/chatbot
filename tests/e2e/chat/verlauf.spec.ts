@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
-import { expect, test, uniq } from "../support/fixtures";
+import { expect, loginUser, test, uniq } from "../support/fixtures";
+import { ADMIN } from "../support/servers.mjs";
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Chatverlauf" });
 const chatButton = (page: Page, title: string) => nav(page).getByRole("button", { name: title, exact: true });
@@ -249,10 +250,23 @@ test.describe("E · Verlauf und Seitenleiste", () => {
     void chat;
   });
 
-  test("E10 Admin-Link führt in den Admin-Bereich", async ({ chat, page }) => {
-    await page.getByRole("link", { name: "Admin" }).click();
+  test("E10 Admin-Link nur für die Kursleitung; er führt ohne zweite Anmeldung in den Admin-Bereich", async ({ page }) => {
+    // Als Gast: kein Admin-Link, nur der eigene Name mit Gültigkeit.
+    await loginUser(page);
+    await page.goto("/");
+    const nav = page.locator("aside");
+    await expect(nav.getByRole("link", { name: "Admin" })).toHaveCount(0);
+    await expect(nav.getByText(/^Angemeldet als [a-z]+\d+ · gültig bis \d{2}:\d{2} Uhr$/)).toBeVisible();
+
+    // Als Admin: Link sichtbar, kein Gast-Hinweis.
+    await page.context().clearCookies();
+    expect((await page.request.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
+    await page.goto("/");
+    // Der Hinweis gilt pro Konto – die Kursleitung bestätigt ihn am selben Gerät selbst.
+    await page.getByRole("dialog", { name: "Wichtiger Hinweis" }).getByRole("button", { name: "Verstanden" }).click();
+    await expect(nav.getByText(/^Angemeldet als/)).toHaveCount(0);
+    await nav.getByRole("link", { name: "Admin" }).click();
     await expect(page).toHaveURL(/\/admin$/);
-    await expect(page.getByRole("heading", { name: "Admin-Bereich" })).toBeVisible();
-    void chat;
+    await expect(page.getByRole("tablist", { name: "Admin-Bereiche" })).toBeVisible();
   });
 });

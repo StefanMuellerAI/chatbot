@@ -29,15 +29,29 @@ Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
 
    | Variable | Zweck |
    |---|---|
-   | `APP_PASSWORD` | Passwort für Teilnehmende (später im Admin-Bereich pro Schulung änderbar) |
-   | `ADMIN_PASSWORD` | Passwort für `/admin` |
+   | `ADMIN_PASSWORD` | Passwort der Kursleitung (Chat und Admin-Bereich) |
+   | `ADMIN_USERNAME` | Optional: Benutzername der Kursleitung (Standard `admin`) |
    | `SESSION_SECRET` | Zufälliger Wert (≥ 32 Zeichen) zum Signieren der Sitzungen |
    | `ANTHROPIC_API_KEY` | Claude-Modelle |
    | `OPENAI_API_KEY` | GPT-Modelle, Bilder, Transkription, Spracheingabe |
    | `CRON_SECRET` | Schützt den täglichen Aufräumjob |
 
 4. **Deployen.** Beim ersten Aufruf legt Freebie die Tabellen selbst an und befüllt Modelle und Vorlagen.
-5. Unter **`/admin`** anmelden, in der Übersicht den **Systemstatus** prüfen und bei den Modellen auf **Test** klicken.
+5. Mit dem Admin-Zugang anmelden, unter **`/admin`** in der Übersicht den **Systemstatus** prüfen und bei den Modellen
+   auf **Test** klicken.
+6. Unter **Termine** einen Termin mit Gruppen und Gästen anlegen und die Zugangsdaten drucken oder als CSV
+   exportieren.
+
+## Zugänge
+
+- **Kursleitung:** ein Zugang aus `ADMIN_USERNAME`/`ADMIN_PASSWORD` für Chat und Admin-Bereich (Sitzung 12 Stunden).
+- **Gäste:** Im Admin-Bereich unter **Termine** legt die Kursleitung Termine (höchstens 24 Stunden) mit beliebig
+  vielen Gruppen und Gästen an. Jeder Gast bekommt einen einfachen Benutzernamen (z. B. `fuchs27`) und ein einfaches
+  Passwort (z. B. `sonne482`). Gäste kommen nur in den Chat, ab 30 Minuten vor Beginn.
+- **Ablauf:** Zum Termin-Ende verfallen die Gast-Zugänge sofort. Zehn Minuten vorher erscheint im Chat ein Hinweis
+  mit Export-Knopf; danach werden die Gast-Chats vom Gerät gelöscht. Kosten und Anfragen bleiben 90 Tage in der
+  Statistik („Nach Termin“ in der Übersicht).
+- `APP_PASSWORD` aus früheren Versionen wird nicht mehr verwendet und kann in Vercel gelöscht werden.
 
 > **Hinweis zum Tarif:** Im Hobby-Tarif dürfen Funktionen höchstens 300 Sekunden laufen. Das reicht für normale
 > Antworten, auch auf „Hoch“. Sehr lange Antworten auf „Maximal“ mit vielen Websuchen können an diese Grenze
@@ -47,7 +61,7 @@ Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
 
 ```bash
 npm install
-cp .env.example .env.local   # Passwörter setzen; ohne API-Schlüssel: FREEBIE_MOCK=1
+cp .env.example .env.local   # ADMIN_PASSWORD setzen; ohne API-Schlüssel: FREEBIE_MOCK=1
 npm run dev                  # http://localhost:3000
 ```
 
@@ -62,7 +76,7 @@ Mock-Provider – damit lässt sich die komplette Oberfläche ohne API-Kosten au
 | `npm run build` | Produktions-Build (nötig vor den E2E-Tests) |
 | `npm run test:e2e` | Komplette E2E-Suite mit Playwright gegen den Produktions-Build (startet eigene Server) |
 | `npm run test:coverage` | Abdeckungsmatrix: jede Einstellung, Route und Katalog-ID hat einen Test |
-| `npm run test:e2e:live` | Live-Smoke gegen `freebie.stefanai.de` (`LIVE_PASSWORD`, optional `LIVE_ADMIN_PASSWORD`; < 0,10 $) |
+| `npm run test:e2e:live` | Live-Smoke gegen `freebie.stefanai.de` (`LIVE_ADMIN_PASSWORD`, legt einen Termin mit einem Gast an und löscht ihn wieder; < 0,10 $) |
 
 ### E2E-Tests
 

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { request as playwrightRequest, type APIRequestContext, type APIResponse } from "@playwright/test";
-import { expect, test, uniq } from "../support/fixtures";
+import { createGuest, expect, test, uniq } from "../support/fixtures";
 import { payload } from "../support/files";
-import { CRON_SECRET, PASSWORDS } from "../support/servers.mjs";
+import { ADMIN, CRON_SECRET } from "../support/servers.mjs";
 
 // U: Alle Routen ohne Browser – Anmeldung, Methoden, kaputte Eingaben, Pfad-Tricks, Header.
 
@@ -21,9 +21,20 @@ const USER_ROUTES: [Method, string][] = [
   ["POST", "/api/upload/local"],
   ["POST", "/api/upload/token"],
   ["POST", "/api/auth/logout"],
+  ["GET", "/api/auth/session"],
 ];
 const ADMIN_ROUTES: [Method, string][] = [
-  ["POST", "/api/admin/logout"],
+  ["GET", "/api/admin/events"],
+  ["POST", "/api/admin/events"],
+  ["PUT", "/api/admin/events"],
+  ["DELETE", "/api/admin/events?id=x"],
+  ["POST", "/api/admin/events/end"],
+  ["POST", "/api/admin/events/groups"],
+  ["PUT", "/api/admin/events/groups"],
+  ["DELETE", "/api/admin/events/groups?id=x"],
+  ["POST", "/api/admin/events/guests"],
+  ["DELETE", "/api/admin/events/guests?id=x"],
+  ["POST", "/api/admin/events/guests/password"],
   ["POST", "/api/admin/models/discover"],
   ["GET", "/api/admin/models"],
   ["POST", "/api/admin/models"],
@@ -42,8 +53,8 @@ const ADMIN_ROUTES: [Method, string][] = [
 
 async function client(baseURL: string, ip: string, login?: "user" | "admin"): Promise<APIRequestContext> {
   const api = await playwrightRequest.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ip } });
-  if (login === "user") expect((await api.post("/api/auth/login", { data: { password: PASSWORDS.app } })).status()).toBe(200);
-  if (login === "admin") expect((await api.post("/api/admin/login", { data: { password: PASSWORDS.admin } })).status()).toBe(200);
+  if (login === "user") expect((await api.post("/api/auth/login", { data: await createGuest(baseURL) })).status()).toBe(200);
+  if (login === "admin") expect((await api.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
   return api;
 }
 
@@ -68,51 +79,57 @@ test.describe("U · API-Robustheit", () => {
       await expectGermanError(await call(api, method, url, { data: {} }), 401, "Bitte melde dich erneut an.");
     }
     for (const [method, url] of ADMIN_ROUTES) {
-      await expectGermanError(await call(api, method, url, { data: {} }), 401, "Admin-Anmeldung erforderlich.");
+      await expectGermanError(await call(api, method, url, { data: {} }), 401, "Bitte melde dich erneut an.");
     }
     await api.dispose();
   });
 
-  test("U01 gefälschte, fremde und Teilnehmer-Sitzungen öffnen nichts", async ({ baseURL, ip }) => {
-    const host = new URL(baseURL!).hostname;
+  test("U01 gefälschte Sitzungen öffnen nichts, Gäste bekommen an Admin-Routen 403", async ({ baseURL, ip }) => {
     const forged = await client(baseURL!, ip);
-    await forged.storageState();
     const headers = { cookie: "freebie_session=eyJhbGciOiJIUzI1NiJ9.eyJ2IjoxfQ.ungueltig; freebie_admin=abc" };
     expect((await forged.get("/api/config", { headers })).status()).toBe(401);
     expect((await forged.get("/api/admin/settings", { headers })).status()).toBe(401);
 
-    // Ein gültiges Teilnehmer-Cookie unter dem Admin-Namen wird nicht akzeptiert.
-    const user = await client(baseURL!, `${ip}-u`, "user");
-    const cookie = (await user.storageState()).cookies.find((c) => c.name === "freebie_session" && c.domain.includes(host));
-    expect(cookie).toBeTruthy();
-    expect((await forged.get("/api/admin/settings", { headers: { cookie: `freebie_admin=${cookie!.value}` } })).status()).toBe(401);
-    expect((await user.get("/api/admin/overview")).status()).toBe(401);
-    await Promise.all([forged.dispose(), user.dispose()]);
+    const guest = await client(baseURL!, `${ip}-u`, "user");
+    expect((await guest.get("/api/config")).status()).toBe(200);
+    for (const [method, url] of ADMIN_ROUTES) {
+      await expectGermanError(await call(guest, method, url, { data: {} }), 403, "Dieser Bereich ist nur für die Kursleitung.");
+    }
+    await Promise.all([forged.dispose(), guest.dispose()]);
   });
 
   test("U01 Cookies: httpOnly, SameSite, Secure hinter HTTPS und begrenzte Laufzeit", async ({ baseURL, ip }) => {
     const api = await client(baseURL!, ip);
-    const res = await api.post("/api/auth/login", { data: { password: PASSWORDS.app } });
-    const setCookie = res.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value).join("\n");
+    const guest = await createGuest(baseURL!);
+    const setCookieOf = (res: APIResponse) => res.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value).join("\n");
+    const setCookie = setCookieOf(await api.post("/api/auth/login", { data: guest }));
     expect(setCookie).toMatch(/freebie_session=[^;]+;/);
     expect(setCookie).toMatch(/HttpOnly/i);
     expect(setCookie).toMatch(/SameSite=Lax/i);
     expect(setCookie).toMatch(/Path=\//);
     expect(setCookie).toMatch(/Max-Age=\d+|Expires=/i);
     expect(setCookie).not.toMatch(/;\s*Secure/i);
-    // Hinter HTTPS (wie auf Vercel) ist das Cookie immer Secure.
-    const https = await api.post("/api/auth/login", { data: { password: PASSWORDS.app }, headers: { "x-forwarded-proto": "https" } });
-    const secure = https.headersArray().filter((h) => h.name.toLowerCase() === "set-cookie").map((h) => h.value).join("\n");
-    expect(secure).toMatch(/freebie_session=[^;]+;.*Secure/i);
-    const admin = await api.post("/api/admin/login", { data: { password: PASSWORDS.admin }, headers: { "x-forwarded-proto": "https" } });
-    const adminCookie = admin.headersArray().find((h) => h.name.toLowerCase() === "set-cookie")?.value ?? "";
-    expect(adminCookie).toMatch(/^freebie_admin=[^;]+;/);
+    // Hinter HTTPS (wie auf Vercel) ist das Cookie immer Secure – für Gäste wie für den Admin.
+    expect(setCookieOf(await api.post("/api/auth/login", { data: guest, headers: { "x-forwarded-proto": "https" } }))).toMatch(/freebie_session=[^;]+;.*Secure/i);
+    const adminCookie = setCookieOf(await api.post("/api/auth/login", { data: ADMIN, headers: { "x-forwarded-proto": "https" } }));
+    expect(adminCookie).toMatch(/^freebie_session=[^;]+;/);
     expect(adminCookie).toMatch(/;\s*Secure/i);
-    expect(adminCookie).toMatch(/SameSite=Strict/i);
+    expect(adminCookie).toMatch(/HttpOnly/i);
     const logout = await api.post("/api/auth/logout");
     expect(logout.status()).toBe(200);
     expect((await api.get("/api/config")).status()).toBe(401);
     await api.dispose();
+  });
+
+  test("U01 ändernde Aufrufe von fremden Seiten werden abgewiesen", async ({ baseURL, ip }) => {
+    const admin = await client(baseURL!, ip, "admin");
+    for (const origin of ["https://boese.example", "null"]) {
+      await expectGermanError(await admin.post("/api/admin/security", { data: { action: "clear-answer-cache" }, headers: { origin } }), 403, "Anfrage von einer fremden Seite abgelehnt.");
+    }
+    // Lesen bleibt erlaubt, die eigene Seite sowieso.
+    expect((await admin.get("/api/admin/settings", { headers: { origin: "https://boese.example" } })).status()).toBe(200);
+    expect((await admin.post("/api/admin/security", { data: { action: "clear-answer-cache" }, headers: { origin: baseURL! } })).status()).toBe(200);
+    await admin.dispose();
   });
 
   test("U02 falsche Methode ergibt 405", async ({ baseURL, ip }) => {
@@ -131,6 +148,9 @@ test.describe("U · API-Robustheit", () => {
       [admin, "GET", "/api/admin/security"],
       [admin, "DELETE", "/api/admin/settings"],
       [admin, "GET", "/api/admin/models/test"],
+      [admin, "GET", "/api/admin/events/end"],
+      [admin, "GET", "/api/admin/events/guests"],
+      [admin, "PATCH" as Method, "/api/admin/events"],
     ];
     for (const [ctx, method, url] of wrong) {
       expect((await call(ctx, method, url)).status(), `${method} ${url}`).toBe(405);
@@ -157,6 +177,13 @@ test.describe("U · API-Robustheit", () => {
       [admin, "POST", "/api/admin/presets"],
       [admin, "PUT", "/api/admin/settings"],
       [admin, "POST", "/api/admin/security"],
+      [admin, "POST", "/api/admin/events"],
+      [admin, "PUT", "/api/admin/events"],
+      [admin, "POST", "/api/admin/events/end"],
+      [admin, "POST", "/api/admin/events/groups"],
+      [admin, "PUT", "/api/admin/events/groups"],
+      [admin, "POST", "/api/admin/events/guests"],
+      [admin, "POST", "/api/admin/events/guests/password"],
     ];
     for (const [ctx, method, url] of routes) {
       const broken = await call(ctx, method, url, { headers: { "content-type": "application/json" }, data: "{kaputt" });
@@ -185,7 +212,9 @@ test.describe("U · API-Robustheit", () => {
     await expectGermanError(await api.post("/api/images", { data: { prompt: "x".repeat(4001), size: "1024x1024", quality: "low" } }), 400);
     await expectGermanError(await api.post("/api/images", { data: { prompt: "Bild", size: "999x999", quality: "low" } }), 400);
     const login = await client(baseURL!, `${ip}-l`);
-    await expectGermanError(await login.post("/api/auth/login", { data: { password: "x".repeat(5000) } }), 401, "Das Passwort stimmt nicht.");
+    await expectGermanError(await login.post("/api/auth/login", { data: { username: "fuchs27", password: "x".repeat(5000) } }), 401, "Benutzername oder Passwort stimmt nicht.");
+    await expectGermanError(await login.post("/api/auth/login", { data: { username: ADMIN.username, password: "x".repeat(5000) } }), 401, "Benutzername oder Passwort stimmt nicht.");
+    await expectGermanError(await login.post("/api/auth/login", { data: { password: "nur-passwort" } }), 400, "Bitte Benutzername und Passwort eingeben.");
     await Promise.all([api.dispose(), login.dispose()]);
   });
 

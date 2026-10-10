@@ -252,7 +252,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     await expect(dialog).toContainText(full);
     await dialog.getByRole("button", { name: "Verstanden" }).click();
     await expect(chat.page.getByText(short)).toBeVisible();
-    expect(await chat.page.evaluate((k) => localStorage.getItem(k), noticeKey(full))).toBe("1");
+    expect(await chat.page.evaluate((k) => localStorage.getItem(k), noticeKey(full, chat.guest!.id))).toBe("1");
 
     const anon = await browser.newPage({ baseURL });
     await anon.goto("/login");

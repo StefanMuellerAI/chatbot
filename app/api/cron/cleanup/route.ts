@@ -3,6 +3,7 @@ import { safeEqual } from "@/lib/auth/password";
 import { deleteExpiredAnswers } from "@/lib/chat/answer-cache";
 import { errorResponse } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
+import { purgeExpiredGuests, purgeOldEvents } from "@/lib/events/store";
 import { getSettings } from "@/lib/settings";
 import { deleteExpiredFiles } from "@/lib/storage";
 
@@ -30,7 +31,17 @@ export async function GET(request: Request) {
       .delete(schema.transcriptCache)
       .where(lt(schema.transcriptCache.createdAt, retention))
       .returning({ sha: schema.transcriptCache.sha256 });
-    return Response.json({ ok: true, deletedFiles, deletedTexts: texts.length, deletedTranscripts: transcripts.length });
+    // Zugänge beendeter Termine löschen; Termine selbst bleiben 90 Tage in der Statistik.
+    const deletedGuests = await purgeExpiredGuests();
+    const deletedEvents = await purgeOldEvents();
+    return Response.json({
+      ok: true,
+      deletedFiles,
+      deletedTexts: texts.length,
+      deletedTranscripts: transcripts.length,
+      deletedGuests,
+      deletedEvents,
+    });
   } catch (err) {
     return errorResponse(err);
   }

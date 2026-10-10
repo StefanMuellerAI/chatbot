@@ -102,24 +102,24 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| A01 | Ohne Anmeldung `/` bzw. `/api/...` aufrufen | Weiterleitung auf `/login` bzw. 401 mit deutscher Meldung |
-| A02 | Login-Seite | Titel, Spielumgebungs-Hinweis aus den Einstellungen, Link zu stefanai.de in neuem Tab |
-| A03 | Leeres Passwort | Button gesperrt, Enter tut nichts |
-| A04 | Falsches Passwort | „Das Passwort stimmt nicht.“, Feld bleibt nutzbar |
-| A05 | Richtiges Passwort per Button und per Enter | Chat öffnet; Cookie HttpOnly, SameSite=Lax, 12 Stunden; Secure hinter HTTPS (U01) |
-| A06 | Passwort mit über 200 Zeichen | verständliche Meldung (heute irreführend) |
-| A07 | 50 Fehlversuche, dann der 51. | Sperre mit Meldung, auch das richtige Passwort wird abgewiesen; andere IP nicht betroffen; Erfolg zählt einen Versuch zurück |
-| A08 | Abgelaufene, manipulierte oder Admin-Tokens als Teilnehmer-Cookie | abgewiesen, Weiterleitung auf Login |
-| A09 | Bereits angemeldet `/login` öffnen | Weiterleitung in den Chat (heute: Login-Seite) |
-| A10 | „Abmelden“ | zurück zum Login, Cookie weg, Zurück-Taste zeigt keine Daten mehr |
-| A11 | Admin ändert Passwort / meldet alle ab, während jemand chattet | nächste Aktion führt sauber zum Login, nichts geht verloren |
-| A12 | Passwort aus Umgebung ↔ im Admin gesetzt ↔ zurückgesetzt | jeweils gilt genau das richtige Passwort |
+| A01 | Ohne Anmeldung `/`, `/admin` bzw. `/api/...` aufrufen | Weiterleitung auf `/login` (bzw. `/login?weiter=admin`) bzw. 401 mit deutscher Meldung |
+| A02 | Login-Seite | Titel, Spielumgebungs-Hinweis aus den Einstellungen, Felder „Benutzername“ und „Passwort“ mit passendem `autocomplete`, Link zu stefanai.de in neuem Tab |
+| A03 | Leere Felder (auch nur Leerzeichen im Namen) | Button gesperrt, Enter tut nichts |
+| A04 | Falscher Name oder falsches Passwort; vor dem Laden Getipptes bzw. Autofill | „Benutzername oder Passwort stimmt nicht.“ (verrät nicht, was falsch war), Feld bleibt nutzbar; Vorausgefülltes wird übernommen |
+| A05 | Gast meldet sich per Enter an (Groß-/Kleinschreibung, Leerzeichen egal) | Chat öffnet; Cookie HttpOnly, SameSite=Lax, 12 Stunden; Secure hinter HTTPS (U01) |
+| A06 | Sehr lange Eingaben | gelten einfach als falsch |
+| A07 | 50 Fehlversuche von einer IP, dann der 51. | Sperre mit Meldung, auch richtige Zugangsdaten werden abgewiesen; andere IP und Kursleitung nicht betroffen; Erfolg zählt einen Versuch zurück |
+| A08 | Abgelaufene, manipulierte, veraltete Tokens und Tokens unbekannter Gäste | abgewiesen, Weiterleitung auf Login |
+| A09 | Bereits angemeldet `/login` öffnen | Weiterleitung in den Chat |
+| A10 | „Abmelden“ (Gast: mit Rückfrage, Chats werden vom Gerät gelöscht) | zurück zum Login, Cookie weg |
+| A11 | Kursleitung meldet alle ab, während jemand chattet | nächste Aktion führt sauber zum Login (ohne „abgelaufen“); nach erneuter Anmeldung sind die Chats des Kontos wieder da |
+| A12 | „Alle abmelden“ bei mehreren Admin-Sitzungen | andere Admin-Sitzungen enden, die eigene bleibt |
 
 ### B · Hinweis „Spielumgebung“
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| B01 | Erster Besuch | Hinweis-Dialog, nur mit „Verstanden“ schließbar (nicht Esc, nicht Klick daneben); nach Neuladen nicht mehr |
+| B01 | Erster Besuch (je Konto – am gemeinsamen Rechner bestätigt jeder Gast selbst, T13) | Hinweis-Dialog, nur mit „Verstanden“ schließbar (nicht Esc, nicht Klick daneben); nach Neuladen nicht mehr |
 | B02 | Admin ändert den Hinweistext | Dialog erscheint bei allen erneut, neuer Text auf Login-Seite und im Dialog |
 | B03 | Fußzeile und „Mehr“ | Kurztext aus den Einstellungen; Dialog per X, Esc und Klick daneben schließbar |
 
@@ -267,10 +267,10 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| O01 | Admin-Anmeldung | wie A03–A05; Cookie 2 Stunden, SameSite=Strict; Teilnehmer-Cookie reicht nicht |
+| O01 | Admin-Anmeldung über die gemeinsame Login-Seite (`/admin` → `/login?weiter=admin`) | falsches Passwort abgewiesen; Admin-Bereich mit allen Reitern; Cookie 12 Stunden, SameSite=Lax; Chat ohne zweite Anmeldung; Gäste kommen nicht hinein (T09) |
 | O02 | Kennzahlen | Kosten, Ersparnis, Anfragen, Cache-Quote und Treffer stimmen exakt mit den im Test ausgelösten Aktionen überein (im Fake-API-Modus mit echten Preisen) |
 | O03 | Diagramm | Balken mit Beschriftung, Tooltip per Maus und Tastatur, Tabellenansicht mit denselben Zahlen |
-| O04 | Systemstatus | jede Zeile spiegelt die Umgebung (Schlüssel, Datenbank, Blob per Token/OIDC, Secrets, Passwortquelle) |
+| O04 | Systemstatus | jede Zeile spiegelt die Umgebung (Schlüssel, Datenbank, Blob per Token/OIDC, Secrets, Admin-Zugang, laufende Termine) |
 
 ### P · Admin: Modelle
 
@@ -314,16 +314,42 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| S01 | Passwort setzen (unter 4, gültig, über 200 Zeichen) | Meldung; Teilnehmende abgemeldet; neues gilt, altes nicht |
-| S02 | Zurück zum Umgebungs-Passwort | APP_PASSWORD gilt wieder |
+| S01 | „Alle abmelden“, während Gäste chatten | Meldung „Alle Sitzungen wurden abgemeldet.“; Gäste landen bei der nächsten Aktion auf der Anmeldung |
+| S02 | Reiter „Sicherheit“ | erklärt den Admin-Zugang (Benutzername, Passwort aus `ADMIN_PASSWORD`); kein gemeinsames Teilnehmer-Passwort mehr |
 | S03 | Alle abmelden (bestätigen / abbrechen) | alle Teilnehmenden raus, eigener Admin-Zugang bleibt |
 | S04 | Cache leeren (bestätigen / abbrechen) | nächste gleiche Frage kommt nicht aus dem Cache |
 
-### U · API-Robustheit (ohne Browser, alle 24 Routen)
+### T · Termine und Gast-Zugänge
+
+Die Kursleitung legt Termine (höchstens 24 Stunden) mit Gruppen und Gästen an; jeder Gast hat einen einfachen
+Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [ZUGANG-PLAN.md](ZUGANG-PLAN.md)).
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| U01 | Ohne, mit gefälschter und mit Teilnehmer-Sitzung an Admin-Routen; Cookie-Attribute | 401 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit |
+| T01 | Termin anlegen, Prüfungen (Ende vor Beginn, über 24 h, Vergangenheit, leerer Name, „bis“ vor „von“) | Termin unter „Läuft“/„Geplant“, deutsche Meldungen, Hinweis „Ende am Folgetag“ |
+| T02 | Gruppen anlegen, umbenennen, löschen (Bestätigung) | Löschen entfernt die Gäste; ihre Sitzungen enden sofort, Login mit „abgelaufen“, Chats vom Gerät gelöscht |
+| T03 | Gäste erzeugen, nachlegen, einzeln löschen, Passwort neu erzeugen, Passwörter zeigen/verbergen | einfache, eindeutige Zugangsdaten (`fuchs27`/`sonne482`); altes Passwort gilt nicht mehr |
+| T04 | Druckansicht und CSV je Gruppe und Termin | alle Gäste mit Benutzername, Passwort und Gültigkeit; CSV für Excel |
+| T05 | Termin verschieben bzw. verkürzen und verlängern | wirkt sofort auf bestehende Sitzungen („Sitzung beendet“, Chats bleiben) und neue Anmeldungen |
+| T06 | „Jetzt beenden“ (abbrechen / bestätigen) | Gäste bei der nächsten Aktion abgemeldet („abgelaufen“), Zugänge gelöscht, Termin unter „Vorbei“ |
+| T07 | Termin löschen (laufend bzw. vorbei) | Gäste sofort weg; vorbei: nur noch aus der Statistik entfernen |
+| T08 | Mehrere Termine, Filter Läuft/Geplant/Vorbei | richtige Zuordnung und Sortierung |
+| T09 | Gast im Chat | kein Admin-Link; `/admin` → Login, `/api/admin/*` → 403 |
+| T10 | Anmeldung vor Beginn bzw. ab 30 Minuten vorher | Meldung mit Startzeit bzw. Zugang |
+| T11 | Termin endet während der Sitzung (echter Kurztermin) | Warnung, zum Ende ohne Zutun zur Anmeldung „Dein Zugang ist abgelaufen.“, Chats vom Gerät gelöscht, Anmeldung danach abgelehnt |
+| T12 | „gültig bis“ und Warnung 10 Minuten vor Ende | Uhrzeit in der Seitenleiste; Warnung mit „Chats exportieren“; verkürzte und verlängerte Termine kommen ohne Neuladen an |
+| T13 | Zwei Gäste nacheinander am selben Gerät, dazu die Kursleitung | keiner sieht die Chats des anderen; Abmelden löscht Gast-Chats (Admin-Chats bleiben); Hinweis je Konto |
+| T14 | Login-Bremse pro Benutzername | 10 Fehlversuche sperren den Namen (auch in anderer Schreibweise), andere Konten nicht; unbekannte Namen verhalten sich gleich |
+| T15 | Admin meldet sich an | Chat und Admin-Bereich ohne zweite Anmeldung; Abmelden beendet beides |
+| T16 | Übersicht „Nach Termin“ | Gast-Anfragen und Sitzungen je Termin und (aufgeklappt) je Gruppe; Summen nach Rolle; gelöschte Gruppen und Termine bleiben in der Statistik |
+| T17 | Aufräumjob nach dem Termin-Ende | löscht die Gast-Zugänge, der Termin bleibt in der Statistik |
+| T18 | API der Termine | 401 ohne Sitzung, 403 für Gäste, 400 mit deutscher Meldung, 404 für unbekannte IDs |
+
+### U · API-Robustheit (ohne Browser, alle Routen)
+
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| U01 | Ohne, mit gefälschter und mit Gast-Sitzung an Admin-Routen; Cookie-Attribute; ändernde Aufrufe von fremden Seiten | 401 bzw. 403 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit; fremde Origin → 403 |
 | U02 | Falsche Methode | 405 |
 | U03 | Kaputtes JSON, falsche Felder, Grenzwerte (Nachricht, Anhänge, Bild-Prompt, Passwort) | 400 mit deutscher Meldung bzw. „Passwort stimmt nicht“ – nie 500 |
 | U04 | Pfad-Tricks (`../`, kodiert, fremde Präfixe, Nullbyte), hochgeladenes HTML | 400/404; Auslieferung als Download mit Sandbox-CSP |
@@ -352,8 +378,9 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 ### X · Live-Smoke (`freebie.stefanai.de`)
 
-Nach jedem Production-Deploy und auf Abruf, mit dem Teilnehmer-Passwort, ohne Einstellungen zu ändern
-(`LIVE=1 LIVE_PASSWORD=… LIVE_ADMIN_PASSWORD=… npm run test:e2e:live`):
+Nach jedem Production-Deploy und auf Abruf, ohne Einstellungen zu ändern. Der Test legt mit dem Admin-Zugang einen
+Termin für eine Stunde mit einem Gast an, chattet als dieser Gast und löscht den Termin am Ende wieder
+(`LIVE=1 LIVE_ADMIN_PASSWORD=… npm run test:e2e:live`):
 
 | ID | Schritt | Erwartete Wirkung |
 |---|---|---|
@@ -363,6 +390,7 @@ Nach jedem Production-Deploy und auf Abruf, mit dem Teilnehmer-Passwort, ohne Ei
 | X04 | kurze MP3 transkribieren | Transkript, Antwort |
 | X05 | ein Bild in Entwurfsqualität | Bild erscheint |
 | X06 | eine Websuche-Frage und ein kleines Artefakt | Quellen; Artefakt-Panel öffnet sich |
+| X07 | Gast meldet sich über das Formular an; Termin wird gelöscht | nur Chat, kein Admin; nach dem Löschen spätestens nach 15 Sekunden abgemeldet („abgelaufen“) |
 
 Geschätzte Kosten: unter 0,10 $ pro Lauf.
 
@@ -442,7 +470,7 @@ liegt bei dir.
    - Login-Bremse *getrennt* für Teilnehmende und Admin
 5. **Production-Branch in Vercel:** Die laufende Version wurde noch von meinem Arbeits-Branch deployt, neuere
    Pushes landen als Preview. Bitte prüfen, dass in Vercel `main` der Production-Branch ist; Änderungen gehen dann
-   per Pull Request live. Für Live-Tests gegen Previews fehlen dort die Umgebungsvariablen (z. B. `APP_PASSWORD`) –
+   per Pull Request live. Für Live-Tests gegen Previews fehlen dort die Umgebungsvariablen (z. B. `ADMIN_PASSWORD`) –
    *Empfehlung:* sie auch für „Preview“ setzen, dann kann jede Änderung vor dem Merge live geprüft werden.
 
 ## 8. Umsetzung in Phasen
@@ -456,6 +484,7 @@ liegt bei dir.
 | 5 · Fehler beheben | Abschnitt 6 | erledigt (34 Fehler, je mit Test) |
 | 6 · Breite | Handy/Tablet, Safari/Firefox, Barrierefreiheit, Belastbarkeit (N, W) | erledigt; WebKit und Firefox grün in der CI (lokal nicht installierbar) |
 | 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
+| 8 · Zugänge | Bereich T (Termine, Gruppen, Gast-Zugänge), A/O/S angepasst | erledigt |
 
 Ergebnis: 207 E2E-Tests in 19 Dateien (plus 6 Live-Smoke-Tests) und 46 Unit-Tests; die komplette Suite läuft lokal in gut 5 Minuten
 (3 Worker) und dreimal hintereinander ohne Wiederholungen grün (621 von 621). In der CI laufen zusätzlich die

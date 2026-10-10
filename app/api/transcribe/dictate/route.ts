@@ -1,5 +1,5 @@
 import { transcribeBuffer } from "@/lib/audio/transcribe";
-import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
+import { errorResponse, HttpError, requireUser, usageTag } from "@/lib/auth/session";
 import { DIRECT_UPLOAD_LIMIT } from "@/lib/files/limits";
 import { requireFeature } from "@/lib/guards";
 import { logUsage, TRANSCRIPTION_PRICE_PER_MIN } from "@/lib/usage";
@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     const text = await transcribeBuffer(Buffer.from(await file.arrayBuffer()), `diktat.${ext}`, mime, settings.dictationModel);
     await logUsage({
       sessionHash: session.sessionHash,
+      ...usageTag(session),
       modelId: settings.dictationModel,
       feature: "dictation",
       units: durationSec / 60,

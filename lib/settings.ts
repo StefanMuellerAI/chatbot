@@ -7,24 +7,32 @@ export { DEFAULT_NOTICE, DEFAULT_SETTINGS, type AppSettings } from "@/lib/shared
 
 const KEY = "app";
 
-/** Kurzlebiger In-Memory-Cache, damit nicht jede Anfrage die DB fragt. */
-let cached: { value: AppSettings; at: number } | null = null;
+/**
+ * Kurzlebiger In-Memory-Cache, damit nicht jede Anfrage die DB fragt – auf globalThis, damit alle
+ * Routen einer Instanz denselben Stand sehen (sonst hielte jedes Server-Bundle seine eigene Kopie).
+ */
+type Cached = { value: AppSettings; at: number } | null;
+const store = globalThis as unknown as { freebieSettings?: Cached };
 const TTL_MS = 5_000;
 
 export async function getSettings(opts: { fresh?: boolean } = {}): Promise<AppSettings> {
+  const cached = store.freebieSettings;
   if (!opts.fresh && cached && Date.now() - cached.at < TTL_MS) return cached.value;
   const db = await getDb();
   const rows = await db.select().from(schema.settings).where(eq(schema.settings.key, KEY)).limit(1);
   const value = withDefaults((rows[0]?.value ?? {}) as Partial<AppSettings>);
-  cached = { value, at: Date.now() };
+  store.freebieSettings = { value, at: Date.now() };
   return value;
 }
 
 function withDefaults(stored: Partial<AppSettings>): AppSettings {
+  // Das frühere gemeinsame Teilnehmer-Passwort gibt es nicht mehr (nur noch Gast-Konten pro Termin).
+  const { appPasswordHash: _legacy, ...current } = stored as Partial<AppSettings> & { appPasswordHash?: unknown };
+  void _legacy;
   return {
     ...DEFAULT_SETTINGS,
-    ...stored,
-    features: { ...DEFAULT_SETTINGS.features, ...(stored.features ?? {}) },
+    ...current,
+    features: { ...DEFAULT_SETTINGS.features, ...(current.features ?? {}) },
   };
 }
 
@@ -49,10 +57,10 @@ export async function updateSettings(patch: Partial<AppSettings>): Promise<AppSe
   const raw = rows[0]?.value;
   const stored = (typeof raw === "string" ? JSON.parse(raw) : raw ?? {}) as Partial<AppSettings>;
   const value = withDefaults(stored);
-  cached = { value, at: Date.now() };
+  store.freebieSettings = { value, at: Date.now() };
   return value;
 }
 
 export function invalidateSettingsCache() {
-  cached = null;
+  store.freebieSettings = null;
 }

@@ -1,7 +1,7 @@
 import "server-only";
 import { providerErrorMessage } from "@/lib/errors";
 import { createHash } from "node:crypto";
-import type { UserSession } from "@/lib/auth/session";
+import { usageTag, type UserSession } from "@/lib/auth/session";
 import { getModel, getPreset, providerConfigured } from "@/lib/models";
 import { runAnthropic } from "@/lib/providers/anthropic";
 import { runMock } from "@/lib/providers/mock";
@@ -129,6 +129,8 @@ async function runChat(
       send({ type: "done", native: hit.answer.native, usage: hit.usage, stopReason: hit.answer.stopReason, fromCache: true });
       await logUsage({
         sessionHash: session.sessionHash,
+    ...usageTag(session),
+        ...usageTag(session),
         modelId: model.id,
         feature: "chat",
         costUsd: 0,
@@ -155,7 +157,7 @@ async function runChat(
     emit: send,
     generateImage: async (input) => {
       imagesGenerated++;
-      return generateImage(input, { sessionHash: session.sessionHash, settings });
+      return generateImage(input, { sessionHash: session.sessionHash, tag: usageTag(session), settings });
     },
   };
 
@@ -175,6 +177,7 @@ async function runChat(
 
   await logUsage({
     sessionHash: session.sessionHash,
+    ...usageTag(session),
     modelId: model.id,
     feature: "chat",
     usage: result.usage,

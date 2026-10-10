@@ -1,46 +1,56 @@
 import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import { z } from "zod";
-import { safeEqual, verifyHashedPassword } from "@/lib/auth/password";
+import { safeEqual } from "@/lib/auth/password";
 import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/session";
-import { devPassword, secureCookie, signUser, USER_COOKIE, USER_MAX_AGE_S } from "@/lib/auth/tokens";
+import { adminCredentials, SESSION_COOKIE, SESSION_MAX_AGE_S, sessionCookie, signSession, type SessionClaims } from "@/lib/auth/tokens";
+import { normalizeUsername } from "@/lib/events/credentials";
+import { checkGuestLogin, purgeExpiredGuests } from "@/lib/events/store";
+import { formatStart } from "@/lib/events/window";
 import { getSettings } from "@/lib/settings";
 
-const Body = z.object({ password: z.string().min(1) });
+const Body = z.object({ username: z.string().trim().min(1), password: z.string().min(1) });
 // Längere Eingaben gelten einfach als falsch (und werden gar nicht erst verglichen).
-const MAX_PASSWORD = 4000;
+const MAX_INPUT = 4000;
+const WRONG = "Benutzername oder Passwort stimmt nicht.";
 
+/** Eine Anmeldung für alle: Admin (aus der Umgebung) oder Gast eines laufenden Termins. */
 export async function POST(request: Request) {
   try {
-    const { password } = Body.parse(await request.json());
-    const refundAttempt = await consumeLoginAttempt(request, "user");
-    const settings = await getSettings();
-    let ok = false;
-    if (password.length > MAX_PASSWORD) {
-      ok = false;
-    } else if (settings.appPasswordHash) {
-      ok = await verifyHashedPassword(password, settings.appPasswordHash);
+    const body = Body.parse(await request.json());
+    const username = normalizeUsername(body.username.slice(0, MAX_INPUT));
+    const password = body.password;
+    const admin = adminCredentials();
+    const refundAttempt = await consumeLoginAttempt(request, username, username === admin.username);
+    const settings = await getSettings({ fresh: true });
+
+    // Sitzungen gelten 12 Stunden; das Termin-Ende prüft der Server bei jeder Anfrage. So bleiben
+    // Gäste angemeldet, wenn ein laufender Termin verlängert wird.
+    const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_S * 1000);
+    let claims: SessionClaims;
+    if (username === admin.username) {
+      if (!admin.password) throw new HttpError(500, "ADMIN_PASSWORD ist nicht konfiguriert.");
+      if (password.length > MAX_INPUT || !safeEqual(password, admin.password)) throw new HttpError(401, WRONG);
+      claims = { sid: randomUUID(), v: settings.sessionVersion, role: "admin", name: username };
     } else {
-      const expected = devPassword("APP_PASSWORD");
-      if (!expected) throw new HttpError(500, "APP_PASSWORD ist nicht konfiguriert.");
-      ok = safeEqual(password, expected);
+      await purgeExpiredGuests();
+      const result = await checkGuestLogin(username, password.slice(0, MAX_INPUT + 1));
+      if (!result.ok) {
+        if (result.reason === "zu-frueh") throw new HttpError(403, `Dein Termin beginnt am ${formatStart(result.startsAt)}. Die Anmeldung ist ab 30 Minuten vorher möglich.`);
+        if (result.reason === "vorbei") throw new HttpError(403, "Dein Zugang ist abgelaufen.");
+        throw new HttpError(401, WRONG);
+      }
+      const { guest, event } = result;
+      claims = { sid: randomUUID(), v: settings.sessionVersion, role: "guest", name: guest.username, gid: guest.id, eid: event.id, grp: guest.groupId };
     }
-    if (!ok) {
-      throw new HttpError(401, "Das Passwort stimmt nicht.");
-    }
+
     await refundAttempt();
-    const token = await signUser({ sid: randomUUID(), v: settings.sessionVersion });
     const jar = await cookies();
-    jar.set(USER_COOKIE, token, {
-      httpOnly: true,
-      secure: secureCookie(request),
-      sameSite: "lax",
-      path: "/",
-      maxAge: USER_MAX_AGE_S,
-    });
-    return Response.json({ ok: true });
+    jar.set(SESSION_COOKIE, await signSession(claims, expiresAt), sessionCookie(request, expiresAt));
+    // „key“ benennt die lokale Chat-Datenbank des Kontos (Gäste: eigene, Admin: „freebie“).
+    return Response.json({ ok: true, role: claims.role, key: claims.gid ?? "admin" });
   } catch (err) {
-    if (err instanceof z.ZodError) return Response.json({ error: "Bitte ein Passwort eingeben." }, { status: 400 });
+    if (err instanceof z.ZodError) return Response.json({ error: "Bitte Benutzername und Passwort eingeben." }, { status: 400 });
     return errorResponse(err);
   }
 }

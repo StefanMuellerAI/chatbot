@@ -23,9 +23,11 @@ async function request(url: string, init: RequestInit): Promise<Response> {
   }
 }
 
+/** Ohne gültige Sitzung (oder als Gast im Admin-Bereich) zur Anmeldung. */
 function handleUnauthorized(status: number, admin = false) {
-  if (status === 401 && !admin && typeof window !== "undefined") {
-    window.location.replace(`${window.location.origin}/login`);
+  if (typeof window === "undefined") return;
+  if (status === 401 || (admin && status === 403)) {
+    window.location.replace(`${window.location.origin}/login${admin ? "?weiter=admin" : ""}`);
   }
 }
 
