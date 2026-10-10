@@ -26,6 +26,9 @@ async function chatRequests(marker: string, provider: "anthropic" | "openai"): P
 /** Das Datum steht in der Nutzer-Nachricht (nicht im System-Prompt), damit der Cache-Präfix stabil bleibt. */
 const withDate = (text: string) => expect.stringMatching(new RegExp(`^\\[Kontext: Heute ist \\p{L}+, \\d{1,2}\\. \\p{L}+ \\d{4}\\.\\]\\n\\n${text}$`, "u"));
 
+/** Die Werkzeuge der Verbindung „Posteingang“ stehen immer bereit (fester Präfix fürs Prompt Caching). */
+const MAILBOX_TOOLS = ["mailbox_list", "mailbox_read", "mailbox_send"];
+
 const TRUNCATED = "(Die Antwort wurde wegen der Längenbegrenzung abgeschnitten.)";
 const REFUSED = "Das Modell hat diese Anfrage aus Sicherheitsgründen abgelehnt.";
 
@@ -57,7 +60,7 @@ for (const m of MODELS) {
         expect(body.fallbacks).toBe("default");
         expect(request.headers["anthropic-beta"]).toContain("thinking-binding-controls-2026-08-01");
         expect(request.headers["anthropic-beta"]).toContain("server-side-fallback-2026-07-01");
-        expect(body.tools.map((t: { name: string }) => t.name)).toEqual(["generate_image", "web_fetch", "web_search"]);
+        expect(body.tools.map((t: { name: string }) => t.name)).toEqual(["generate_image", ...MAILBOX_TOOLS, "web_fetch", "web_search"]);
         expect(body.messages).toEqual([{ role: "user", content: [{ type: "text", text: withDate(`Hallo Fake ${id}`) }] }]);
       } else {
         expect(typeof body.instructions).toBe("string");
@@ -66,7 +69,7 @@ for (const m of MODELS) {
         expect(body.reasoning).toEqual({ effort: "medium", summary: "auto" });
         expect(body.include).toEqual(["reasoning.encrypted_content"]);
         expect(body.max_output_tokens).toBe(32000);
-        expect(body.tools.map((t: { type: string; name?: string }) => t.name ?? t.type)).toEqual(["generate_image", "web_search"]);
+        expect(body.tools.map((t: { type: string; name?: string }) => t.name ?? t.type)).toEqual(["generate_image", ...MAILBOX_TOOLS, "web_search"]);
         expect(body.input).toEqual([{ role: "user", content: [{ type: "input_text", text: withDate(`Hallo Fake ${id}`) }] }]);
       }
     });
@@ -171,7 +174,7 @@ test.describe("V · nur Claude", () => {
     await expect(answer.getByRole("navigation", { name: "Quellen" }).getByRole("link")).toHaveCount(3);
     const [request] = await chatRequests(id, "anthropic");
     const types = request.body.tools.map((t: { type?: string; name: string }) => t.type ?? t.name);
-    expect(types).toEqual(["generate_image", "web_fetch_20250910", "web_search_20250305"]);
+    expect(types).toEqual(["generate_image", ...MAILBOX_TOOLS, "web_fetch_20250910", "web_search_20250305"]);
     expect(request.body.fallbacks).toBeUndefined();
   });
 });

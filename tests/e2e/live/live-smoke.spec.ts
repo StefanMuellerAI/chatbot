@@ -1,6 +1,7 @@
 import { request as playwrightRequest, type APIRequestContext, type Locator, type Page } from "@playwright/test";
 import { expect, inMinutes, noticeKey, test, uniq } from "../support/fixtures";
 import { attach, expectReady, payload } from "../support/files";
+import { setConnection } from "../support/mail";
 
 // X: Live-Smoke gegen die echte Installation (Standard: https://freebie.stefanai.de).
 // Ändert keine Einstellungen. Legt einen Termin für eine Stunde mit einem Gast an und löscht ihn am Ende
@@ -154,6 +155,31 @@ test("X06 Websuche mit Quellen und ein kleines Artefakt", async ({ page }) => {
   await page.getByRole("button", { name: "Websuche" }).click();
   await ask(page, `Erstelle als Artefakt ein kleines SVG mit einem blauen Quadrat. Sonst nichts. (Smoke ${uniq()})`);
   await expect(page.getByRole("region", { name: /^Artefakt:/ })).toBeVisible();
+});
+
+test("X09 Posteingang: Claude Haiku liest den Betreff über die Verbindung; Abmelden leert das Postfach", async ({ page }) => {
+  await login(page);
+  const config = (await (await page.request.get("/api/config")).json()) as { features: { mailbox?: boolean } };
+  test.skip(!config.features.mailbox, "Der Posteingang ist in den Einstellungen ausgeschaltet.");
+  const subject = `Live-Smoke Raum ${uniq()}`;
+  const sent = await page.request.post("/api/mail", { data: { to: [guest.username], cc: [], subject, body: "Notiz an mich selbst." } });
+  expect(sent.status(), await sent.text()).toBe(200);
+
+  await newChat(page);
+  await chooseModel(page, "Claude Haiku 5.5");
+  await setConnection(page, true);
+  const answer = await ask(page, `Wie lautet der Betreff der neuesten E-Mail in meinem Posteingang? Antworte nur mit dem Betreff. (Smoke ${uniq()})`);
+  await expect(answer).toContainText(subject);
+  await expect(answer.getByRole("navigation", { name: "Gelesene E-Mails" })).toBeVisible();
+
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("button", { name: "Abmelden" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  const again = await page.request.post("/api/auth/login", { data: guest });
+  expect(again.status(), await again.text()).toBe(200);
+  const inbox = (await (await page.request.get("/api/mail?folder=inbox")).json()) as { mails: { subject: string }[] };
+  expect(inbox.mails.map((m) => m.subject)).not.toContain(subject);
+  expect((await (await page.request.get("/api/mail?folder=sent")).json()).total).toBe(0);
 });
 
 test("X07 Gast-Zugang: Anmeldung über das Formular, nur Chat; Termin gelöscht – sofort abgemeldet", async ({ page }) => {

@@ -249,6 +249,53 @@ test("W04 25 Teilnehmende über eine IP: keine Sperre, keine Fehler, gemeinsamer
   }
 });
 
+// ---------------------------------------------------------------- W05 Posteingang unter Last
+
+test("W05 25 Personen einer Gruppe schreiben sich gleichzeitig Mails, alle fragen ihr Postfach ab", async ({ baseURL, ip, admin }) => {
+  const { id: eventId } = await admin.json<{ id: string }>("POST", "/api/admin/events", {
+    name: `Mail-Schulung ${uniq()}`,
+    startsAt: new Date(Date.now() - 60_000).toISOString(),
+    endsAt: new Date(Date.now() + 3 * 3_600_000).toISOString(),
+  });
+  const { guests } = await admin.json<{ guests: { username: string; password: string }[] }>("POST", "/api/admin/events/groups", { eventId, name: "Gruppe A", count: 25 });
+  const group = await participants(baseURL!, ip, 25);
+  try {
+    const logins = await Promise.all(group.map((api, i) => api.post("/api/auth/login", { data: guests[i] })));
+    expect(logins.map((r) => r.status())).toEqual(Array(25).fill(200));
+
+    const started = Date.now();
+    const tag = uniq();
+    // Jede Person schreibt der nächsten; währenddessen fragen alle ihr Postfach ab (wie der Browser alle 15 s).
+    const [sends, polls] = await Promise.all([
+      Promise.all(
+        group.map((api, i) =>
+          api.post("/api/mail", { data: { to: [guests[(i + 1) % 25].username], cc: [], subject: `Kette ${tag} von ${i}`, body: "Hallo!" } }),
+        ),
+      ),
+      Promise.all(group.flatMap((api) => [api.get("/api/mail/status"), api.get("/api/mail?folder=inbox")])),
+    ]);
+    expect(sends.map((r) => r.status())).toEqual(Array(25).fill(200));
+    expect(polls.map((r) => r.status())).toEqual(Array(50).fill(200));
+    // Und eine Rundmail an alle gleichzeitig mit den nächsten Abfragen.
+    const [round] = await Promise.all([
+      group[0].post("/api/mail", { data: { to: guests.slice(1).map((g) => g.username), cc: [], subject: `Rundmail ${tag}`, body: "An alle" } }),
+      ...group.map((api) => api.get("/api/mail/status")),
+    ]);
+    expect(round.status()).toBe(200);
+
+    const inboxes = await Promise.all(group.map(async (api) => (await (await api.get("/api/mail?folder=inbox")).json()) as { mails: { subject: string }[] }));
+    inboxes.forEach((inbox, i) => {
+      const subjects = inbox.mails.map((m) => m.subject);
+      expect(subjects, `Postfach ${i}`).toContain(`Kette ${tag} von ${(i + 24) % 25}`);
+      if (i > 0) expect(subjects, `Postfach ${i}`).toContain(`Rundmail ${tag}`);
+    });
+    // Alles zusammen deutlich unter dem Abfrage-Takt des Browsers.
+    expect(Date.now() - started).toBeLessThan(20_000);
+  } finally {
+    await Promise.all(group.map((api) => api.dispose()));
+  }
+});
+
 async function browserChat(browser: Browser, baseURL: string, ip: string, guest: { username: string; password: string }): Promise<ChatPage> {
   const context = await browser.newContext({ baseURL, locale: "de-DE", timezoneId: "Europe/Berlin", extraHTTPHeaders: { "x-forwarded-for": ip } });
   trackErrors(context);

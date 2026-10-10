@@ -32,11 +32,12 @@ export async function GET(request: Request) {
       .delete(schema.transcriptCache)
       .where(lt(schema.transcriptCache.createdAt, retention))
       .returning({ sha: schema.transcriptCache.sha256 });
+    // Posteingänge beendeter Termine (die meisten sind schon beim Abmelden weg). Vor den Zugängen,
+    // sonst verschwinden die Mails der Gäste unbemerkt mit ihnen und die Zahl stimmt nicht.
+    const deletedMails = await purgeMail();
     // Zugänge beendeter Termine löschen; Termine selbst bleiben 90 Tage in der Statistik.
     const deletedGuests = await purgeExpiredGuests();
     const deletedEvents = await purgeOldEvents();
-    // Posteingänge beendeter Termine (die meisten sind schon beim Abmelden weg).
-    const deletedMails = await purgeMail();
     return Response.json({
       ok: true,
       deletedFiles,

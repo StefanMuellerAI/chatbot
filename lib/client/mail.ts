@@ -48,7 +48,7 @@ export function deleteMailRequest(id: string) {
 const TZ = "Europe/Berlin";
 const dayKey = (d: Date) => new Intl.DateTimeFormat("de-DE", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
-/** Zeit in der Liste: „14:05“, „Gestern“, „Mo.“ oder „03.10.“. */
+/** Zeit in der Liste: „14:05“, „Gestern“, „Mo“ oder „03.10.“. */
 export function listTime(iso: string, now = new Date()): string {
   const d = new Date(iso);
   if (dayKey(d) === dayKey(now)) return new Intl.DateTimeFormat("de-DE", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(d);

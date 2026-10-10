@@ -111,7 +111,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | A07 | 50 Fehlversuche von einer IP, dann der 51. | Sperre mit Meldung, auch richtige Zugangsdaten werden abgewiesen; andere IP und Kursleitung nicht betroffen; Erfolg zählt einen Versuch zurück |
 | A08 | Abgelaufene, manipulierte, veraltete Tokens und Tokens unbekannter Gäste | abgewiesen, Weiterleitung auf Login |
 | A09 | Bereits angemeldet `/login` öffnen | Weiterleitung in den Chat |
-| A10 | „Abmelden“ (Gast: mit Rückfrage, Chats werden vom Gerät gelöscht) | zurück zum Login, Cookie weg |
+| A10 | „Abmelden“ (Gast: mit Rückfrage, Chats werden vom Gerät gelöscht, der Posteingang wird geleert) | zurück zum Login, Cookie weg |
 | A11 | Kursleitung meldet alle ab, während jemand chattet | nächste Aktion führt sauber zum Login (ohne „abgelaufen“); nach erneuter Anmeldung sind die Chats des Kontos wieder da |
 | A12 | „Alle abmelden“ bei mehreren Admin-Sitzungen | andere Admin-Sitzungen enden, die eigene bleibt |
 
@@ -258,7 +258,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| N01 | Handy | Menü öffnet/schließt, Chatwahl schließt die Leiste, Aktionen ohne Hover erreichbar, Eingabe mit Bildschirmtastatur nutzbar |
+| N01 | Handy | Menü öffnet/schließt, Chatwahl schließt die Leiste, Aktionen ohne Hover erreichbar, Eingabe mit Bildschirmtastatur nutzbar (auch mit dem Knopf „Verbindungen“) |
 | N02 | Dunkelmodus | Screenshot-Satz aller Seiten zur Sichtprüfung |
 | N03 | axe auf jeder Seite und in jedem Dialog, hell und dunkel | keine schweren Befunde |
 | N04 | Nur Tastatur | sinnvolle Reihenfolge, sichtbarer Fokus, Dialoge halten und geben den Fokus zurück |
@@ -302,6 +302,8 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | Q18 | Hinweistext lang/kurz | siehe B |
 | Q19 | Hinweise an das Modell | Abschnitt im System-Prompt, neuer Cache-Schlüssel |
 | Q20 | Speichern | „Gespeichert.“, Fehler sichtbar, zwei Admins gleichzeitig überschreiben sich nicht |
+| Q22 | Schalter „Posteingang“ aus und wieder an | Umschalter, Verbindung, Werkzeuge (Mock-Diagnose „aus“) und API (403) weg, alter Link führt zum Chat; wieder an: alles da, vorhandene Mails bleiben |
+| Q23 | Begrüßungs-E-Mail ändern bzw. leeren | neue Postfächer bekommen den neuen Text (einmal, auch bei erneuter Anmeldung), leer: keine Begrüßung; zu lang: Meldung |
 
 ### R · Admin: Vorlagen
 
@@ -349,7 +351,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| U01 | Ohne, mit gefälschter und mit Gast-Sitzung an Admin-Routen; Cookie-Attribute; ändernde Aufrufe von fremden Seiten | 401 bzw. 403 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit; fremde Origin → 403 |
+| U01 | Ohne, mit gefälschter und mit Gast-Sitzung an Admin-Routen (inkl. der Posteingangs-Routen); Cookie-Attribute; ändernde Aufrufe von fremden Seiten | 401 bzw. 403 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit; fremde Origin → 403 |
 | U02 | Falsche Methode | 405 |
 | U03 | Kaputtes JSON, falsche Felder, Grenzwerte (Nachricht, Anhänge, Bild-Prompt, Passwort) | 400 mit deutscher Meldung bzw. „Passwort stimmt nicht“ – nie 500 |
 | U04 | Pfad-Tricks (`../`, kodiert, fremde Präfixe, Nullbyte), hochgeladenes HTML | 400/404; Auslieferung als Download mit Sandbox-CSP |
@@ -364,8 +366,9 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | V02 | Websuche mit Quellen (inkl. Haiku mit Basis-Werkzeug) | Quellenkarten |
 | V03 | Bild-Werkzeug-Schleife, Fortsetzung nach Pause, Max-Tokens, Ablehnung, Ersatzmodell | richtige Fortsetzung, Hinweise und Kennzeichen „Ersatzmodell“ |
 | V04 | Fehler 401/429/413/400/500 und Abbruch mitten im Stream | deutsche Meldungen, keine hängenden Anfragen |
-| V05 | **Caching-Vertrag über 3 Runden** | System-Prompt, Werkzeuge und frühere Nachrichten byte-gleich; Cache-Marker korrekt; Effort-Wechsel ohne Präfixbruch; gleicher Cache-Schlüssel bei GPT |
+| V05 | **Caching-Vertrag über 3 Runden** | System-Prompt, Werkzeuge und frühere Nachrichten byte-gleich; Cache-Marker korrekt; Effort-Wechsel ohne Präfixbruch; gleicher Cache-Schlüssel bei GPT; Werkzeuge mit und ohne Verbindung „Posteingang“ byte-gleich, Umschalten ändert keinen früheren Teil der Anfrage |
 | V06 | Titel, Transkription, Bilder, Modell-Listen | Anfragen in der erwarteten Form |
+| V07 | Claude und GPT lesen den Posteingang und senden (Werkzeug-Schleife) | Liste → Lesen → Antwort mit Betreff; Senden → Mail beim Empfänger; Statuszeilen; Karten „Gelesene E-Mails“ und „Gesendete E-Mails“; ohne Verbindung Werkzeug-Fehler mit Hinweis |
 
 ### W · Belastbarkeit
 
@@ -375,6 +378,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | W02 | Verbindung bricht mitten in der Antwort ab, Neuladen während einer Antwort | Kennzeichnung „unterbrochen“, kein kaputter Verlauf |
 | W03 | Chat mit 100 Nachrichten, 500 Chats in der Leiste | bleibt flüssig (Zeitbudget je Aktion) |
 | W04 | **Schulungssituation:** 25 Personen gleichzeitig, eine IP | keine Sperre, keine Fehler, Antwort-Cache wird geteilt |
+| W05 | 25 Personen einer Gruppe schreiben sich gleichzeitig Mails, alle Postfächer fragen ab | keine Fehler, keine Sperre, jede Mail kommt an |
 
 ### X · Live-Smoke (`freebie.stefanai.de`)
 
@@ -391,8 +395,35 @@ Termin für eine Stunde mit einem Gast an, chattet als dieser Gast und löscht d
 | X05 | ein Bild in Entwurfsqualität | Bild erscheint |
 | X06 | eine Websuche-Frage und ein kleines Artefakt | Quellen; Artefakt-Panel öffnet sich |
 | X07 | Gast meldet sich über das Formular an; Termin wird gelöscht | nur Chat, kein Admin; nach dem Löschen spätestens nach 15 Sekunden abgemeldet („abgelaufen“) |
+| X09 | Gast schreibt sich selbst eine Mail, verbindet den Posteingang und fragt Claude Haiku („Niedrig“) nach dem Betreff; meldet sich ab | Antwort nennt den Betreff, Karte „Gelesene E-Mails“; nach erneuter Anmeldung ist das Postfach geleert (übersprungen, wenn der Posteingang ausgeschaltet ist) |
 
 Geschätzte Kosten: unter 0,10 $ pro Lauf.
+
+### Z · Posteingang und Verbindung „Posteingang“
+
+Übungs-Postfach je Gast (Plan: `POSTEINGANG-PLAN.md`). Jeder Test legt einen eigenen Termin an; Mails gehen nur an die
+eigene Gruppe und die Kursleitung. Neue Mails kommen per Abfrage alle 15 Sekunden – die Tests spulen die Uhr im
+Browser vor.
+
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| Z01 | Posteingang über den Umschalter öffnen; „Adresse kopieren“ | Ordner, eigene Adresse, Begrüßungs-E-Mail, Zähler; `?ansicht=posteingang` bleibt nach dem Neuladen; eine laufende Chat-Antwort läuft weiter |
+| Z02 | Gast A schreibt Gast B (zwei Browser) | B sieht die Mail ohne Neuladen: Zähler am Umschalter, Hinweis im Chat mit „Öffnen“; A hat sie unter „Gesendet“ |
+| Z03 | Lesen, „Als ungelesen markieren“, Löschen (abbrechen/bestätigen) | Zähler stimmen; Löschen entfernt nur die eigene Kopie; kein falscher Hinweis „Neue E-Mail“ |
+| Z04 | Antworten, Allen antworten, Weiterleiten | „AW:“/„WG:“, Zitat mit Kopfzeile, Empfänger vorbelegt, Fokus im richtigen Feld |
+| Z05 | Schreiben: Adressbuch und Prüfungen | Vorschläge beim Tippen (nur eigene Gruppe und Kursleitung), „Alle in meiner Gruppe“, Cc, an sich selbst; fremde Gruppe, fremde Adresse, fehlender Empfänger: deutsche Meldungen, nichts verschickt; Verwerfen mit Rückfrage; Enter im Betreff springt in den Text; Strg+Enter sendet |
+| Z06 | Suche und Ordner | Treffer in Absender und Text; „Keine Treffer.“; „Gesendet“ zeigt Empfänger und Anzahl |
+| Z07 | Darstellung des Inhalts | HTML, Skripte und Markdown erscheinen als Text (kein Skript läuft); Zitate, Umlaute, Emoji; Zeitangaben |
+| Z08 | Abmelden | Rückfrage nennt Chats und Posteingang; Postfach danach leer; Mails an andere bleiben bei diesen; neue Anmeldung: nur die Begrüßung |
+| Z09 | „Jetzt beenden“, Termin, Gast oder Gruppe löschen, „Alle abmelden“, Aufräumjob | Postfächer des Termins weg, auch die Kopien bei der Kursleitung; an Gelöschte geht nichts mehr; „Alle abmelden“ lässt die Postfächer stehen (keine zweite Begrüßung); der Aufräumjob meldet die gelöschten Mails |
+| Z10 | Verbindung im Chat | Menü „Verbindungen“ (auch per Tastatur), Zustand pro Chat gemerkt, neuer Chat startet ohne; Trennlinie „verbunden/getrennt“; Mock-Diagnose; ohne Verbindung ein Hinweis statt Inhalt, auch wenn das Modell es trotzdem versucht |
+| Z11 | Karten „Gelesene E-Mails“ und „Mit Freebie besprechen“ | Karten öffnen die Mail, gelöschte Mail → Hinweis; Markdown-Export nennt die Mails; der Knopf startet einen neuen Chat mit Verbindung und vorbereiteter Frage (nicht gesendet) |
+| Z12 | Datenschutz der Verbindung | Freebie sieht nur das eigene Postfach (fremde ID → „nicht gefunden“); gleiche Frage zweier Gäste nie aus dem Antwort-Cache; Lesen durch Freebie ändert „ungelesen“ nicht |
+| Z13 | Kursleitung | eigenes Postfach ohne Begrüßung; Antwort an einen Gast; Rundmail an eine Gruppe über das Adressbuch (Termin · Gruppe); Gäste aus zwei Terminen in einer Mail → Meldung; Abmelden fragt nach und leert das Postfach |
+| Z14 | Handy und Tablet (`@mobil`, `@tablet`) | Menü → Posteingang, Liste → Lesen → zurück; Schreiben im Vollbild; „Neue E-Mail“ erreichbar; kein seitliches Scrollen |
+| Z15 | Barrierefreiheit | keine „serious“/„critical“-Befunde von axe im Posteingang, Lesebereich, Schreiben-Dialog (mit Adressbuch) und Menü „Verbindungen“, hell und dunkel; Esc schließt erst die Vorschläge, dann den Dialog |
+| Z16 | API des Posteingangs | 400 mit deutscher Meldung (Felder, Grenzen, Adressen), 404 für fremde und unbekannte IDs (fremde Mail bleibt unverändert), 403 bei fremder Origin, 429 ab der 21. Mail pro Minute, Adressbuch nur mit eigener Gruppe, Suche mit `%`/`_` wörtlich; Not-Aus: Lesen geht, Senden 503 |
+| Z17 | Freebie verschickt Mails | mit Verbindung und Auftrag von der eigenen Adresse: beim Empfänger „über Freebie“, in „Gesendet“, Karte „Gesendete E-Mails“; fremde Gruppe → Werkzeug-Fehler; ohne Verbindung nichts; höchstens 5 pro Antwort; „Neu generieren“ fragt nach |
 
 ## 5. Abdeckungsmatrix
 

@@ -24,7 +24,8 @@ export interface MailboxState {
 export function useMailbox(enabled: boolean, onNewMail: (latest: NonNullable<MailStatus["latest"]>) => void): MailboxState {
   const [status, setStatus] = useState<{ unread: number; total: number }>({ unread: 0, total: 0 });
   const [version, setVersion] = useState(0);
-  const latestId = useRef<string | null | undefined>(undefined);
+  /** Neueste Mail im Posteingang beim letzten Abruf (undefined: noch nie abgefragt). */
+  const latest = useRef<{ id: string; sentAt: string } | null | undefined>(undefined);
   const notify = useRef(onNewMail);
   const pollRef = useRef<() => Promise<void>>(async () => {});
 
@@ -46,12 +47,14 @@ export function useMailbox(enabled: boolean, onNewMail: (latest: NonNullable<Mai
           const s = await fetchMailStatus();
           if (cancelled) return;
           setStatus((prev) => (prev.unread === s.unread && prev.total === s.total ? prev : { unread: s.unread, total: s.total }));
-          const id = s.latest?.id ?? null;
-          if (latestId.current !== undefined && id && id !== latestId.current) {
+          const next = s.latest ? { id: s.latest.id, sentAt: s.latest.sentAt } : null;
+          const prev = latest.current;
+          if (prev !== undefined && next && next.id !== prev?.id) {
             setVersion((v) => v + 1);
-            notify.current(s.latest!);
+            // Nur wirklich neue Mails melden: nach dem Löschen der neuesten rückt eine ältere nach.
+            if (!prev || next.sentAt > prev.sentAt) notify.current(s.latest!);
           }
-          latestId.current = id;
+          latest.current = next;
         }
       } catch {
         // offline oder Posteingang abgeschaltet: beim nächsten Mal wieder

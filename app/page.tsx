@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { ChatApp } from "@/components/chat/ChatApp";
 import { getUserSession, sessionEnd } from "@/lib/auth/session";
 import { groupName } from "@/lib/events/store";
+import { getSettings } from "@/lib/settings";
 import { TEACHER } from "@/lib/shared/mail";
 import type { AccountInfo } from "@/lib/shared/types";
 
@@ -23,5 +24,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
     groupName: session.groupId ? await groupName(session.groupId).catch(() => null) : null,
   };
   const { ansicht } = await searchParams;
-  return <ChatApp account={account} initialView={ansicht === "posteingang" ? "mail" : "chat"} />;
+  // Bei ausgeschaltetem Posteingang führt ein alter Link „?ansicht=posteingang“ einfach zum Chat.
+  const mailbox = ansicht === "posteingang" && (await getSettings().catch(() => null))?.features.mailbox === true;
+  return <ChatApp account={account} initialView={mailbox ? "mail" : "chat"} />;
 }

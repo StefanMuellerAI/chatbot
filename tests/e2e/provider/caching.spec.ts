@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test, uniq } from "../support/fixtures";
 import { fakeRequests, type Recorded } from "../support/fake";
+import { setConnection } from "../support/mail";
 
 // V05: Der Caching-Vertrag. Jede Folgeanfrage muss den bisherigen Verlauf byte-gleich
 // wiederholen – sonst zahlt jede Runde wieder den vollen Preis für den ganzen Chat.
@@ -108,3 +109,33 @@ test("V05 Modellwechsel mitten im Chat: frühere Antworten gehen als Text an das
   const [gpt] = await rounds(marker, "/v1/responses", 1);
   expect(gpt.body.input[1]).toEqual({ role: "assistant", content: "Fake-Antwort von claude-sonnet-5-5." });
 });
+
+for (const m of [
+  { name: "Claude Sonnet 5.5", path: "/v1/messages" },
+  { name: "GPT-6.1 Sol", path: "/v1/responses" },
+] as const) {
+  test(`V05 ${m.name}: Verbindung „Posteingang“ ein- und ausschalten bricht den Präfix nicht`, async ({ chat, page }) => {
+    await chooseModel(page, m.name);
+    const marker = uniq();
+    await chat.ask(`Erste Frage ${marker}`);
+    await setConnection(page, true);
+    await chat.ask(`Zweite Frage ${uniq()}`);
+    await setConnection(page, false);
+    await chat.ask(`Dritte Frage ${uniq()}`);
+    const [r1, r2, r3] = (await rounds(marker, m.path, 3)).map((r) => r.body);
+    const history = (r: Record<string, unknown>) => (m.path === "/v1/messages" ? r.messages : r.input) as unknown[];
+
+    // Die Werkzeuge sind immer da – ob verbunden, prüft der Server beim Aufruf.
+    for (const r of [r2, r3]) {
+      expect(json(r.tools)).toBe(json(r1.tools));
+      expect(json(r.system ?? r.instructions)).toBe(json(r1.system ?? r1.instructions));
+    }
+    expect(json(history(r2).slice(0, history(r1).length))).toBe(json(history(r1)));
+    expect(json(history(r3).slice(0, history(r2).length))).toBe(json(history(r2)));
+    // Der Hinweis steht nur in der Nachricht, mit der umgeschaltet wurde.
+    expect(json(history(r1))).not.toContain("[Verbindung:");
+    expect(json(history(r2).at(-1))).toContain("[Verbindung: Der Posteingang ist ab dieser Nachricht verbunden.]");
+    expect(json(history(r3).at(-1))).toContain("[Verbindung: Der Posteingang ist ab dieser Nachricht nicht mehr verbunden.");
+    expect(json(history(r3).slice(history(r2).length))).not.toContain("ab dieser Nachricht verbunden.]");
+  });
+}

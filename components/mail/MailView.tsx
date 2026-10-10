@@ -162,8 +162,9 @@ export function MailView({
           />
         </label>
       </header>
-      <div role="note" className="mx-2 mb-3 flex items-start gap-2.5 rounded-2xl bg-warning-soft px-3.5 py-2 text-xs leading-relaxed text-warning sm:mx-6 sm:text-[0.82rem]">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
+      {/* Text in Grundfarbe: Gelb auf hellem Gelb erreicht den nötigen Kontrast nicht. */}
+      <div role="note" className="mx-2 mb-3 flex items-start gap-2.5 rounded-2xl bg-warning-soft px-3.5 py-2 text-xs leading-relaxed text-text sm:mx-6 sm:text-[0.82rem]">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
         <span>Übungs-Postfach: Mails bleiben in Freebie und werden beim Abmelden gelöscht. Bitte keine echten oder vertraulichen Daten.</span>
       </div>
 

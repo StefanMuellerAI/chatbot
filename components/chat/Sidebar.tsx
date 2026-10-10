@@ -261,6 +261,7 @@ function MailNav({ mail, account, onClose }: { mail: SidebarMail; account: Accou
     <button
       type="button"
       aria-current={mail.folder === value ? "page" : undefined}
+      aria-label={count ? `${label}, ${count} ungelesen` : label}
       onClick={() => {
         mail.onFolder(value);
         onClose?.();

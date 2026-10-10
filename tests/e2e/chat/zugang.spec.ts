@@ -175,7 +175,7 @@ test.describe("A · Zugang und Sitzung", () => {
 
   test("A10 Abmelden beendet die Sitzung", async ({ chat, page, context }) => {
     page.once("dialog", (d) => {
-      expect(d.message()).toMatch(/^Beim Abmelden werden deine Chats von diesem Gerät gelöscht\./);
+      expect(d.message()).toMatch(/^Beim Abmelden werden deine Chats von diesem Gerät gelöscht und dein Posteingang wird geleert\./);
       void d.accept();
     });
     await page.getByRole("button", { name: "Abmelden" }).click();

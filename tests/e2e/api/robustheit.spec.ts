@@ -22,6 +22,12 @@ const USER_ROUTES: [Method, string][] = [
   ["POST", "/api/upload/token"],
   ["POST", "/api/auth/logout"],
   ["GET", "/api/auth/session"],
+  ["GET", "/api/mail?folder=inbox"],
+  ["POST", "/api/mail"],
+  ["PUT", "/api/mail"],
+  ["DELETE", "/api/mail?id=x"],
+  ["GET", "/api/mail/status"],
+  ["GET", "/api/mail/contacts"],
 ];
 const ADMIN_ROUTES: [Method, string][] = [
   ["GET", "/api/admin/events"],

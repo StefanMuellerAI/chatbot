@@ -149,7 +149,13 @@ function ComposeForm({ draft, me, onClose, onSent }: { draft: ComposeDraft; me: 
 
   return (
     // Esc, X und Klick daneben fragen nach, wenn schon etwas geschrieben ist.
-    <Dialog open onClose={requestClose} title={TITLES[draft.mode]} className="w-[min(720px,calc(100vw-1rem))]">
+    // Auf dem Handy füllt der Dialog den ganzen Bildschirm; der Text wächst mit.
+    <Dialog
+      open
+      onClose={requestClose}
+      title={TITLES[draft.mode]}
+      className="w-[min(720px,calc(100vw-1rem))] max-sm:m-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-screen max-sm:max-w-none max-sm:rounded-none max-sm:border-0 max-sm:*:flex max-sm:*:h-full max-sm:*:flex-col"
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -161,7 +167,7 @@ function ComposeForm({ draft, me, onClose, onSent }: { draft: ComposeDraft; me: 
             void send({ to: toText, cc: ccText });
           }
         }}
-        className="-mx-6 -mb-6 flex flex-col border-t border-border"
+        className="-mx-6 -mb-6 flex flex-col border-t border-border max-sm:flex-1"
       >
         <div className="px-6">
           <div className="flex min-h-11 items-center gap-3 border-b border-border text-sm">

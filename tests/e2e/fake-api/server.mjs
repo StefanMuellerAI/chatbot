@@ -4,6 +4,7 @@
 // Verhalten pro Anfrage über Schlüsselwörter in der letzten Nutzer-Nachricht:
 //   #fake:websuche  #fake:bild  #fake:pause  #fake:maxtokens  #fake:ablehnung
 //   #fake:ersatzmodell  #fake:fehler:NNN  #fake:abbruch  #fake:langsam
+//   #fake:postfach (Liste → Lesen → Antwort)  #fake:senden:<name> (Senden → Antwort)
 // Jede Anfrage wird mitgeschrieben: GET /__requests?contains=<Text> liefert alle Anfragen,
 // deren Inhalt den Text enthält (so bleiben parallel laufende Tests getrennt).
 import { createServer } from "node:http";
@@ -93,7 +94,46 @@ function scenario(text) {
     abort: has("abbruch"),
     slow: has("langsam"),
     status: status ? Number(status) : null,
+    mailbox: has("postfach"),
+    sendTo: /#fake:senden:(\S+)/.exec(text)?.[1] ?? null,
   };
+}
+
+/**
+ * Nächster Schritt im Posteingang-Szenario – wie ein echtes Modell: erst Liste, dann die erste Mail
+ * lesen und den Betreff nennen; beim Senden das Ergebnis des Werkzeugs wiedergeben.
+ * `exchange` ist der letzte Werkzeug-Aufruf samt Ergebnis (oder null am Anfang).
+ */
+function mailboxStep(s, exchange) {
+  if (!exchange) {
+    if (s.sendTo) return { tool: "mailbox_send", input: { to: [s.sendTo], cc: [], subject: "Fake-Antwort", body: "Hallo von der Fake-API.", in_reply_to: "" } };
+    return { tool: "mailbox_list", input: { folder: "inbox", unread_only: false, query: "", limit: 10 } };
+  }
+  if (exchange.isError) return { text: `Werkzeug-Fehler: ${exchange.content}` };
+  if (exchange.name === "mailbox_list") {
+    const id = /<email id="([^"]+)"/.exec(exchange.content)?.[1];
+    return id ? { tool: "mailbox_read", input: { ids: [id] } } : { text: "Der Posteingang ist leer." };
+  }
+  if (exchange.name === "mailbox_read") return { text: `Im Posteingang liegt: „${/Betreff: (.+)/.exec(exchange.content)?.[1] ?? "?"}“.` };
+  return { text: `Gesendet laut Werkzeug: ${exchange.content}` };
+}
+
+/** Anthropic: letzter tool_use und sein tool_result. */
+function anthropicExchange(messages) {
+  const last = messages.at(-1);
+  const result = Array.isArray(last?.content) ? last.content.find((b) => b.type === "tool_result") : null;
+  if (!result) return null;
+  const use = (Array.isArray(messages.at(-2)?.content) ? messages.at(-2).content : []).filter((b) => b.type === "tool_use").at(-1);
+  const content = typeof result.content === "string" ? result.content : (result.content ?? []).map((c) => c.text ?? "").join("");
+  return { name: use?.name, content, isError: Boolean(result.is_error) };
+}
+
+/** OpenAI: letzter function_call und sein Ergebnis. */
+function openaiExchange(input) {
+  const last = input.at(-1);
+  if (last?.type !== "function_call_output") return null;
+  const call = input.find((i) => i.type === "function_call" && i.call_id === last.call_id);
+  return { name: call?.name, content: last.output, isError: String(last.output).startsWith("Fehler:") };
 }
 
 /** Bild-Prompt mit der Frage darin, damit Tests die Anfrage an die Bild-API wiederfinden. */
@@ -154,6 +194,17 @@ async function anthropicMessages(req, res, body) {
   if (s.refusal) {
     blocks.push({ block: { type: "text", text: "" }, deltas: [{ type: "text_delta", text: "Dabei kann ich nicht helfen." }] });
     stop = "refusal";
+  } else if (s.mailbox || s.sendTo) {
+    const step = mailboxStep(s, afterTool ? anthropicExchange(messages) : null);
+    if (step.tool) {
+      blocks.push({
+        block: { type: "tool_use", id: `toolu_fake_${Date.now()}`, name: step.tool, input: {} },
+        deltas: [{ type: "input_json_delta", partial_json: JSON.stringify(step.input) }],
+      });
+      stop = "tool_use";
+    } else {
+      blocks.push({ block: { type: "text", text: "" }, deltas: [{ type: "text_delta", text: step.text }] });
+    }
   } else if (s.image && !afterTool) {
     const input = { prompt: imagePrompt(text), size: "1024x1024", quality: "low", reference_image_ids: [] };
     blocks.push({ block: { type: "text", text: "" }, deltas: [{ type: "text_delta", text: "Ich erzeuge das Bild." }] });
@@ -309,6 +360,13 @@ async function openaiResponses(req, res, body) {
   }
   if (s.refusal) {
     refusal = "Dabei kann ich nicht helfen.";
+  } else if (s.mailbox || s.sendTo) {
+    const step = mailboxStep(s, afterTool ? openaiExchange(input) : null);
+    if (step.tool) {
+      items.push({ id: `fc_fake_${items.length}`, type: "function_call", call_id: `call_fake_${Date.now()}`, name: step.tool, arguments: JSON.stringify(step.input), status: "completed" });
+    } else {
+      items.push(message(step.text));
+    }
   } else if (s.image && !afterTool) {
     items.push({
       id: "fc_fake",
