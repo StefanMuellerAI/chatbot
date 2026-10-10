@@ -565,6 +565,8 @@ test.describe("Y · Fundus", () => {
 
   for (const scheme of ["light", "dark"] as const) {
     test(`Y19 Fundus ist barrierearm (${scheme === "light" ? "hell" : "dunkel"}): Liste, Vorschauen und E-Mails`, async ({ chat, page }, testInfo) => {
+      // Fünf axe-Prüfungen mit Screenshots: in WebKit (CI) knapp über 60 Sekunden, daher das längere Budget.
+      test.slow();
       await page.emulateMedia({ colorScheme: scheme });
       const catalog = await catalogOf(page);
       await openFundus(page);
