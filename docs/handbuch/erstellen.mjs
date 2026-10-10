@@ -1,5 +1,6 @@
-// Erzeugt docs/Freebie-Handbuch.pdf: startet Freebie im Testmodus mit frischer Datenbank, nimmt alle
-// Screenshots auf und rendert das Handbuch mit Chromium. Zwischenstände liegen in .data/handbuch.
+// Erzeugt docs/Freebie-Handbuch.pdf und docs/Freebie-Handbuch-Teilnehmende.pdf: startet Freebie im Testmodus
+// mit frischer Datenbank, nimmt alle Screenshots auf und rendert beide Handbücher mit Chromium.
+// Zwischenstände liegen in .data/handbuch.
 //
 //   npm run build && npm run docs:handbuch
 process.env.TZ = "Europe/Berlin";
@@ -15,7 +16,11 @@ import { takeScreenshots } from "./screenshots.mjs";
 const root = path.resolve(import.meta.dirname, "../..");
 const source = import.meta.dirname;
 const build = path.join(root, ".data/handbuch");
-const output = path.join(root, "docs/Freebie-Handbuch.pdf");
+/** Beide Handbücher nutzen dieselben Screenshots, dieselbe Gestaltung und dasselbe Inhaltsverzeichnis-Skript. */
+const books = [
+  { html: "handbuch.html", output: path.join(root, "docs/Freebie-Handbuch.pdf") },
+  { html: "teilnehmende.html", output: path.join(root, "docs/Freebie-Handbuch-Teilnehmende.pdf") },
+];
 const PORT = 3400;
 const baseURL = `http://localhost:${PORT}`;
 
@@ -63,7 +68,7 @@ function copyFonts() {
 }
 
 function copySources() {
-  for (const file of ["handbuch.html", "style.css", "inhalt.js"]) copyFileSync(path.join(source, file), path.join(build, file));
+  for (const file of [...books.map((b) => b.html), "style.css", "inhalt.js"]) copyFileSync(path.join(source, file), path.join(build, file));
   copyFileSync(path.join(root, "app/icon.png"), path.join(build, "icon.png"));
   copyFileSync(path.join(root, "public/stefanai-logo.png"), path.join(build, "stefanai-logo.png"));
 }
@@ -89,10 +94,10 @@ async function findPages(pdf, toc) {
   return { result, count: pages.length };
 }
 
-async function render(browser, pages) {
+async function render(browser, html, pages) {
   const page = await browser.newPage();
   await page.addInitScript((p) => (window.__PAGES = p), pages);
-  await page.goto(`file://${path.join(build, "handbuch.html")}`, { waitUntil: "load" });
+  await page.goto(`file://${path.join(build, html)}`, { waitUntil: "load" });
   await page.evaluate(async () => {
     await document.fonts.ready;
     await Promise.all([...document.images].map((img) => img.decode().catch(() => {})));
@@ -113,24 +118,26 @@ try {
   await takeScreenshots({ browser, baseURL, admin: ADMIN, outDir: path.join(build, "shots"), filesDir: path.join(build, "dateien") });
   stopServer();
 
-  console.log("Rendere das Handbuch …");
   copyFonts();
   copySources();
-  // Seitenzahlen im Inhaltsverzeichnis: rendern, nachschlagen, erneut rendern – bis sie sich nicht mehr ändern.
-  let pages = {};
-  let pdf;
-  let count = 0;
-  for (let pass = 1; pass <= 4; pass++) {
-    const rendered = await render(browser, pages);
-    const found = await findPages(rendered.pdf, rendered.toc);
-    pdf = rendered.pdf;
-    count = found.count;
-    if (JSON.stringify(found.result) === JSON.stringify(pages)) break;
-    pages = found.result;
-    if (pass === 4) throw new Error("Die Seitenzahlen im Inhaltsverzeichnis stabilisieren sich nicht.");
+  for (const { html, output } of books) {
+    console.log(`Rendere ${html} …`);
+    // Seitenzahlen im Inhaltsverzeichnis: rendern, nachschlagen, erneut rendern – bis sie sich nicht mehr ändern.
+    let pages = {};
+    let pdf;
+    let count = 0;
+    for (let pass = 1; pass <= 4; pass++) {
+      const rendered = await render(browser, html, pages);
+      const found = await findPages(rendered.pdf, rendered.toc);
+      pdf = rendered.pdf;
+      count = found.count;
+      if (JSON.stringify(found.result) === JSON.stringify(pages)) break;
+      pages = found.result;
+      if (pass === 4) throw new Error(`Die Seitenzahlen im Inhaltsverzeichnis von ${html} stabilisieren sich nicht.`);
+    }
+    writeFileSync(output, pdf);
+    console.log(`Fertig: ${path.relative(root, output)} (${count} Seiten, ${(pdf.length / 1024 / 1024).toFixed(1)} MB)`);
   }
-  writeFileSync(output, pdf);
-  console.log(`Fertig: ${path.relative(root, output)} (${count} Seiten, ${(pdf.length / 1024 / 1024).toFixed(1)} MB)`);
 } finally {
   await browser.close();
   stopServer();

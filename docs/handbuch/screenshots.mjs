@@ -530,6 +530,8 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await p.getByRole("list", { name: "Zugangskärtchen" }).waitFor();
     await p.waitForTimeout(500);
     await shot(p, "a09-druck");
+    // Ein einzelnes Kärtchen für das Handbuch der Teilnehmenden.
+    await shot(p.getByRole("list", { name: "Zugangskärtchen" }).getByRole("listitem").first(), "c32-kaertchen");
     await printCtx.close();
   });
 

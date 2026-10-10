@@ -67,6 +67,8 @@ Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
 - `APP_PASSWORD` aus früheren Versionen wird nicht mehr verwendet und kann in Vercel gelöscht werden.
 
 Alle Funktionen von Chat und Admin-Bereich beschreibt das Handbuch [docs/Freebie-Handbuch.pdf](docs/Freebie-Handbuch.pdf).
+Für Teilnehmende gibt es eine eigene Fassung ohne Admin-Bereich:
+[docs/Freebie-Handbuch-Teilnehmende.pdf](docs/Freebie-Handbuch-Teilnehmende.pdf).
 
 > **Hinweis zum Tarif:** Im Hobby-Tarif dürfen Funktionen höchstens 300 Sekunden laufen. Das reicht für normale
 > Antworten, auch auf „Hoch“. Sehr lange Antworten auf „Maximal“ mit vielen Websuchen können an diese Grenze
@@ -92,7 +94,7 @@ Mock-Provider – damit lässt sich die komplette Oberfläche ohne API-Kosten au
 | `npm run build` | Produktions-Build (nötig vor den E2E-Tests) |
 | `npm run test:e2e` | Komplette E2E-Suite mit Playwright gegen den Produktions-Build (startet eigene Server) |
 | `npm run test:coverage` | Abdeckungsmatrix: jede Einstellung, Route und Katalog-ID hat einen Test |
-| `npm run docs:handbuch` | Handbuch für Kolleginnen und Kollegen als PDF neu erzeugen ([docs/Freebie-Handbuch.pdf](docs/Freebie-Handbuch.pdf), siehe [docs/handbuch](docs/handbuch/README.md)) |
+| `npm run docs:handbuch` | Beide Handbücher als PDF neu erzeugen – für Kolleginnen und Kollegen ([docs/Freebie-Handbuch.pdf](docs/Freebie-Handbuch.pdf)) und für Teilnehmende ([docs/Freebie-Handbuch-Teilnehmende.pdf](docs/Freebie-Handbuch-Teilnehmende.pdf)), siehe [docs/handbuch](docs/handbuch/README.md) |
 | `npm run test:e2e:live` | Live-Smoke gegen `freebie.stefanai.de` (`LIVE_ADMIN_PASSWORD`, legt einen Termin mit einem Gast an und löscht ihn wieder; < 0,10 $) |
 
 ### E2E-Tests
