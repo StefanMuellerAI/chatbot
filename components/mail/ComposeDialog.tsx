@@ -154,7 +154,8 @@ function ComposeForm({ draft, me, onClose, onSent }: { draft: ComposeDraft; me: 
       open
       onClose={requestClose}
       title={TITLES[draft.mode]}
-      className="w-[min(720px,calc(100vw-1rem))] max-sm:m-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-screen max-sm:max-w-none max-sm:rounded-none max-sm:border-0 max-sm:*:flex max-sm:*:h-full max-sm:*:flex-col"
+      className="w-[min(720px,calc(100vw-1rem))] max-sm:m-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-screen max-sm:max-w-none max-sm:rounded-none max-sm:border-0"
+      bodyClassName="max-sm:flex max-sm:h-full max-sm:flex-col"
     >
       <form
         onSubmit={(e) => {
