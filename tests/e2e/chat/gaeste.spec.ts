@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import type { Page } from "@playwright/test";
+import type { Dialog, Page } from "@playwright/test";
 import { ChatPage, createGuest, expect, inMinutes, ipFor, openChat, test, uniq } from "../support/fixtures";
 import { ADMIN } from "../support/servers.mjs";
 
@@ -126,8 +126,15 @@ test.describe("T · Gäste im Chat", () => {
     await loginViaForm(page, ADMIN, true);
     const fromAdmin = `Frage der Kursleitung ${uniq()}`;
     await chat.ask(fromAdmin);
+    // Liegt (z. B. von parallelen Tests) etwas im Posteingang der Kursleitung, fragt das Abmelden danach.
+    const mailboxQuestion = (d: Dialog) => {
+      expect(d.message()).toBe("Beim Abmelden wird dein Posteingang geleert. Jetzt abmelden?");
+      void d.accept();
+    };
+    page.once("dialog", mailboxQuestion);
     await page.getByRole("button", { name: "Abmelden" }).click();
     await expect(page).toHaveURL(/\/login$/);
+    page.off("dialog", mailboxQuestion);
     expect(await databases(page)).toContain("freebie");
 
     // A kommt zurück: nichts von B, nichts von der Kursleitung – und die eigenen Chats sind vom Gerät gelöscht.
