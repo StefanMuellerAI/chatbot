@@ -563,7 +563,7 @@ liegt bei dir.
 | 8 · Zugänge | Bereich T (Termine, Gruppen, Gast-Zugänge), A/O/S angepasst | erledigt |
 | 9 · Posteingang | Bereich Z, Q22/Q23, V07, W05, X09; V05, A10, E08, N01 und U01 angepasst (`POSTEINGANG-PLAN.md`) | erledigt |
 
-Ergebnis: 258 E2E-Tests in 25 Dateien (plus 8 Live-Smoke-Tests) und 92 Unit-Tests; die komplette Suite läuft lokal in gut 6 Minuten
+Ergebnis: 286 E2E-Tests in 26 Dateien (plus 9 Live-Smoke-Tests) und 118 Unit-Tests; die komplette Suite läuft lokal in knapp 7 Minuten
 (3 Worker) und dreimal hintereinander ohne Wiederholungen grün. In der CI laufen zusätzlich die
 Chat-Tests in WebKit und Firefox.
 
