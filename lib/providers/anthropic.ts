@@ -8,15 +8,11 @@ import type {
   BetaToolUnion,
   MessageCreateParamsStreaming,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
-import { z } from "zod";
 import type { PreparedMessage } from "@/lib/chat/prepare";
-import type { Citation, Effort, GeneratedImage } from "@/lib/shared/types";
+import type { Citation, Effort } from "@/lib/shared/types";
 import {
   addUsage,
   emptyUsage,
-  IMAGE_TOOL_DESCRIPTION,
-  IMAGE_TOOL_NAME,
-  IMAGE_TOOL_SCHEMA,
   maxTokensFor,
   ProviderError,
   type ProviderRequest,
@@ -28,13 +24,6 @@ const EFFORT_BETA = "mid-conversation-output-config-2026-07-01";
 const BINDING_BETA = "thinking-binding-controls-2026-08-01";
 const WEB_SEARCH_COST_USD = 0.01; // $10 pro 1.000 Suchen
 const MAX_ITERATIONS = 8;
-
-const ImageInput = z.object({
-  prompt: z.string().min(1),
-  size: z.enum(["1024x1024", "1536x1024", "1024x1536"]),
-  quality: z.enum(["low", "medium", "high"]),
-  reference_image_ids: z.array(z.string()),
-});
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -71,14 +60,16 @@ export function buildAnthropicRequest(req: ProviderRequest): {
 
   // Tools: deterministisch nach Namen sortiert, pro Gespräch fest.
   const tools: BetaToolUnion[] = [];
-  if (req.tools.generateImage && caps.tools) {
-    tools.push({
-      name: IMAGE_TOOL_NAME,
-      description: IMAGE_TOOL_DESCRIPTION,
-      input_schema: IMAGE_TOOL_SCHEMA as unknown as Anthropic.Beta.BetaTool.InputSchema,
-      strict: true,
-      eager_input_streaming: true,
-    });
+  if (caps.tools) {
+    for (const tool of req.customTools) {
+      tools.push({
+        name: tool.name,
+        description: tool.description,
+        input_schema: tool.schema as unknown as Anthropic.Beta.BetaTool.InputSchema,
+        strict: true,
+        eager_input_streaming: true,
+      });
+    }
   }
   if (req.tools.webSearch && caps.webSearch) {
     const basic = caps.anthropicWebTools === "basic";
@@ -216,7 +207,6 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
   let thinking = "";
   const citations: Citation[] = [];
   const seenUrls = new Set<string>();
-  const images: GeneratedImage[] = [];
   let stopReason = "end_turn";
   let fallbackModel: string | undefined;
 
@@ -249,8 +239,9 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
           req.emit({ type: "status", status: null });
         } else if (block.type === "web_fetch_tool_result") {
           req.emit({ type: "status", status: null });
-        } else if (block.type === "tool_use" && block.name === IMAGE_TOOL_NAME) {
-          req.emit({ type: "status", status: "Erzeuge Bild …" });
+        } else if (block.type === "tool_use") {
+          const tool = req.customTools.find((t) => t.name === block.name);
+          if (tool) req.emit({ type: "status", status: tool.status });
         } else if (block.type === "fallback") {
           fallbackModel = block.to?.model;
           if (fallbackModel) req.emit({ type: "fallback", model: fallbackModel });
@@ -285,7 +276,6 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
         text: text || "",
         thinking,
         citations,
-        images,
         native: undefined,
         usage,
         stopReason,
@@ -310,10 +300,11 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
     if (toolUses.length === 0) break;
     const results: BetaToolResultBlockParam[] = await Promise.all(
       toolUses.map(async (tu): Promise<BetaToolResultBlockParam> => {
-        if (tu.name !== IMAGE_TOOL_NAME) {
+        const tool = req.customTools.find((t) => t.name === tu.name);
+        if (!tool) {
           return { type: "tool_result", tool_use_id: tu.id, is_error: true, content: "Unbekanntes Werkzeug." };
         }
-        const parsed = ImageInput.safeParse(tu.input);
+        const parsed = tool.input.safeParse(tu.input);
         if (!parsed.success) {
           return {
             type: "tool_result",
@@ -322,18 +313,12 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
             content: "INVALID_JSON: Die Werkzeug-Eingabe war unvollständig. Bitte erneut versuchen.",
           };
         }
-        const result = await req.generateImage(parsed.data);
+        const output = await tool.run(parsed.data);
         req.emit({ type: "status", status: null });
-        if (!result.ok) {
-          return { type: "tool_result", tool_use_id: tu.id, is_error: true, content: result.error };
+        if (output.isError) {
+          return { type: "tool_result", tool_use_id: tu.id, is_error: true, content: output.content };
         }
-        images.push(result.image);
-        req.emit({ type: "image", image: result.image });
-        return {
-          type: "tool_result",
-          tool_use_id: tu.id,
-          content: `Bild erzeugt und angezeigt (Bild-ID: ${result.image.id}).`,
-        };
+        return { type: "tool_result", tool_use_id: tu.id, content: output.content };
       }),
     );
     // Alle Tool-Ergebnisse in EINER Nutzer-Nachricht zurückgeben.
@@ -350,7 +335,6 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
     text,
     thinking,
     citations,
-    images,
     native: { provider: "anthropic", model: req.model.modelId, items: appended },
     usage,
     stopReason,

@@ -1,10 +1,31 @@
+import type { z } from "zod";
 import type { PreparedMessage } from "@/lib/chat/prepare";
 import type { ModelRow } from "@/lib/models";
 import type { Citation, GeneratedImage, NativeTurn, StreamEvent, UsageInfo } from "@/lib/shared/types";
 
+/** Werkzeug-Ergebnis für Freebie: Text und ob es ein Fehler war. */
+export type ToolOutput = { content: string; isError?: boolean };
+
 export interface ToolSet {
   webSearch: boolean;
   generateImage: boolean;
+  /** Werkzeuge des Posteingangs stehen bereit (unabhängig davon, ob er im Chat verbunden ist). */
+  mailbox: boolean;
+}
+
+/**
+ * Eigenes Werkzeug (Function Calling), für beide Anbieter gleich: Bild erzeugen, Posteingang …
+ * Die Adapter prüfen die Eingabe mit `input` und melden Fehler im jeweils üblichen Format.
+ */
+export interface CustomTool {
+  name: string;
+  description: string;
+  /** Striktes JSON-Schema (alle Felder Pflicht, keine weiteren). */
+  schema: Record<string, unknown>;
+  /** Statuszeile, solange das Werkzeug läuft. */
+  status: string;
+  input: z.ZodType;
+  run: (input: unknown) => Promise<ToolOutput>;
 }
 
 export interface ImageToolInput {
@@ -28,7 +49,10 @@ export interface ProviderRequest {
   /** Stabiler Schlüssel pro Gespräch (OpenAI prompt_cache_key). */
   conversationKey: string;
   signal: AbortSignal;
-  generateImage: ToolExecutor;
+  /** Eigene Werkzeuge, nach Namen sortiert (Teil des gecachten Präfixes). */
+  customTools: CustomTool[];
+  /** Ob der Posteingang für die aktuelle Nachricht verbunden ist (nur zur Anzeige im Mock). */
+  mailboxConnected?: boolean;
   emit: (event: StreamEvent) => void;
 }
 
@@ -36,7 +60,6 @@ export interface ProviderResult {
   text: string;
   thinking: string;
   citations: Citation[];
-  images: GeneratedImage[];
   native?: NativeTurn;
   usage: UsageInfo;
   stopReason: string;

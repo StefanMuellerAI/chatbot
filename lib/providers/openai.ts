@@ -8,15 +8,11 @@ import type {
   ResponseInputItem,
   Tool,
 } from "openai/resources/responses/responses";
-import { z } from "zod";
 import type { PreparedMessage } from "@/lib/chat/prepare";
-import type { Citation, Effort, GeneratedImage } from "@/lib/shared/types";
+import type { Citation, Effort } from "@/lib/shared/types";
 import {
   addUsage,
   emptyUsage,
-  IMAGE_TOOL_DESCRIPTION,
-  IMAGE_TOOL_NAME,
-  IMAGE_TOOL_SCHEMA,
   maxTokensFor,
   ProviderError,
   type ProviderRequest,
@@ -28,13 +24,6 @@ const MAX_ITERATIONS = 8;
 
 export const WEB_SEARCH_OFF_NOTE =
   "Für diese Nachricht ist die Websuche ausgeschaltet. Nutze keine Websuche.";
-
-const ImageInput = z.object({
-  prompt: z.string().min(1),
-  size: z.enum(["1024x1024", "1536x1024", "1024x1536"]),
-  quality: z.enum(["low", "medium", "high"]),
-  reference_image_ids: z.array(z.string()),
-});
 
 let client: OpenAI | null = null;
 export function getOpenAI(): OpenAI {
@@ -60,14 +49,10 @@ export function buildOpenAIRequest(req: ProviderRequest): Omit<ResponseCreatePar
     : req.systemPrompt;
 
   const tools: Tool[] = [];
-  if (req.tools.generateImage && caps.tools) {
-    tools.push({
-      type: "function",
-      name: IMAGE_TOOL_NAME,
-      description: IMAGE_TOOL_DESCRIPTION,
-      parameters: IMAGE_TOOL_SCHEMA as unknown as Record<string, unknown>,
-      strict: true,
-    });
+  if (caps.tools) {
+    for (const tool of req.customTools) {
+      tools.push({ type: "function", name: tool.name, description: tool.description, parameters: tool.schema, strict: true });
+    }
   }
   if (req.tools.webSearch && caps.webSearch) {
     tools.push({
@@ -145,7 +130,6 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
   let thinking = "";
   const citations: Citation[] = [];
   const seen = new Set<string>();
-  const images: GeneratedImage[] = [];
   let stopReason = "end_turn";
 
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
@@ -186,8 +170,10 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
           req.emit({ type: "status", status: null });
           break;
         case "response.output_item.added":
-          if (event.item.type === "function_call" && event.item.name === IMAGE_TOOL_NAME) {
-            req.emit({ type: "status", status: "Erzeuge Bild …" });
+          if (event.item.type === "function_call") {
+            const name = event.item.name;
+            const tool = req.customTools.find((t) => t.name === name);
+            if (tool) req.emit({ type: "status", status: tool.status });
           }
           break;
         case "response.output_text.annotation.added": {
@@ -233,7 +219,6 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
         text: text ? `${text}\n\n${refusal}` : refusal,
         thinking,
         citations,
-        images,
         native: undefined,
         usage,
         stopReason: "refusal",
@@ -260,28 +245,22 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
     stopReason = "tool_use";
     for (const call of calls) {
       let output: string;
-      if (call.name !== IMAGE_TOOL_NAME) {
+      const tool = req.customTools.find((t) => t.name === call.name);
+      if (!tool) {
         output = "Fehler: Unbekanntes Werkzeug.";
       } else {
-        let parsed: z.infer<typeof ImageInput> | null = null;
+        let parsed: { success: true; data: unknown } | { success: false } = { success: false };
         try {
-          const r = ImageInput.safeParse(JSON.parse(call.arguments));
-          parsed = r.success ? r.data : null;
+          parsed = tool.input.safeParse(JSON.parse(call.arguments));
         } catch {
-          parsed = null;
+          parsed = { success: false };
         }
-        if (!parsed) {
+        if (!parsed.success) {
           output = "Fehler: Die Werkzeug-Eingabe war ungültig. Bitte erneut versuchen.";
         } else {
-          const result = await req.generateImage(parsed);
+          const result = await tool.run(parsed.data);
           req.emit({ type: "status", status: null });
-          if (result.ok) {
-            images.push(result.image);
-            req.emit({ type: "image", image: result.image });
-            output = `Bild erzeugt und angezeigt (Bild-ID: ${result.image.id}).`;
-          } else {
-            output = `Fehler: ${result.error}`;
-          }
+          output = result.isError ? `Fehler: ${result.content}` : result.content;
         }
       }
       appended.push({ type: "function_call_output", call_id: call.call_id, output });
@@ -298,7 +277,6 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
     text,
     thinking,
     citations,
-    images,
     native: { provider: "openai", model: req.model.modelId, items: appended },
     usage,
     stopReason,

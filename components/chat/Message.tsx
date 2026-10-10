@@ -9,7 +9,9 @@ import {
   Globe,
   ImageIcon,
   LayoutTemplate,
+  Mail,
   Pencil,
+  Send,
   RotateCcw,
   TriangleAlert,
   Workflow,
@@ -17,7 +19,9 @@ import {
 } from "lucide-react";
 import { memo, useId, useMemo, useState } from "react";
 import { artifactKey, parseSegments, type Artifact } from "@/lib/client/artifacts";
-import type { Attachment, ChatMessage, Citation, GeneratedImage } from "@/lib/shared/types";
+import { mailName } from "@/lib/shared/mail";
+import type { Attachment, ChatMessage, Citation, GeneratedImage, MailRef } from "@/lib/shared/types";
+import { MailAvatar } from "@/components/mail/Avatar";
 import { labelFor } from "@/components/artifacts/ArtifactPanel";
 import { LogoMark } from "@/components/ui/Logo";
 import { cn } from "@/components/ui/cn";
@@ -32,6 +36,8 @@ export interface StreamingState {
   status: string | null;
   fromCache: boolean;
   fallbackModel?: string;
+  /** Mails, die Freebie bisher gelesen bzw. verschickt hat. */
+  mails?: { read: MailRef[]; sent: MailRef[] };
 }
 
 export function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: () => void }) {
@@ -110,6 +116,7 @@ export const AssistantMessage = memo(function AssistantMessage({
   artifactsEnabled = true,
   onRegenerate,
   onOpenArtifact,
+  onOpenMail,
 }: {
   message?: ChatMessage;
   streaming?: StreamingState;
@@ -121,8 +128,11 @@ export const AssistantMessage = memo(function AssistantMessage({
   artifactsEnabled?: boolean;
   onRegenerate?: () => void;
   onOpenArtifact: (id: string, messageId: string) => void;
+  /** Karte „Gelesene/Gesendete E-Mails“ öffnet die Mail im Posteingang. */
+  onOpenMail?: (mail: MailRef) => void;
 }) {
   const text = streaming?.text ?? message?.text ?? "";
+  const mails = streaming?.mails ?? message?.mails;
   const thinking = streaming?.thinking ?? message?.thinking ?? "";
   const citations = streaming?.citations ?? message?.citations ?? [];
   const images = streaming?.images ?? message?.images ?? [];
@@ -184,6 +194,8 @@ export const AssistantMessage = memo(function AssistantMessage({
           </div>
         )}
         {citations.length > 0 && <Sources citations={citations} />}
+        {mails && mails.read.length > 0 && <MailCards title="Gelesene E-Mails" kind="read" mails={mails.read} onOpen={onOpenMail} />}
+        {mails && mails.sent.length > 0 && <MailCards title="Gesendete E-Mails" kind="sent" mails={mails.sent} onOpen={onOpenMail} />}
         {message?.error && (
           <div role="alert" className="mt-2 flex items-start gap-2 rounded-2xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
@@ -250,6 +262,43 @@ function ThinkingBlock({ text, active }: { text: string; active: boolean }) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Mails, die Freebie gelesen oder verschickt hat – ein Klick öffnet sie im Posteingang. */
+function MailCards({ title, kind, mails, onOpen }: { title: string; kind: "read" | "sent"; mails: MailRef[]; onOpen?: (mail: MailRef) => void }) {
+  return (
+    <nav aria-label={title} className="mt-4">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted uppercase">
+        {kind === "read" ? <Mail className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />} {title}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {mails.map((m) => {
+          const who = kind === "read" ? m.from : (m.to[0] ?? "");
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => onOpen?.(m)}
+              disabled={!onOpen}
+              title={m.subject}
+              className={cn(
+                "flex max-w-xs items-center gap-2.5 rounded-xl border px-2.5 py-1.5 text-left text-xs hover:border-primary disabled:cursor-default",
+                kind === "sent" ? "border-primary/40 bg-primary-soft" : "border-border bg-surface",
+              )}
+            >
+              <MailAvatar local={who} size={24} />
+              <span className="min-w-0">
+                <span className="block truncate font-medium">{m.subject || "(Kein Betreff)"}</span>
+                <span className="block truncate text-muted">
+                  {kind === "read" ? "von" : "an"} {kind === "read" ? mailName(who) : m.to.map(mailName).join(", ")}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 

@@ -9,7 +9,10 @@ import { runOpenAI } from "@/lib/providers/openai";
 import { ProviderError, type ProviderRequest, type ProviderResult } from "@/lib/providers/types";
 import { getSettings } from "@/lib/settings";
 import type { ChatRequestBody, StreamEvent } from "@/lib/shared/types";
+import { mailboxFor } from "@/lib/mail/store";
+import { mailboxTools } from "@/lib/mail/tools";
 import { generateImage } from "@/lib/tools/images";
+import { imageTool } from "@/lib/tools/image-tool";
 import { costOf, logUsage, modelPrices, promptCacheSavings } from "@/lib/usage";
 import { answerCacheKey, lookupAnswer, storeAnswer } from "./answer-cache";
 import { prepareMessages } from "./prepare";
@@ -97,7 +100,14 @@ async function runChat(
   const tools = {
     webSearch: features.webSearch && model.capabilities.webSearch,
     generateImage: features.imageGeneration && imageAvailable && model.capabilities.tools,
+    mailbox: features.mailbox && model.capabilities.tools,
   };
+  // Verbunden ist der Posteingang, wenn er für die aktuelle Nachricht eingeschaltet war.
+  const mailboxConnected = tools.mailbox && Boolean(last.connections?.includes("mailbox"));
+  // Antworten mit Posteingang hängen vom eigenen Postfach ab (und können Mails verschicken):
+  // nie aus dem gemeinsamen Antwort-Cache und nie hinein.
+  const personal = body.messages.some((m) => m.role === "user" && m.connections?.includes("mailbox"));
+  const useAnswerCache = features.answerCache && !personal;
   const prices = modelPrices(model);
 
   // 1) Antwort-Cache: identischer Verlauf → gespeicherte Antwort ohne API-Aufruf.
@@ -115,7 +125,7 @@ async function runChat(
     tools,
     messages: body.messages,
   });
-  if (features.answerCache && !body.bypassCache) {
+  if (useAnswerCache && !body.bypassCache) {
     const hit = await lookupAnswer(cacheKey);
     if (hit) {
       send({ type: "start", modelId: model.id, fromCache: true });
@@ -143,8 +153,19 @@ async function runChat(
 
   // 2) Nachrichten deterministisch aufbereiten und Provider aufrufen.
   send({ type: "start", modelId: model.id, fromCache: false });
-  const prepared = await prepareMessages(body.messages, model, { nativePdf: settings.nativePdf });
+  const prepared = await prepareMessages(body.messages, model, { nativePdf: settings.nativePdf, mailbox: tools.mailbox });
   let imagesGenerated = 0;
+  const customTools = [
+    ...(tools.generateImage
+      ? [
+          imageTool(async (input) => {
+            imagesGenerated++;
+            return generateImage(input, { sessionHash: session.sessionHash, tag: usageTag(session), settings });
+          }, send),
+        ]
+      : []),
+    ...(tools.mailbox ? mailboxTools({ box: mailboxFor(session), connected: mailboxConnected, emit: send }) : []),
+  ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const request: ProviderRequest = {
     model,
     systemPrompt,
@@ -155,10 +176,8 @@ async function runChat(
     conversationKey: `freebie-${createHash("sha256").update(body.conversationId).digest("hex").slice(0, 16)}`,
     signal,
     emit: send,
-    generateImage: async (input) => {
-      imagesGenerated++;
-      return generateImage(input, { sessionHash: session.sessionHash, tag: usageTag(session), settings });
-    },
+    customTools,
+    mailboxConnected,
   };
 
   let result: ProviderResult;
@@ -186,7 +205,7 @@ async function runChat(
   });
 
   // 3) Antwort für identische Anfragen speichern (ohne Bilder, nur vollständige Antworten).
-  if (features.answerCache && imagesGenerated === 0 && result.stopReason === "end_turn" && result.text.trim()) {
+  if (useAnswerCache && imagesGenerated === 0 && result.stopReason === "end_turn" && result.text.trim()) {
     await storeAnswer(
       cacheKey,
       model.id,

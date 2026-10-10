@@ -2,6 +2,7 @@ import type { PreparedMessage } from "@/lib/chat/prepare";
 import { SEED_MODELS } from "@/lib/db/seed";
 import type { ModelRow } from "@/lib/models";
 import type { ProviderRequest } from "@/lib/providers/types";
+import { imageTool } from "@/lib/tools/image-tool";
 import type { NativeTurn } from "@/lib/shared/types";
 
 export function seedModel(id: string): ModelRow {
@@ -16,11 +17,11 @@ export function request(model: ModelRow, messages: PreparedMessage[], overrides:
     systemPrompt: "SYSTEM",
     presetPrompt: null,
     messages,
-    tools: { webSearch: true, generateImage: true },
+    tools: { webSearch: true, generateImage: true, mailbox: false },
     cacheTtl: "5m",
     conversationKey: "freebie-test",
     signal: new AbortController().signal,
-    generateImage: async () => ({ ok: false, error: "nicht im Test" }),
+    customTools: [imageTool(async () => ({ ok: false, error: "nicht im Test" }), () => {})],
     emit: () => {},
     ...overrides,
   };

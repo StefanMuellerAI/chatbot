@@ -1,5 +1,5 @@
 "use client";
-import { ArrowUp, Brain, Check, Globe, ImagePlus, Loader2, Paperclip, Square, X } from "lucide-react";
+import { ArrowUp, Brain, Check, ChevronDown, Globe, ImagePlus, Loader2, Mail, Paperclip, Plug, Square, X } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { ACCEPT_ATTRIBUTE, MAX_ATTACHMENTS, MAX_MESSAGE_CHARS, maxBytesFor } from "@/lib/files/limits";
 import { prepareImage, processUpload, transcribeUpload, uploadCategory, uploadFile } from "@/lib/client/upload";
@@ -42,10 +42,19 @@ interface Props {
   onSend: (text: string, attachments: Attachment[]) => void;
   onStop: () => void;
   onImageMode: () => void;
+  /** Menü „Verbindungen“ (nur wenn der Posteingang eingeschaltet ist). */
+  connections?: ConnectionsProps;
+}
+
+export interface ConnectionsProps {
+  mailbox: boolean;
+  onMailbox: (on: boolean) => void;
+  /** Gesetzt, wenn das Modell keine Werkzeuge kann – der Schalter ist dann gesperrt. */
+  unavailable?: string;
 }
 
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(props, ref) {
-  const { config, model, text, onTextChange, effort, onEffortChange, webSearch, onWebSearchChange, streaming, disabledReason, onSend, onStop, onImageMode } = props;
+  const { config, model, text, onTextChange, effort, onEffortChange, webSearch, onWebSearchChange, streaming, disabledReason, onSend, onStop, onImageMode, connections } = props;
   const disabled = Boolean(disabledReason);
   const [pending, setPending] = useState<Pending[]>([]);
   const pendingRef = useRef<Pending[]>([]);
@@ -269,6 +278,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             <Globe className="h-4.5 w-4.5" />
           </ToolButton>
         )}
+        {connections && <ConnectionsMenu {...connections} disabled={disabled} />}
         {efforts.length > 0 && <EffortMenu value={effort} options={efforts} onChange={onEffortChange} disabled={disabled} />}
         {features.imageGeneration && (
           <ToolButton onClick={onImageMode} disabled={streaming || disabled} title="Bild-Modus: direkt ein Bild erzeugen" label="Bild" ariaLabel="Bild-Modus">
@@ -345,6 +355,84 @@ function ToolButton({
       {children}
       {label && <span className="max-sm:hidden">{label}</span>}
     </button>
+  );
+}
+
+/** Verbindungen: Daten, auf die Freebie in diesem Chat zugreifen darf (Posteingang, später E-Akte). */
+function ConnectionsMenu({ mailbox, onMailbox, unavailable, disabled }: ConnectionsProps & { disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const active = mailbox && !unavailable;
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    ref.current?.querySelector<HTMLElement>('[role="switch"]')?.focus();
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={active ? "Verbindungen: Posteingang verbunden" : "Verbindungen"}
+        title="Verbindungen: worauf Freebie in diesem Chat zugreifen darf"
+        className={cn(
+          "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors disabled:opacity-40",
+          active ? "bg-primary-soft font-medium text-primary" : "text-muted hover:bg-surface-2 hover:text-text",
+        )}
+      >
+        {active ? <Mail className="h-4.5 w-4.5" /> : <Plug className="h-4.5 w-4.5" />}
+        <span className="max-sm:hidden">{active ? "Posteingang" : "Verbindungen"}</span>
+        <ChevronDown className="h-3.5 w-3.5 max-sm:hidden" />
+      </button>
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Verbindungen"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              setOpen(false);
+              triggerRef.current?.focus();
+            }
+          }}
+          className="absolute bottom-11 left-0 z-30 w-[min(20rem,calc(100vw-2.5rem))] rounded-2xl border border-border bg-surface p-1.5 shadow-xl max-sm:-left-24"
+        >
+          <div className="px-3 pt-1.5 pb-1 text-xs font-semibold tracking-wide text-muted uppercase">Verbindungen</div>
+          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">
+              <Mail className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span id="verbindung-posteingang" className="block text-sm font-semibold">
+                Posteingang
+              </span>
+              <span className="block text-xs leading-snug text-muted">{unavailable ?? "Freebie kann deine E-Mails lesen und in deinem Namen senden."}</span>
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={active}
+              aria-labelledby="verbindung-posteingang"
+              disabled={Boolean(unavailable)}
+              onClick={() => onMailbox(!mailbox)}
+              className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50", active ? "bg-primary" : "bg-surface-3")}
+            >
+              <span className={cn("absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", active && "translate-x-5")} />
+            </button>
+          </div>
+          <p className="px-3 pt-0.5 pb-1.5 text-xs leading-snug text-muted">Gilt nur für diesen Chat. Neue Chats starten ohne Verbindung.</p>
+        </div>
+      )}
+    </div>
   );
 }
 

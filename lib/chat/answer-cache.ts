@@ -36,7 +36,7 @@ export function answerCacheKey(input: {
   modelConfig?: unknown;
   systemVersion: string;
   presetVersion: string | null;
-  tools: { webSearch: boolean; generateImage: boolean };
+  tools: { webSearch: boolean; generateImage: boolean; mailbox?: boolean };
   messages: ChatMessage[];
 }): string {
   const history = input.messages.map((m) =>

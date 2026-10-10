@@ -25,6 +25,7 @@ export const ChatMessageSchema = z.object({
   contextDate: z.string().max(100).optional(),
   effort: Effort.optional(),
   webSearch: z.boolean().optional(),
+  connections: z.array(z.enum(["mailbox"])).max(5).optional(),
   modelId: z.string().max(100).optional(),
   thinking: z.string().optional(),
   citations: z.array(z.object({ url: z.string(), title: z.string() })).optional(),

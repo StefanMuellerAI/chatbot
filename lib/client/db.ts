@@ -1,6 +1,6 @@
 "use client";
 import Dexie, { type EntityTable } from "dexie";
-import type { ChatMessage, Effort } from "@/lib/shared/types";
+import type { ChatMessage, ConnectionId, Effort } from "@/lib/shared/types";
 
 export interface Conversation {
   id: string;
@@ -10,6 +10,8 @@ export interface Conversation {
   effort?: Effort;
   /** Zuletzt gewählter Zustand des Websuche-Schalters in diesem Chat. */
   webSearch?: boolean;
+  /** Eingeschaltete Verbindungen in diesem Chat (z. B. Posteingang). */
+  connections?: ConnectionId[];
   createdAt: number;
   updatedAt: number;
   messages: ChatMessage[];

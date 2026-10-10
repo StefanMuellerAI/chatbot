@@ -1,4 +1,5 @@
 "use client";
+import { mailAddress } from "@/lib/shared/mail";
 import type { Conversation } from "./db";
 
 /** Ein Gespräch als Markdown-Datei (inkl. Quellen und Anhänge). */
@@ -16,6 +17,12 @@ export function conversationToMarkdown(c: Conversation, modelName: (id?: string)
       for (const img of m.images ?? []) lines.push(`![${img.prompt.replace(/[\[\]]/g, "")}](${img.url})`, "");
       if (m.citations?.length) {
         lines.push("**Quellen:**", ...m.citations.map((q, i) => `${i + 1}. [${q.title}](${q.url})`), "");
+      }
+      if (m.mails?.read.length) {
+        lines.push("**Gelesene E-Mails:**", ...m.mails.read.map((r) => `- „${r.subject || "(Kein Betreff)"}“ von ${mailAddress(r.from)}`), "");
+      }
+      if (m.mails?.sent.length) {
+        lines.push("**Gesendete E-Mails (über Freebie):**", ...m.mails.sent.map((r) => `- „${r.subject || "(Kein Betreff)"}“ an ${r.to.map(mailAddress).join(", ")}`), "");
       }
       if (m.error) lines.push(`> ⚠️ ${m.error}`, "");
     }

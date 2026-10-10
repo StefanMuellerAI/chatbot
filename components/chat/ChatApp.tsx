@@ -1,14 +1,14 @@
 "use client";
 import { useLiveQuery } from "dexie-react-hooks";
-import { FileDown, Info, Menu, MessageSquarePlus, PanelRight, Printer, TriangleAlert, Upload } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileDown, Info, Mail, Menu, MessageSquarePlus, PanelRight, Printer, TriangleAlert, Upload } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/client/api";
 import { collectArtifacts, type ArtifactVersion } from "@/lib/client/artifacts";
 import { appendMessages, db, saveConversation, selectAccount, type Conversation } from "@/lib/client/db";
 import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/export";
 import { streamChat } from "@/lib/client/api";
 import { formatContextDate } from "@/lib/shared/date";
-import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, PublicConfig, StreamEvent } from "@/lib/shared/types";
+import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, MailRef, PublicConfig, StreamEvent } from "@/lib/shared/types";
 import { newDraft, type ComposeDraft } from "@/lib/client/mail";
 import type { MailFolder } from "@/lib/shared/mail";
 import { ArtifactPanel } from "@/components/artifacts/ArtifactPanel";
@@ -47,6 +47,7 @@ function payloadMessages(messages: ChatMessage[]): ChatMessage[] {
             contextDate: m.contextDate,
             effort: m.effort,
             webSearch: m.webSearch,
+            connections: m.connections,
           }
         : {
             id: m.id,
@@ -85,6 +86,8 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const [presetId, setPresetId] = useState<string | null>(null);
   const [effort, setEffort] = useState<Effort>("medium");
   const [webSearch, setWebSearch] = useState(true);
+  // Verbindung „Posteingang“ – pro Chat gemerkt, neue Chats starten ohne.
+  const [mailConnected, setMailConnected] = useState(false);
   const [text, setText] = useState("");
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [streaming, setStreaming] = useState<{ conversationId: string; state: StreamingState } | null>(null);
@@ -184,6 +187,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       }
       setPresetId(conv.presetId);
       setWebSearch(conv.webSearch ?? true);
+      setMailConnected(Boolean(conv.connections?.includes("mailbox")));
       composerRef.current?.setAttachments([]);
     },
     [config, conversations, streaming],
@@ -199,6 +203,11 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const changeWebSearch = (value: boolean) => {
     setWebSearch(value);
     if (active) void db.conversations.update(active.id, { webSearch: value });
+  };
+
+  const changeMailConnected = (value: boolean) => {
+    setMailConnected(value);
+    if (active) void db.conversations.update(active.id, { connections: value ? ["mailbox"] : [] });
   };
 
   const changeModel = async (id: string) => {
@@ -224,6 +233,18 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   }, [streaming, active?.messages.length]);
 
   const messages = useMemo(() => active?.messages ?? [], [active]);
+  // Wo die Verbindung „Posteingang“ umgeschaltet wurde (Nachrichten-ID → verbunden?) – wie der Hinweis an das Modell.
+  const connectionChanges = useMemo(() => {
+    const out = new Map<string, boolean>();
+    let on = false;
+    for (const m of messages) {
+      if (m.role !== "user") continue;
+      const now = Boolean(m.connections?.includes("mailbox"));
+      if (now !== on) out.set(m.id, now);
+      on = now;
+    }
+    return out;
+  }, [messages]);
   // Endet ein Chat mit einer Frage aus einer früheren Sitzung (Seite während der Antwort neu
   // geladen), fehlt die Antwort: Hinweis mit „Neu generieren“ statt eines stummen Endes.
   const missingAnswer = useMemo<ChatMessage | null>(() => {
@@ -296,7 +317,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const runAssistant = async (conv: Conversation, bypassCache: boolean) => {
     const controller = new AbortController();
     abortRef.current = controller;
-    const state: StreamingState = { text: "", thinking: "", citations: [], images: [], status: null, fromCache: false };
+    const state: StreamingState = { text: "", thinking: "", citations: [], images: [], status: null, fromCache: false, mails: { read: [], sent: [] } };
     setStreaming({ conversationId: conv.id, state: { ...state } });
     stickToBottom.current = true;
     let done: Extract<StreamEvent, { type: "done" }> | null = null;
@@ -308,7 +329,10 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       scheduled = false;
       // Ein verspäteter Frame (z. B. aus einem Hintergrund-Tab) darf den beendeten Stream nicht wiederbeleben.
       if (finished) return;
-      setStreaming({ conversationId: conv.id, state: { ...state, citations: [...state.citations], images: [...state.images] } });
+      setStreaming({
+        conversationId: conv.id,
+        state: { ...state, citations: [...state.citations], images: [...state.images], mails: { read: [...state.mails!.read], sent: [...state.mails!.sent] } },
+      });
     };
     try {
       await streamChat(
@@ -342,6 +366,11 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
             case "fallback":
               state.fallbackModel = ev.model;
               break;
+            case "mail": {
+              const list = state.mails![ev.kind];
+              if (!list.some((m) => m.id === ev.mail.id)) list.push(ev.mail);
+              break;
+            }
             case "done":
               done = ev;
               break;
@@ -381,6 +410,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       stopReason: stopped ? "stopped" : (result?.stopReason ?? "incomplete"),
       error: error ?? (stopped && !state.text ? "Abgebrochen." : undefined),
       fallbackModel: state.fallbackModel,
+      mails: state.mails!.read.length || state.mails!.sent.length ? state.mails : undefined,
     };
     await appendMessages(conv.id, [assistant]);
     setStreaming(null);
@@ -414,6 +444,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       contextDate: formatContextDate(new Date()),
       effort: model.efforts.length ? effort : undefined,
       webSearch: config.features.webSearch && model.capabilities.webSearch ? webSearch : undefined,
+      connections: mailEnabled && model.capabilities.tools && mailConnected ? ["mailbox"] : undefined,
     };
     const conv: Conversation = {
       ...(active ?? {
@@ -427,11 +458,12 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       modelId: model.id,
       effort,
       webSearch,
+      connections: mailConnected ? ["mailbox"] : [],
       messages: [...baseMessages, userMsg],
     } as Conversation;
     if (active && editIndex === null) {
       // Normaler Fall: nur anhängen (ein parallel gesetzter Titel bleibt erhalten).
-      await appendMessages(active.id, [userMsg], { modelId: model.id, effort, webSearch });
+      await appendMessages(active.id, [userMsg], { modelId: model.id, effort, webSearch, connections: mailConnected ? ["mailbox"] : [] });
     } else {
       await saveConversation(conv);
     }
@@ -445,6 +477,15 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const regenerate = async () => {
     if (!active || streaming) return;
     const msgs = [...active.messages];
+    const lastAnswer = msgs[msgs.length - 1];
+    // Eine Antwort, die Mails verschickt hat, würde sie beim Neu-Generieren womöglich noch einmal senden.
+    if (
+      lastAnswer?.role === "assistant" &&
+      lastAnswer.mails?.sent.length &&
+      !confirm("Diese Antwort hat E-Mails verschickt. Freebie könnte sie beim Neu-Generieren noch einmal senden. Trotzdem neu generieren?")
+    ) {
+      return;
+    }
     const previous = msgs[msgs.length - 1]?.role === "assistant" ? msgs.pop() : undefined;
     // Mit dem Modell der ursprünglichen Antwort, solange es noch verfügbar ist.
     const original = previous?.modelId && config?.models.some((m) => m.id === previous.modelId) ? previous.modelId : undefined;
@@ -468,6 +509,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     setArtifactSel(null);
     setPresetId(null);
     setWebSearch(true);
+    setMailConnected(false);
     setText("");
     composerRef.current?.setAttachments([]);
     setSidebarOpen(false);
@@ -480,6 +522,20 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     if (streaming) return;
     resetToNewChat();
   };
+
+  /** „Mit Freebie besprechen“: neuer Chat mit verbundenem Posteingang und vorbereiteter Frage. */
+  const discussMail = (mail: { subject: string; from: string }) => {
+    setView("chat");
+    if (streaming) {
+      showToast("Bitte warte, bis Freebie mit der aktuellen Antwort fertig ist.");
+      return;
+    }
+    resetToNewChat();
+    setMailConnected(true);
+    const from = mail.from === "kursleitung" ? "der Kursleitung" : mail.from;
+    setText(`Fasse die E-Mail „${mail.subject || "(Kein Betreff)"}“ von ${from} zusammen und schlag mir eine Antwort vor.`);
+  };
+  const openMailRef = (ref: MailRef) => openMail(ref.id, ref.folder);
 
   const addImageModeResult = async (prompt: string, image: GeneratedImage) => {
     const now = Date.now();
@@ -573,8 +629,10 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
             version={mailbox.version}
             onChanged={mailbox.refresh}
             onCompose={setCompose}
+            onDiscuss={discussMail}
             onOpenMenu={() => setSidebarOpen(true)}
             onToast={showToast}
+            onUnread={mailbox.reportUnread}
           />
         </main>
       )}
@@ -707,7 +765,15 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
               {messages.map((m, i) =>
                 m.role === "user" ? (
-                  <UserMessage key={m.id} message={m} onEdit={!streaming ? () => startEdit(i) : undefined} />
+                  <Fragment key={m.id}>
+                    {mailEnabled && connectionChanges.has(m.id) && (
+                      <div role="note" className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-xs text-muted">
+                        <Mail className="h-3.5 w-3.5" />
+                        {connectionChanges.get(m.id) ? "Posteingang verbunden" : "Posteingang getrennt"}
+                      </div>
+                    )}
+                    <UserMessage message={m} onEdit={!streaming ? () => startEdit(i) : undefined} />
+                  </Fragment>
                 ) : (
                   <AssistantMessage
                     key={m.id}
@@ -719,6 +785,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
                     onRegenerate={m.stopReason === "image-mode" ? undefined : regenerate}
                     artifactsEnabled={artifactsEnabled}
                     onOpenArtifact={openArtifact}
+                    onOpenMail={mailEnabled ? openMailRef : undefined}
                   />
                 ),
               )}
@@ -742,6 +809,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
                   showCost={false}
                   artifactsEnabled={artifactsEnabled}
                   onOpenArtifact={openArtifact}
+                  onOpenMail={mailEnabled ? openMailRef : undefined}
                 />
               )}
             </div>
@@ -781,6 +849,15 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
               onSend={send}
               onStop={() => abortRef.current?.abort()}
               onImageMode={() => !streaming && setImageMode(true)}
+              connections={
+                mailEnabled
+                  ? {
+                      mailbox: mailConnected,
+                      onMailbox: changeMailConnected,
+                      unavailable: model && !model.capabilities.tools ? "Dieses Modell kann keine Verbindungen nutzen. Bitte ein anderes Modell wählen." : undefined,
+                    }
+                  : undefined
+              }
             />
           )}
           {config && (

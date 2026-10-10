@@ -13,6 +13,8 @@ export interface MailboxState {
   version: number;
   /** Sofort neu abfragen (nach Senden, Lesen, Löschen). */
   refresh: () => void;
+  /** Frisch geladene Zahl ungelesener Mails übernehmen (die Liste ist manchmal schneller als die Abfrage). */
+  reportUnread: (unread: number) => void;
 }
 
 /**
@@ -76,5 +78,9 @@ export function useMailbox(enabled: boolean, onNewMail: (latest: NonNullable<Mai
     void pollRef.current();
   }, []);
 
-  return { unread: enabled ? status.unread : 0, total: enabled ? status.total : 0, version, refresh };
+  const reportUnread = useCallback((unread: number) => {
+    setStatus((prev) => (prev.unread === unread ? prev : { ...prev, unread }));
+  }, []);
+
+  return { unread: enabled ? status.unread : 0, total: enabled ? status.total : 0, version, refresh, reportUnread };
 }

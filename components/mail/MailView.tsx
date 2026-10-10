@@ -31,6 +31,7 @@ export function MailView({
   onDiscuss,
   onOpenMenu,
   onToast,
+  onUnread,
 }: {
   /** Lokaler Teil der eigenen Adresse. */
   me: string;
@@ -46,6 +47,8 @@ export function MailView({
   onDiscuss?: (mail: MailFull) => void;
   onOpenMenu: () => void;
   onToast: (text: string) => void;
+  /** Zahl ungelesener Mails aus der frisch geladenen Liste. */
+  onUnread: (unread: number) => void;
 }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
@@ -68,11 +71,14 @@ export function MailView({
       .then((data) => {
         setList(data);
         setListError(null);
+        onUnread(data.unread);
       })
       .catch((err) => {
         if (!controller.signal.aborted) setListError(err instanceof Error ? err.message : "Der Posteingang konnte nicht geladen werden.");
       });
     return () => controller.abort();
+    // onUnread ist stabil (useCallback).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folder, debounced, version]);
 
   // Gewählte Mail laden; Öffnen markiert sie als gelesen.

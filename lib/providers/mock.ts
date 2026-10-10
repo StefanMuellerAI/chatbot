@@ -20,6 +20,10 @@ import { emptyUsage } from "./types";
  *   #lang               sehr lange Antwort
  *   #svg #markdown-artefakt #code-artefakt #mermaid-fehler #version:N #artefakt-angriff
  *   #zeige-dateien      gibt die an das Modell übergebenen Dateiinhalte aus
+ *   #postfach           liest den Posteingang (auch bei Fragen nach „E-Mails“ oder „Posteingang“)
+ *   #postfach-erzwingen ruft die Postfach-Werkzeuge auch ohne Verbindung auf (Server muss ablehnen)
+ *   #mail-lesen:ID      liest eine bestimmte Mail
+ *   #senden:a,b         verschickt eine Mail an a und b (mit #anzahl:N mehrfach)
  */
 export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
   const users = req.messages.filter((m) => m.role === "user");
@@ -38,7 +42,9 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
   let stopReason = "end_turn";
   let fallbackModel: string | undefined;
   const citations: ProviderResult["citations"] = [];
-  const images: ProviderResult["images"] = [];
+  let imageMade = false;
+  let mailHandled = false;
+  const tool = (name: string) => req.customTools.find((t) => t.name === name);
 
   const say = async (chunk: string) => {
     for (const piece of chunk.match(/[\s\S]{1,24}/g) ?? []) {
@@ -83,11 +89,12 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
     req.emit({ type: "status", status: null });
   }
 
-  if (req.tools.generateImage && (/\bbild\b|foto|illustration/.test(lower) || flag("#bildfehler"))) {
-    req.emit({ type: "status", status: "Erzeuge Bild …" });
+  const imageTool = tool("generate_image");
+  if (imageTool && (/\bbild\b|foto|illustration/.test(lower) || flag("#bildfehler"))) {
+    req.emit({ type: "status", status: imageTool.status });
     const result = flag("#bildfehler")
-      ? ({ ok: false, error: "Die Bild-API hat kein Bild geliefert." } as const)
-      : await req.generateImage({
+      ? { content: "Die Bild-API hat kein Bild geliefert.", isError: true }
+      : await imageTool.run({
           prompt: lastText.slice(0, 200) || "A friendly robot",
           size: "1024x1024",
           quality: "low",
@@ -96,12 +103,52 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
           ),
         });
     req.emit({ type: "status", status: null });
-    if (result.ok) {
-      images.push(result.image);
-      req.emit({ type: "image", image: result.image });
+    if (!result.isError) {
+      imageMade = true;
       await say("Hier ist dein Bild (Testmodus). ");
     } else {
-      await say(`Das Bild konnte nicht erzeugt werden: ${result.error} `);
+      await say(`Das Bild konnte nicht erzeugt werden: ${result.content} `);
+    }
+  }
+
+  // Posteingang: über dieselben Werkzeuge wie die echten Modelle (Rechte und Verbindung prüft der Server).
+  if (req.tools.mailbox && !imageMade) {
+    const force = flag("#postfach-erzwingen");
+    const sendTo = /#senden:(\S+)/.exec(lastText)?.[1];
+    const readId = /#mail-lesen:(\S+)/.exec(lastText)?.[1];
+    const asks = force || flag("#postfach") || /posteingang|postfach|meine[nrs]? (neuen |ungelesenen )?e-?mails?\b/.test(lower);
+    const run = async (name: string, input: unknown) => {
+      const t = tool(name)!;
+      req.emit({ type: "status", status: t.status });
+      const out = await t.run(input);
+      req.emit({ type: "status", status: null });
+      return out;
+    };
+    if ((sendTo || readId || asks) && !req.mailboxConnected && !force) {
+      mailHandled = true;
+      await say("Der Posteingang ist in diesem Chat nicht verbunden. Du kannst ihn unten im Eingabefeld unter „Verbindungen“ einschalten.");
+    } else if (sendTo) {
+      mailHandled = true;
+      const count = Math.min(Number(/#anzahl:(\d+)/.exec(lower)?.[1] ?? 1), 10);
+      const body = lastText.replace(/#\S+/g, "").trim() || "Hallo aus dem Testmodus!";
+      for (let i = 0; i < count; i++) {
+        const out = await run("mailbox_send", { to: sendTo.split(","), cc: [], subject: count > 1 ? `Testmodus ${i + 1}` : "Nachricht von Freebie (Testmodus)", body, in_reply_to: "" });
+        await say(`${out.isError ? "Werkzeug-Fehler" : "Gesendet"}: ${out.content}\n\n`);
+      }
+    } else if (readId) {
+      mailHandled = true;
+      const out = await run("mailbox_read", { ids: [readId] });
+      await say(out.isError ? `Werkzeug-Fehler: ${out.content}` : mailTable(out.content));
+    } else if (asks) {
+      mailHandled = true;
+      const listed = await run("mailbox_list", { folder: "inbox", unread_only: false, query: "", limit: 10 });
+      if (listed.isError) {
+        await say(`Werkzeug-Fehler: ${listed.content}`);
+      } else {
+        const ids = [...listed.content.matchAll(/<email id="([^"]+)"/g)].map((m) => m[1]).slice(0, 3);
+        if (ids.length === 0) await say("Dein Posteingang ist leer (Testmodus).");
+        else await say(mailTable((await run("mailbox_read", { ids })).content));
+      }
     }
   }
 
@@ -133,7 +180,7 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
     await say(
       `Hier ist der Ablauf als Diagramm:\n\n<artifact id="ablauf" type="mermaid" title="Ablauf">\nflowchart LR\n  A["Frage stellen"] --> B["Freebie denkt nach"]\n  B --> C["Antwort lesen"]\n</artifact>\n`,
     );
-  } else if (images.length === 0) {
+  } else if (!imageMade && !mailHandled) {
     await say(diagnosis(req, parts, lastText));
     // Tilden-Zaun: Dateiinhalte enthalten selbst ```-Blöcke (z. B. Tabellen als CSV).
     if (flag("#zeige-dateien")) await say(`\n\n~~~~text\n${fileContents(parts)}\n~~~~`);
@@ -155,7 +202,6 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
     text,
     thinking,
     citations,
-    images,
     native: { provider: "mock", model: req.model.modelId, items: [{ text }] },
     usage,
     stopReason,
@@ -188,12 +234,27 @@ function diagnosis(req: ProviderRequest, parts: PreparedPart[], lastText: string
     ["Effort", last?.role === "user" ? last.effort : "-"],
     ["Websuche", req.tools.webSearch && last?.role === "user" && last.webSearch ? "an" : "aus"],
     ["Bild-Werkzeug", req.tools.generateImage ? "an" : "aus"],
+    ["Posteingang", req.tools.mailbox ? (req.mailboxConnected ? "verbunden" : "nicht verbunden") : "aus"],
     ["Artefakte", req.systemPrompt.includes("# Artefakte") ? "an" : "aus"],
     ["Vorlage", req.presetPrompt ? req.presetPrompt.slice(0, 50).replace(/\s+/g, " ") : "keine"],
     ["Kursleitung", req.systemPrompt.includes("# Hinweise der Kursleitung") ? "ja" : "nein"],
   ];
   const table = rows.map(([k, v]) => `| ${k} | ${String(v).replace(/\|/g, "/")} |`).join("\n");
   return `**Testmodus:** Ich bin der Mock-Provider von Freebie.\n\nDu hast geschrieben:\n\n> ${quote}\n\n| Eigenschaft | Wert |\n|---|---|\n${table}\n\nFormel-Test: $E = mc^2$`;
+}
+
+/** Gelesene Mails als Tabelle (Von, Betreff, erste Textzeile) – so prüfen die Tests, was Freebie sah. */
+function mailTable(content: string): string {
+  const mails = [...content.matchAll(/<email [^>]*>([\s\S]*?)<\/email>/g)].map((m) => {
+    const block = m[1];
+    const from = /Von: (.+)/.exec(block)?.[1] ?? "?";
+    const subject = /Betreff: (.+)/.exec(block)?.[1] ?? "?";
+    const text = block.split("\n\n").slice(1).join(" ").replace(/\s+/g, " ").trim().slice(0, 80);
+    return `| ${from} | ${subject.replace(/\|/g, "/")} | ${text.replace(/\|/g, "/")} |`;
+  });
+  const missing = /Nicht gefunden: (.+)/.exec(content)?.[1];
+  const table = mails.length ? `**Testmodus – gelesene E-Mails:**\n\n| Von | Betreff | Text |\n|---|---|---|\n${mails.join("\n")}` : "Keine E-Mail gelesen.";
+  return missing ? `${table}\n\nNicht gefunden: ${missing}` : table;
 }
 
 function fileContents(parts: PreparedPart[]): string {

@@ -28,6 +28,9 @@ export type PreparedMessage = PreparedUser | PreparedAssistant;
 
 const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
+export const MAILBOX_ON_NOTE = "[Verbindung: Der Posteingang ist ab dieser Nachricht verbunden.]";
+export const MAILBOX_OFF_NOTE = "[Verbindung: Der Posteingang ist ab dieser Nachricht nicht mehr verbunden. Nutze die Postfach-Werkzeuge nicht.]";
+
 /**
  * Baut aus dem neutralen Verlauf deterministische Nachrichteninhalte.
  * Gleicher Verlauf ergibt byte-gleiche Inhalte – Voraussetzung für Prompt Caching.
@@ -35,7 +38,7 @@ const IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif
 export async function prepareMessages(
   messages: ChatMessage[],
   model: ModelRow,
-  opts: { nativePdf: boolean },
+  opts: { nativePdf: boolean; mailbox?: boolean },
 ): Promise<PreparedMessage[]> {
   const shas = new Set<string>();
   for (const m of messages) {
@@ -44,6 +47,9 @@ export async function prepareMessages(
   const texts = await loadExtractedTexts([...shas]);
 
   const prepared: PreparedMessage[] = [];
+  // Hinweis nur dort, wo die Verbindung umgeschaltet wurde – er hängt allein am Verlauf, frühere
+  // Nachrichten bleiben byte-gleich (wie beim Effort-Wechsel). Am Anfang ist nichts verbunden.
+  let mailboxOn = false;
   for (const m of messages) {
     if (m.role === "assistant") {
       // Bild-IDs mitgeben, damit das Modell Bilder später weiterbearbeiten kann.
@@ -54,6 +60,11 @@ export async function prepareMessages(
     }
     const parts: PreparedPart[] = [];
     if (m.contextDate) parts.push({ type: "text", text: `[Kontext: Heute ist ${m.contextDate}.]` });
+    if (opts.mailbox) {
+      const on = Boolean(m.connections?.includes("mailbox"));
+      if (on !== mailboxOn) parts.push({ type: "text", text: on ? MAILBOX_ON_NOTE : MAILBOX_OFF_NOTE });
+      mailboxOn = on;
+    }
     for (const a of m.attachments ?? []) {
       parts.push(...(await attachmentParts(a, model, texts, opts)));
     }

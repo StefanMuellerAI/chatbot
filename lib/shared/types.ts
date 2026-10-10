@@ -138,6 +138,18 @@ export interface NativeTurn {
   items: unknown[];
 }
 
+/** Verbindungen, die Freebie in einem Chat nutzen darf (später auch die E-Akte). */
+export type ConnectionId = "mailbox";
+
+/** Eine Mail, die Freebie gelesen oder verschickt hat (für die Karten unter der Antwort). */
+export interface MailRef {
+  id: string;
+  folder: "inbox" | "sent";
+  from: string;
+  to: string[];
+  subject: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -149,6 +161,8 @@ export interface ChatMessage {
   contextDate?: string;
   effort?: Effort;
   webSearch?: boolean;
+  /** Verbindungen, die für diese Nachricht eingeschaltet waren. */
+  connections?: ConnectionId[];
   // Assistenten-Nachricht
   modelId?: string;
   thinking?: string;
@@ -160,6 +174,8 @@ export interface ChatMessage {
   stopReason?: string;
   error?: string;
   fallbackModel?: string;
+  /** Mails, die Freebie in dieser Antwort gelesen bzw. verschickt hat. */
+  mails?: { read: MailRef[]; sent: MailRef[] };
 }
 
 export interface ChatRequestBody {
@@ -180,6 +196,7 @@ export type StreamEvent =
   | { type: "citation"; citation: Citation }
   | { type: "image"; image: GeneratedImage }
   | { type: "fallback"; model: string }
+  | { type: "mail"; kind: "read" | "sent"; mail: MailRef }
   | {
       type: "done";
       native?: NativeTurn;
