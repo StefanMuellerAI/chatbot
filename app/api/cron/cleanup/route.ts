@@ -4,6 +4,7 @@ import { deleteExpiredAnswers } from "@/lib/chat/answer-cache";
 import { errorResponse } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
 import { purgeExpiredGuests, purgeOldEvents } from "@/lib/events/store";
+import { purgeMail } from "@/lib/mail/store";
 import { getSettings } from "@/lib/settings";
 import { deleteExpiredFiles } from "@/lib/storage";
 
@@ -34,6 +35,8 @@ export async function GET(request: Request) {
     // Zugänge beendeter Termine löschen; Termine selbst bleiben 90 Tage in der Statistik.
     const deletedGuests = await purgeExpiredGuests();
     const deletedEvents = await purgeOldEvents();
+    // Posteingänge beendeter Termine (die meisten sind schon beim Abmelden weg).
+    const deletedMails = await purgeMail();
     return Response.json({
       ok: true,
       deletedFiles,
@@ -41,6 +44,7 @@ export async function GET(request: Request) {
       deletedTranscripts: transcripts.length,
       deletedGuests,
       deletedEvents,
+      deletedMails,
     });
   } catch (err) {
     return errorResponse(err);

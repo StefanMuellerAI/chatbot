@@ -9,7 +9,12 @@ import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/exp
 import { streamChat } from "@/lib/client/api";
 import { formatContextDate } from "@/lib/shared/date";
 import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, PublicConfig, StreamEvent } from "@/lib/shared/types";
+import { newDraft, type ComposeDraft } from "@/lib/client/mail";
+import type { MailFolder } from "@/lib/shared/mail";
 import { ArtifactPanel } from "@/components/artifacts/ArtifactPanel";
+import { ComposeDialog } from "@/components/mail/ComposeDialog";
+import { MailView } from "@/components/mail/MailView";
+import { useMailbox } from "@/components/mail/useMailbox";
 import { cn } from "@/components/ui/cn";
 import { useTheme } from "@/components/ui/theme";
 import { AccessExpiry } from "./AccessExpiry";
@@ -58,7 +63,13 @@ function payloadMessages(messages: ChatMessage[]): ChatMessage[] {
 /** Zeitpunkt des Seitenaufrufs – ältere Antworten öffnen ihre Artefakte nicht von selbst. */
 const PAGE_LOADED_AT = Date.now();
 
-export function ChatApp({ account }: { account: AccountInfo }) {
+/** Kurzer Hinweis oben im Fenster, optional mit Knopf (z. B. „Öffnen“). */
+interface Toast {
+  text: string;
+  action?: { label: string; onClick: () => void };
+}
+
+export function ChatApp({ account, initialView = "chat" }: { account: AccountInfo; initialView?: "chat" | "mail" }) {
   // Ende des Gast-Zugangs – kann sich ändern, wenn die Kursleitung den Termin verschiebt.
   const [accessUntil, setAccessUntil] = useState(account.validUntil);
   // Vor dem ersten Datenbankzugriff: lokale Chats gehören zu genau diesem Konto.
@@ -84,7 +95,7 @@ export function ChatApp({ account }: { account: AccountInfo }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [imageMode, setImageMode] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<Toast | null>(null);
   const [dragging, setDragging] = useState(false);
   const [theme, setTheme, isDark] = useTheme();
   const composerRef = useRef<ComposerHandle>(null);
@@ -114,11 +125,43 @@ export function ChatApp({ account }: { account: AccountInfo }) {
 
   const model = config?.models.find((m) => m.id === modelId);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = useCallback((msg: string) => {
-    setToast(msg);
+  const showToast = useCallback((msg: string | Toast) => {
+    const next = typeof msg === "string" ? { text: msg } : msg;
+    setToast(next);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
+    toastTimer.current = setTimeout(() => setToast(null), next.action ? 8000 : 4000);
   }, []);
+
+  // ---------------------------------------------------------------- Posteingang
+  const mailEnabled = Boolean(config?.features.mailbox);
+  const [viewChoice, setView] = useState<"chat" | "mail">(initialView);
+  // Ohne Posteingang (oder bevor die Einstellungen da sind) gibt es nur den Chat.
+  const view = mailEnabled ? viewChoice : config ? "chat" : viewChoice;
+  const [mailFolder, setMailFolder] = useState<MailFolder>("inbox");
+  const [mailSelected, setMailSelected] = useState<string | null>(null);
+  const [compose, setCompose] = useState<ComposeDraft | null>(null);
+  const openMail = useCallback((id: string, folder: MailFolder) => {
+    setView("mail");
+    setMailFolder(folder);
+    setMailSelected(id);
+  }, []);
+  const onNewMail = useCallback(
+    (latest: { id: string; from: string; subject: string }) => {
+      if (latest.from === account.mailLocal) return;
+      showToast({
+        text: `Neue E-Mail von ${latest.from === "kursleitung" ? "Kursleitung" : latest.from}: „${latest.subject || "(Kein Betreff)"}“`,
+        action: { label: "Öffnen", onClick: () => openMail(latest.id, "inbox") },
+      });
+    },
+    [account.mailLocal, openMail, showToast],
+  );
+  const mailbox = useMailbox(mailEnabled, onNewMail);
+  // Die Ansicht steht in der Adresse, damit Neuladen im Posteingang bleibt.
+  useEffect(() => {
+    if (!config) return;
+    const target = view === "mail" ? "/?ansicht=posteingang" : "/";
+    if (`${window.location.pathname}${window.location.search}` !== target) window.history.replaceState(null, "", target);
+  }, [view, config]);
 
   // Beim Wechsel des Chats dessen Einstellungen übernehmen
   const selectConversation = useCallback(
@@ -498,12 +541,46 @@ export function ChatApp({ account }: { account: AccountInfo }) {
           theme={theme}
           onTheme={setTheme}
           onClose={() => setSidebarOpen(false)}
+          mail={
+            mailEnabled
+              ? {
+                  view,
+                  onView: setView,
+                  unread: mailbox.unread,
+                  total: mailbox.total,
+                  folder: mailFolder,
+                  onFolder: (f) => {
+                    setMailFolder(f);
+                    setMailSelected(null);
+                    setView("mail");
+                  },
+                  onNewMail: () => setCompose(newDraft()),
+                }
+              : undefined
+          }
         />
       </div>
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />}
 
       {/* Hauptbereich */}
+      {view === "mail" && (
+        <main className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:hidden">
+          <MailView
+            me={account.mailLocal}
+            folder={mailFolder}
+            selectedId={mailSelected}
+            onSelect={setMailSelected}
+            version={mailbox.version}
+            onChanged={mailbox.refresh}
+            onCompose={setCompose}
+            onOpenMenu={() => setSidebarOpen(true)}
+            onToast={showToast}
+          />
+        </main>
+      )}
+      {/* Der Chat bleibt beim Wechsel in den Posteingang eingehängt: laufende Antworten und Uploads gehen weiter. */}
       <main
+        hidden={view === "mail"}
         className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:block print:bg-white"
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("Files") && config && !config.paused && model) {
@@ -726,15 +803,31 @@ export function ChatApp({ account }: { account: AccountInfo }) {
             </div>
           </div>
         )}
-        {toast && (
-          <div className="absolute top-16 left-1/2 z-40 -translate-x-1/2 rounded-full bg-text px-4 py-2 text-sm text-bg shadow-lg" role="status">
-            {toast}
-          </div>
-        )}
       </main>
+      {toast && (
+        <div
+          role="status"
+          className="fixed top-16 left-1/2 z-[60] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-text py-2 pr-2 pl-4 text-sm text-bg shadow-lg"
+        >
+          <span className="min-w-0 truncate">{toast.text}</span>
+          {toast.action && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.action!.onClick();
+                setToast(null);
+              }}
+              className="shrink-0 rounded-full bg-bg/20 px-3 py-1 font-semibold"
+            >
+              {toast.action.label}
+            </button>
+          )}
+          {!toast.action && <span className="w-2" />}
+        </div>
+      )}
 
       {/* Artefakt-Panel */}
-      {artifactVersions && artifactVersions.length > 0 && (
+      {view === "chat" && artifactVersions && artifactVersions.length > 0 && (
         <section className="fixed inset-0 z-50 border-border md:static md:border-l md:z-auto md:w-[min(46vw,760px)] md:shrink-0 print:hidden">
           <ArtifactPanel
             key={`${artifactSel?.id}:${artifactSel?.version ?? "neu"}`}
@@ -750,6 +843,18 @@ export function ChatApp({ account }: { account: AccountInfo }) {
         <>
           <NoticeDialog text={config.notice.full} accountKey={account.key} forceOpen={noticeOpen} onClose={() => setNoticeOpen(false)} />
           <ImageModeDialog open={imageMode} onClose={() => setImageMode(false)} defaults={config.imageDefaults} onResult={addImageModeResult} />
+          {mailEnabled && (
+            <ComposeDialog
+              draft={compose}
+              me={account.mailLocal}
+              onClose={() => setCompose(null)}
+              onSent={(mail) => {
+                setCompose(null);
+                showToast(`E-Mail an ${mail.to.map((l) => (l === "kursleitung" ? "Kursleitung" : l)).join(", ")} gesendet.`);
+                mailbox.refresh();
+              }}
+            />
+          )}
         </>
       )}
     </div>

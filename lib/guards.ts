@@ -20,6 +20,16 @@ const NEEDS_OPENAI: Partial<Record<keyof FeatureFlags, true>> = { transcription:
  * Prüft serverseitig Not-Aus, Funktionsschalter und – wo nötig – den OpenAI-Schlüssel.
  * Damit gilt jede Einstellung auch dann, wenn jemand die Oberfläche umgeht.
  */
+/**
+ * Posteingang: Schalter „Posteingang“ muss an sein. Bei Not-Aus bleibt Lesen möglich, Senden nicht.
+ */
+export async function requireMailbox(opts: { write?: boolean } = {}): Promise<AppSettings> {
+  const settings = await getSettings();
+  if (!settings.features.mailbox) throw new HttpError(403, "Der Posteingang ist deaktiviert.");
+  if (opts.write && settings.paused) throw new HttpError(503, settings.pausedMessage);
+  return settings;
+}
+
 export async function requireFeature(feature: GuardedFeature): Promise<AppSettings> {
   const settings = await getSettings();
   if (settings.paused) throw new HttpError(503, settings.pausedMessage);

@@ -134,4 +134,22 @@ export const BOOTSTRAP_STATEMENTS: string[] = [
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
   `CREATE INDEX IF NOT EXISTS guests_event_idx ON guests (event_id)`,
+  `CREATE TABLE IF NOT EXISTS mails (
+    id text PRIMARY KEY,
+    owner text NOT NULL,
+    guest_id text REFERENCES guests(id) ON DELETE CASCADE,
+    event_id text REFERENCES events(id) ON DELETE CASCADE,
+    folder text NOT NULL,
+    from_address text NOT NULL,
+    to_addresses jsonb NOT NULL,
+    cc_addresses jsonb NOT NULL,
+    subject text NOT NULL DEFAULT '',
+    body text NOT NULL DEFAULT '',
+    in_reply_to text,
+    via_freebie boolean NOT NULL DEFAULT false,
+    sent_at timestamptz NOT NULL DEFAULT now(),
+    read_at timestamptz
+  )`,
+  `CREATE INDEX IF NOT EXISTS mails_owner_idx ON mails (owner, folder, sent_at)`,
+  `CREATE INDEX IF NOT EXISTS mails_event_idx ON mails (event_id)`,
 ];

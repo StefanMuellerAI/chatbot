@@ -21,6 +21,8 @@ const LABELS: Record<string, string> = {
   noticeText: "Hinweis: vollständiger Text",
   noticeShort: "Hinweis: Kurzform",
   systemPromptAddendum: "Hinweise an das Modell",
+  mailWelcomeSubject: "Begrüßungs-E-Mail: Betreff",
+  mailWelcomeText: "Begrüßungs-E-Mail: Text",
 };
 
 const Patch = z
@@ -36,6 +38,7 @@ const Patch = z
         answerCache: z.boolean(),
         showCacheBadge: z.boolean(),
         showCost: z.boolean(),
+        mailbox: z.boolean(),
       })
       .partial()
       .strict(),
@@ -54,6 +57,8 @@ const Patch = z
     paused: z.boolean(),
     pausedMessage: z.string().min(5).max(500),
     systemPromptAddendum: z.string().max(10000),
+    mailWelcomeSubject: z.string().max(200),
+    mailWelcomeText: z.string().max(5000),
   })
   .partial()
   // Tippfehler im Feldnamen sollen auffallen statt still nichts zu ändern.

@@ -24,6 +24,8 @@ export interface AdminSettings {
   paused: boolean;
   pausedMessage: string;
   systemPromptAddendum: string;
+  mailWelcomeSubject: string;
+  mailWelcomeText: string;
 }
 
 const FEATURES: { key: keyof FeatureFlags; label: string; hint: string }[] = [
@@ -36,6 +38,7 @@ const FEATURES: { key: keyof FeatureFlags; label: string; hint: string }[] = [
   { key: "answerCache", label: "Antwort-Cache", hint: "Identische Anfragen werden aus dem Zwischenspeicher beantwortet" },
   { key: "showCacheBadge", label: "Cache-Hinweis anzeigen", hint: "Kennzeichnet Antworten aus dem Antwort-Cache" },
   { key: "showCost", label: "Kosten pro Antwort anzeigen", hint: "Zeigt Teilnehmenden die geschätzten Kosten" },
+  { key: "mailbox", label: "Posteingang", hint: "Übungs-Postfach für alle und Verbindung „Posteingang“ im Chat" },
 ];
 
 /** Nur geänderte Felder (bei Funktionen: nur geänderte Schalter) – so überschreiben sich zwei Admins nicht. */
@@ -178,6 +181,18 @@ export function SettingsTab({
         </Field>
         <Field label="Kurzform (Fußzeile)" className="mt-3">
           <input className={inputClass} value={s.noticeShort} onChange={(e) => set("noticeShort", e.target.value)} />
+        </Field>
+      </Card>
+
+      <Card
+        title="Begrüßungs-E-Mail"
+        description="Jedes neue Gast-Postfach bekommt sie bei der Anmeldung von „Kursleitung“ – gut für eine erste Übungsaufgabe. Betreff und Text leer lassen: keine Begrüßung."
+      >
+        <Field label="Betreff">
+          <input className={inputClass} value={s.mailWelcomeSubject} onChange={(e) => set("mailWelcomeSubject", e.target.value)} />
+        </Field>
+        <Field label="Text" className="mt-3">
+          <textarea className={textareaClass} rows={8} value={s.mailWelcomeText} onChange={(e) => set("mailWelcomeText", e.target.value)} />
         </Field>
       </Card>
 

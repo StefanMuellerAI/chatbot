@@ -58,6 +58,10 @@ export interface AccountInfo {
   username: string;
   /** Ende des Zugangs (ISO) – bei Gästen das Termin-Ende. */
   validUntil: string | null;
+  /** Lokaler Teil der Posteingangs-Adresse („fuchs27“, Kursleitung: „kursleitung“). */
+  mailLocal: string;
+  /** Name der Gruppe (nur Gäste). */
+  groupName: string | null;
 }
 
 export interface PublicConfig {
@@ -83,6 +87,8 @@ export interface FeatureFlags {
   answerCache: boolean;
   showCacheBadge: boolean;
   showCost: boolean;
+  /** Übungs-Posteingang und Verbindung „Posteingang“ im Chat. */
+  mailbox: boolean;
 }
 
 export type AttachmentKind = "image" | "document" | "transcript";

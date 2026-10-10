@@ -6,6 +6,7 @@ import { open, seal } from "@/lib/auth/secretbox";
 import { adminCredentials } from "@/lib/auth/tokens";
 import { getDb, schema } from "@/lib/db/client";
 import { HttpError } from "@/lib/errors";
+import { deleteEventMails, purgeMail } from "@/lib/mail/store";
 import { generatePassword, generateUsername, normalizeUsername } from "./credentials";
 import { EARLY_LOGIN_MS, effectiveEnd, eventStatus, guestAccess, validateEventTimes, type EventStatus, type EventTimes } from "./window";
 
@@ -168,6 +169,8 @@ export async function endEventNow(id: string): Promise<void> {
   const db = await getDb();
   await db.update(schema.events).set({ endedEarlyAt: new Date() }).where(eq(schema.events.id, id));
   await db.delete(schema.guests).where(eq(schema.guests.eventId, id));
+  // Auch die Kopien bei der Kursleitung (Gast-Postfächer verschwinden mit den Gästen).
+  await deleteEventMails(id);
   invalidateGuestCache();
 }
 
@@ -184,6 +187,13 @@ async function assertEditable(eventId: string): Promise<EventRow> {
   const event = await getEventRow(eventId);
   if (eventStatus(times(event)) === "vorbei") throw new HttpError(400, "Der Termin ist vorbei – Gruppen und Gäste lassen sich nicht mehr ändern.");
   return event;
+}
+
+/** Name einer Gruppe (für die Anzeige im Chat), null wenn es sie nicht mehr gibt. */
+export async function groupName(groupId: string): Promise<string | null> {
+  const db = await getDb();
+  const rows = await db.select({ name: schema.eventGroups.name }).from(schema.eventGroups).where(eq(schema.eventGroups.id, groupId)).limit(1);
+  return rows[0]?.name ?? null;
 }
 
 async function getGroupRow(groupId: string) {
@@ -374,6 +384,8 @@ export async function purgeExpiredGuests(): Promise<number> {
   `)) as unknown as { rows?: unknown[] } | unknown[];
   const n = Array.isArray(res) ? res.length : (res.rows?.length ?? 0);
   if (n) invalidateGuestCache();
+  // Postfächer beendeter Termine gleich mit (auch die Kopien bei der Kursleitung).
+  await purgeMail();
   return n;
 }
 

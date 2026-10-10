@@ -7,6 +7,7 @@ import { adminCredentials, SESSION_COOKIE, SESSION_MAX_AGE_S, sessionCookie, sig
 import { normalizeUsername } from "@/lib/events/credentials";
 import { checkGuestLogin, purgeExpiredGuests } from "@/lib/events/store";
 import { formatStart } from "@/lib/events/window";
+import { ensureWelcomeMail } from "@/lib/mail/store";
 import { getSettings } from "@/lib/settings";
 
 const Body = z.object({ username: z.string().trim().min(1), password: z.string().min(1) });
@@ -42,6 +43,11 @@ export async function POST(request: Request) {
       }
       const { guest, event } = result;
       claims = { sid: randomUUID(), v: settings.sessionVersion, role: "guest", name: guest.username, gid: guest.id, eid: event.id, grp: guest.groupId };
+      // Ein leeres Postfach bekommt die Begrüßungs-E-Mail der Kursleitung.
+      await ensureWelcomeMail(
+        { owner: guest.id, local: guest.username, role: "guest", guestId: guest.id, eventId: event.id, groupId: guest.groupId },
+        settings,
+      ).catch((err) => console.error("welcome mail failed", err));
     }
 
     await refundAttempt();

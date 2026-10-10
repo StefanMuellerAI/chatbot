@@ -19,12 +19,28 @@ export interface AppSettings {
   paused: boolean;
   pausedMessage: string;
   systemPromptAddendum: string;
+  /** Begrüßungs-E-Mail für neue Gast-Postfächer (beide leer: keine). */
+  mailWelcomeSubject: string;
+  mailWelcomeText: string;
   /** Wird bei „Alle abmelden“ erhöht und meldet damit alle Sitzungen ab. */
   sessionVersion: number;
 }
 
 export const DEFAULT_NOTICE =
   "Freebie ist eine Spiel- und Übungsumgebung für unsere Schulungen. Alle Eingaben, Dateien und Sprachaufnahmen werden zur Verarbeitung an OpenAI und Anthropic in den USA übertragen. Die Anwendung läuft bei Vercel (USA). Identische Anfragen können zur Kostenersparnis aus einem gemeinsamen Zwischenspeicher beantwortet werden. Bitte gib keine personenbezogenen, vertraulichen oder geschäftskritischen Daten ein.";
+
+export const DEFAULT_WELCOME_SUBJECT = "Willkommen in deinem Posteingang";
+
+export const DEFAULT_WELCOME_TEXT = `Hallo,
+
+willkommen in deinem Übungs-Posteingang! Deine Adresse steht im Posteingang unter „Deine Adresse“. Du kannst allen aus deiner Gruppe schreiben und der Kursleitung.
+
+Probier es aus: Schalte im Chat unter „Verbindungen“ den Posteingang ein und frag Freebie, was in deinen E-Mails steht. Freebie kann auch in deinem Namen antworten.
+
+Beim Abmelden wird dein Posteingang gelöscht.
+
+Viel Spaß!
+Deine Kursleitung`;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   features: {
@@ -37,6 +53,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     answerCache: true,
     showCacheBadge: true,
     showCost: false,
+    mailbox: true,
   },
   imageModel: "gpt-image-2",
   imageDefaultQuality: "medium",
@@ -53,5 +70,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   paused: false,
   pausedMessage: "Freebie macht gerade eine kurze Pause. Bitte wende dich an die Kursleitung.",
   systemPromptAddendum: "",
+  mailWelcomeSubject: DEFAULT_WELCOME_SUBJECT,
+  mailWelcomeText: DEFAULT_WELCOME_TEXT,
   sessionVersion: 1,
 };

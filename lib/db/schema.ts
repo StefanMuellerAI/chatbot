@@ -179,3 +179,31 @@ export const guests = pgTable("guests", {
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Übungs-Posteingang: eine Zeile je Postfach (Kopie im „Gesendet“ der Absenderin und je eine im
+ * „Posteingang“ der Empfänger). Adressen sind lokale Teile („fuchs27“, „kursleitung“).
+ */
+export const mails = pgTable(
+  "mails",
+  {
+    id: text("id").primaryKey(),
+    /** Postfach: Gast-ID oder „admin“ (Kursleitung). */
+    owner: text("owner").notNull(),
+    /** Bei Gast-Postfächern: mit dem Gast verschwindet sein Postfach. */
+    guestId: text("guest_id").references(() => guests.id, { onDelete: "cascade" }),
+    /** Termin der Mail – mit dessen Ende wird sie gelöscht. Leer nur bei Notizen der Kursleitung an sich selbst. */
+    eventId: text("event_id").references(() => events.id, { onDelete: "cascade" }),
+    folder: text("folder").notNull(),
+    fromAddress: text("from_address").notNull(),
+    toAddresses: jsonb("to_addresses").notNull(),
+    ccAddresses: jsonb("cc_addresses").notNull(),
+    subject: text("subject").notNull().default(""),
+    body: text("body").notNull().default(""),
+    inReplyTo: text("in_reply_to"),
+    viaFreebie: boolean("via_freebie").notNull().default(false),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [index("mails_owner_idx").on(t.owner, t.folder, t.sentAt), index("mails_event_idx").on(t.eventId)],
+);
