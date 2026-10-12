@@ -186,6 +186,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | F07 | Dieselbe Datei zweimal | zweites Mal aus dem Datei-Cache; nach Ablauf der Aufbewahrung sauberer Hinweis |
 | F08 | Uploads bzw. Transkription im Admin aus | Meldung im Chat **und** Sperre in der API |
 | F09 | Anhänge im weiteren Gespräch | bleiben Teil des Verlaufs, erscheinen in Nachricht und Export |
+| F10 | Eingabeleiste mit Anhängen, breit und schmal | Senden-Button bleibt rechts in der Werkzeugzeile; die Token-Summe steht bei den Anhängen |
 
 ### G · Audio-Transkription
 

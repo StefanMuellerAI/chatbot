@@ -195,4 +195,20 @@ test.describe("F · Dateien", () => {
     const text = Buffer.concat(await (await (await download).createReadStream()).toArray()).toString("utf8");
     expect(text).toContain("> 📎 vertrag.docx");
   });
+
+  test("F10 mit Anhängen bleibt der Senden-Button rechts in der Werkzeugleiste", async ({ chat, page }) => {
+    await attach(page, "vertrag.docx", "folien.pptx");
+    for (const name of ["vertrag.docx", "folien.pptx"]) await expectReady(page, name, /ca\. \d+ Tokens/);
+    await expect(page.getByText(/≈ \d+ Tokens im Anhang/)).toBeVisible();
+    const box = async (name: string) => (await page.getByRole("button", { name, exact: true }).boundingBox())!;
+    const bottom = (b: { y: number; height: number }) => b.y + b.height;
+    // Breit: alles in einer Zeile. Schmal (Tablet mit Seitenleiste, Handy): die Werkzeuge brechen um, Senden bleibt rechts unten.
+    for (const width of [1280, 820, 390]) {
+      await page.setViewportSize({ width, height: 860 });
+      const [send, image, clip] = [await chat.sendButton.boundingBox(), await box("Bild-Modus"), await box("Datei anhängen")];
+      expect(Math.abs(bottom(send!) - bottom(image)), `Breite ${width}`).toBeLessThanOrEqual(1);
+      expect(send!.x, `Breite ${width}`).toBeGreaterThan(image.x + image.width);
+      if (width === 1280) expect(Math.abs(bottom(send!) - bottom(clip))).toBeLessThanOrEqual(1);
+    }
+  });
 });

@@ -242,6 +242,10 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
               </button>
             </div>
           ))}
+          {/* Die Summe steht bei den Anhängen, damit die Werkzeugleiste darunter nicht umbricht. */}
+          {totalTokens > 0 && (
+            <span className="ml-auto self-end px-2 pb-1 text-xs text-subtle max-sm:hidden">≈ {new Intl.NumberFormat("de-DE").format(totalTokens)} Tokens im Anhang</span>
+          )}
         </div>
       )}
       {(tooLong || blindImages) && (
@@ -274,63 +278,64 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
         className="block max-h-[280px] w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[0.97rem] leading-relaxed outline-none placeholder:text-subtle"
         aria-label="Nachricht"
       />
-      <div className="flex flex-wrap items-center gap-1.5 px-3 pb-3">
-        {(features.uploads || features.transcription) && (
-          <>
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              aria-label="Dateien zum Anhängen"
-              accept={ACCEPT_ATTRIBUTE}
-              className="hidden"
-              onChange={(e) => {
-                addFiles(Array.from(e.target.files ?? []));
-                e.target.value = "";
-              }}
-            />
-            <ToolButton
-              onClick={() => fileRef.current?.click()}
-              disabled={disabled}
-              title="Datei anhängen (PDF, Word, Excel, PowerPoint, Bilder, MP3 …)"
-              ariaLabel="Datei anhängen"
-            >
-              <Paperclip className="h-4.5 w-4.5" />
+      {/* Werkzeuge dürfen umbrechen, der Senden-Button bleibt immer rechts in der Zeile. */}
+      <div className="flex items-end gap-1.5 px-3 pb-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          {(features.uploads || features.transcription) && (
+            <>
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                aria-label="Dateien zum Anhängen"
+                accept={ACCEPT_ATTRIBUTE}
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(Array.from(e.target.files ?? []));
+                  e.target.value = "";
+                }}
+              />
+              <ToolButton
+                onClick={() => fileRef.current?.click()}
+                disabled={disabled}
+                title="Datei anhängen (PDF, Word, Excel, PowerPoint, Bilder, MP3 …)"
+                ariaLabel="Datei anhängen"
+              >
+                <Paperclip className="h-4.5 w-4.5" />
+              </ToolButton>
+            </>
+          )}
+          {features.library && (
+            <ToolButton onClick={() => setLibraryOpen(true)} disabled={disabled} title="Fundus: erfundene Dateien und E-Mails aus Verwaltungen anhängen" ariaLabel="Fundus öffnen">
+              <Database className="h-4.5 w-4.5" />
             </ToolButton>
-          </>
-        )}
-        {features.library && (
-          <ToolButton onClick={() => setLibraryOpen(true)} disabled={disabled} title="Fundus: erfundene Dateien und E-Mails aus Verwaltungen anhängen" ariaLabel="Fundus öffnen">
-            <Database className="h-4.5 w-4.5" />
-          </ToolButton>
-        )}
-        {features.dictation && <VoiceButton disabled={disabled} onText={(t) => onTextChange(text ? `${text} ${t}` : t)} />}
-        {features.webSearch && model?.capabilities.webSearch && (
-          <ToolButton
-            active={webSearch}
-            disabled={disabled}
-            onClick={() => onWebSearchChange(!webSearch)}
-            title={webSearch ? "Websuche ist an" : "Websuche ist aus"}
-            label="Websuche"
-            ariaLabel="Websuche"
-          >
-            <Globe className="h-4.5 w-4.5" />
-          </ToolButton>
-        )}
-        {connections && <ConnectionsMenu {...connections} disabled={disabled} />}
-        {efforts.length > 0 && <EffortMenu value={effort} options={efforts} onChange={onEffortChange} disabled={disabled} />}
-        {features.imageGeneration && (
-          <ToolButton onClick={onImageMode} disabled={streaming || disabled} title="Bild-Modus: direkt ein Bild erzeugen" label="Bild" ariaLabel="Bild-Modus">
-            <ImagePlus className="h-4.5 w-4.5" />
-          </ToolButton>
-        )}
-        <div className="flex-1" />
-        {totalTokens > 0 && <span className="mr-1 text-xs text-subtle max-sm:hidden">≈ {new Intl.NumberFormat("de-DE").format(totalTokens)} Tokens im Anhang</span>}
+          )}
+          {features.dictation && <VoiceButton disabled={disabled} onText={(t) => onTextChange(text ? `${text} ${t}` : t)} />}
+          {features.webSearch && model?.capabilities.webSearch && (
+            <ToolButton
+              active={webSearch}
+              disabled={disabled}
+              onClick={() => onWebSearchChange(!webSearch)}
+              title={webSearch ? "Websuche ist an" : "Websuche ist aus"}
+              label="Websuche"
+              ariaLabel="Websuche"
+            >
+              <Globe className="h-4.5 w-4.5" />
+            </ToolButton>
+          )}
+          {connections && <ConnectionsMenu {...connections} disabled={disabled} />}
+          {efforts.length > 0 && <EffortMenu value={effort} options={efforts} onChange={onEffortChange} disabled={disabled} />}
+          {features.imageGeneration && (
+            <ToolButton onClick={onImageMode} disabled={streaming || disabled} title="Bild-Modus: direkt ein Bild erzeugen" label="Bild" ariaLabel="Bild-Modus">
+              <ImagePlus className="h-4.5 w-4.5" />
+            </ToolButton>
+          )}
+        </div>
         {streaming ? (
           <button
             type="button"
             onClick={onStop}
-            className="grid h-10 w-10 place-items-center rounded-full bg-text text-bg hover:opacity-90"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-text text-bg hover:opacity-90"
             aria-label="Antwort stoppen"
             title="Stoppen"
           >
@@ -341,7 +346,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             type="button"
             onClick={send}
             disabled={!canSend}
-            className="grid h-10 w-10 place-items-center rounded-full bg-brand-gradient text-white shadow-md transition hover:opacity-95 disabled:opacity-35"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-gradient text-white shadow-md transition hover:opacity-95 disabled:opacity-35"
             aria-label="Senden"
             title="Senden (Enter)"
           >
