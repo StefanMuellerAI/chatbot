@@ -9,6 +9,7 @@ import type {
   MessageCreateParamsStreaming,
 } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import type { PreparedMessage } from "@/lib/chat/prepare";
+import { isLegacyClaude } from "@/lib/shared/claude-models";
 import type { Citation, Effort } from "@/lib/shared/types";
 import {
   addUsage,
@@ -24,6 +25,8 @@ const EFFORT_BETA = "mid-conversation-output-config-2026-07-01";
 const BINDING_BETA = "thinking-binding-controls-2026-08-01";
 const WEB_SEARCH_COST_USD = 0.01; // $10 pro 1.000 Suchen
 const MAX_ITERATIONS = 8;
+/** Thinking-Budget je Effort-Stufe für ältere Modelle ohne adaptives Thinking (z. B. Haiku 4.5). */
+const LEGACY_THINKING_BUDGET: Record<Effort, number> = { low: 2048, medium: 8192, high: 16384, max: 32768 };
 
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
@@ -47,6 +50,9 @@ export function buildAnthropicRequest(req: ProviderRequest): {
 } {
   const { model } = req;
   const caps = model.capabilities;
+  // Ältere Modelle (vor 4.6) lehnen adaptives Thinking, Effort & Co. ab – unabhängig von den
+  // gespeicherten Fähigkeiten.
+  const legacy = isLegacyClaude(model.modelId);
   const cacheControl =
     req.cacheTtl === "1h" ? ({ type: "ephemeral", ttl: "1h" } as const) : ({ type: "ephemeral" } as const);
 
@@ -72,7 +78,7 @@ export function buildAnthropicRequest(req: ProviderRequest): {
     }
   }
   if (req.tools.webSearch && caps.webSearch) {
-    const basic = caps.anthropicWebTools === "basic";
+    const basic = legacy || caps.anthropicWebTools === "basic";
     tools.push({ type: basic ? "web_fetch_20250910" : "web_fetch_20260209", name: "web_fetch" } as BetaToolUnion);
     tools.push({
       type: basic ? "web_search_20250305" : "web_search_20260209",
@@ -84,7 +90,7 @@ export function buildAnthropicRequest(req: ProviderRequest): {
   const users = req.messages.filter((m) => m.role === "user");
   const firstEffort: Effort = users[0]?.effort ?? model.defaultEffort;
   const currentEffort: Effort = users[users.length - 1]?.effort ?? firstEffort;
-  const useMessageEffort = caps.reasoning && caps.perMessageEffort;
+  const useMessageEffort = caps.reasoning && caps.perMessageEffort && !legacy;
   const topEffort = useMessageEffort ? firstEffort : currentEffort;
 
   const messages: BetaMessageParam[] = [];
@@ -115,9 +121,10 @@ export function buildAnthropicRequest(req: ProviderRequest): {
   }
 
   const effortValue = mapEffort(topEffort, model.effortMap);
+  const maxTokens = maxTokensFor(currentEffort, model.maxOutputTokens);
   const params: Omit<MessageCreateParamsStreaming, "stream"> = {
     model: model.modelId,
-    max_tokens: maxTokensFor(currentEffort, model.maxOutputTokens),
+    max_tokens: maxTokens,
     system,
     messages,
     // Automatisches Caching für den wachsenden Gesprächsteil.
@@ -125,7 +132,11 @@ export function buildAnthropicRequest(req: ProviderRequest): {
   };
   if (tools.length) params.tools = tools;
   const betas: string[] = [];
-  if (caps.reasoning) {
+  if (caps.reasoning && legacy) {
+    // Festes Budget statt Effort; es muss mindestens 1.024 und kleiner als max_tokens sein.
+    const budget = Math.min(LEGACY_THINKING_BUDGET[currentEffort] ?? LEGACY_THINKING_BUDGET.medium, Math.floor(maxTokens / 2));
+    if (budget >= 1024) params.thinking = { type: "enabled", budget_tokens: budget };
+  } else if (caps.reasoning) {
     // Ändert sich ein früherer Teil des Verlaufs (abgelaufenes Bild, geänderte Einstellungen),
     // verwirft die API betroffene Thinking-Blöcke, statt die Anfrage abzulehnen.
     params.thinking = {
@@ -136,7 +147,7 @@ export function buildAnthropicRequest(req: ProviderRequest): {
     params.output_config = { effort: effortValue as "low" | "medium" | "high" | "xhigh" | "max" };
     betas.push(BINDING_BETA);
   }
-  if (caps.fallbacks) {
+  if (caps.fallbacks && !legacy) {
     params.fallbacks = "default";
     betas.push(FALLBACK_BETA);
   }
@@ -368,7 +379,8 @@ export async function anthropicTitle(modelId: string, prompt: string): Promise<{
   const res = await anthropic.messages.create({
     model: modelId,
     max_tokens: 2000,
-    output_config: { effort: "low" },
+    // Ältere Modelle (z. B. Haiku 4.5) kennen keinen Effort.
+    ...(isLegacyClaude(modelId) ? {} : { output_config: { effort: "low" as const } }),
     messages: [{ role: "user", content: prompt }],
   });
   const block = res.content.find((b) => b.type === "text");

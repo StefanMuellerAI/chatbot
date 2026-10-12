@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { buildAnthropicRequest, sanitizeForEcho, WEB_SEARCH_OFF_NOTE } from "@/lib/providers/anthropic";
+import { claudeVersion, isLegacyClaude } from "@/lib/shared/claude-models";
 import { assistant, request, seedModel, user } from "./helpers";
 
 const sonnet = seedModel("claude-sonnet-5-5");
 const haiku = seedModel("claude-haiku-5-5");
+// Wie ein im Admin angelegtes älteres Modell – mit Fähigkeiten, die es nicht hat.
+const haiku45 = {
+  ...seedModel("claude-haiku-5-5"),
+  id: "claude-haiku-4-5",
+  modelId: "claude-haiku-4-5",
+  maxOutputTokens: 64000,
+  capabilities: { ...seedModel("claude-sonnet-5-5").capabilities, anthropicWebTools: "dynamic" as const },
+};
 
 describe("buildAnthropicRequest", () => {
   it("setzt Cache-Breakpoints auf System, Vorlage und den Gesprächsrest", () => {
@@ -100,6 +109,66 @@ describe("buildAnthropicRequest", () => {
     expect(JSON.stringify(b.tools)).toBe(JSON.stringify(a.tools));
     expect(JSON.stringify(b.messages.slice(0, a.messages.length))).toBe(JSON.stringify(a.messages));
     expect(b.output_config).toEqual(a.output_config);
+  });
+});
+
+describe("buildAnthropicRequest für ältere Modelle (vor 4.6)", () => {
+  it("nutzt Thinking mit Budget statt adaptivem Thinking und Effort", () => {
+    const { params, betas } = buildAnthropicRequest(request(haiku45, [user("Hallo")]));
+    expect(params.thinking).toEqual({ type: "enabled", budget_tokens: 8192 });
+    expect(params.output_config).toBeUndefined();
+    expect(params.max_tokens).toBe(32000);
+    expect(betas).toEqual([]);
+  });
+
+  it("schickt keinen Fallback, keine Effort-System-Nachricht und die Basis-Web-Tools", () => {
+    const history = [user("Eins"), assistant("Antwort"), user("Zwei", { effort: "high" })];
+    const { params } = buildAnthropicRequest(request(haiku45, history));
+    expect(params.fallbacks).toBeUndefined();
+    expect(params.messages.some((m) => m.role === "system")).toBe(false);
+    expect(params.thinking).toEqual({ type: "enabled", budget_tokens: 16384 });
+    const tools = params.tools as { name: string; type?: string }[];
+    expect(tools.find((t) => t.name === "web_search")?.type).toBe("web_search_20250305");
+    expect(tools.find((t) => t.name === "web_fetch")?.type).toBe("web_fetch_20250910");
+  });
+
+  it("hält das Budget unter max_tokens und lässt Thinking bei sehr kleinem Limit weg", () => {
+    const small = buildAnthropicRequest(request({ ...haiku45, maxOutputTokens: 4000 }, [user("Hallo")])).params;
+    expect(small.thinking).toEqual({ type: "enabled", budget_tokens: 2000 });
+    const tiny = buildAnthropicRequest(request({ ...haiku45, maxOutputTokens: 1500 }, [user("Hallo")])).params;
+    expect(tiny.thinking).toBeUndefined();
+  });
+
+  it("schickt hochgeladene Bilder als Bildblock", () => {
+    const msg = user("Was siehst du?", {
+      parts: [
+        { type: "image", mime: "image/png", base64: "AAAA" },
+        { type: "text", text: "Was siehst du?" },
+      ],
+    });
+    const { params } = buildAnthropicRequest(request(haiku45, [msg]));
+    expect(params.messages[0].content).toEqual([
+      { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } },
+      { type: "text", text: "Was siehst du?" },
+    ]);
+  });
+});
+
+describe("claudeVersion / isLegacyClaude", () => {
+  it("erkennt die Generation an der Modell-ID", () => {
+    expect(claudeVersion("claude-haiku-4-5")).toBe(4.5);
+    expect(claudeVersion("claude-haiku-4-5-20251001")).toBe(4.5);
+    expect(claudeVersion("claude-sonnet-4-20250514")).toBe(4);
+    expect(claudeVersion("claude-3-7-sonnet-20250219")).toBe(3.7);
+    expect(claudeVersion("anthropic.claude-opus-4-1")).toBe(4.1);
+    expect(claudeVersion("claude-opus-5-5")).toBe(5.5);
+    expect(claudeVersion("claude-fable-5-1")).toBeNull();
+    expect(isLegacyClaude("claude-haiku-4-5")).toBe(true);
+    expect(isLegacyClaude("claude-sonnet-4-5")).toBe(true);
+    expect(isLegacyClaude("claude-opus-4-5")).toBe(true);
+    expect(isLegacyClaude("claude-sonnet-4-6")).toBe(false);
+    expect(isLegacyClaude("claude-haiku-5-5")).toBe(false);
+    expect(isLegacyClaude("claude-fable-5-1")).toBe(false);
   });
 });
 

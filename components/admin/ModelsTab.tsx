@@ -2,6 +2,7 @@
 import { CircleCheck, CircleX, Download, Loader2, Pencil, Plus, Star, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/client/api";
+import { isLegacyClaude } from "@/lib/shared/claude-models";
 import type { ModelRow } from "@/lib/models";
 import { EFFORT_LEVELS, type Effort, type ModelCapabilities } from "@/lib/shared/types";
 import { Button } from "@/components/ui/Button";
@@ -25,6 +26,8 @@ type NumberField = (typeof NUMBER_FIELDS)[number];
 
 function blankModel(provider: "anthropic" | "openai", modelId = "", name = ""): ModelRow {
   const isClaude = provider === "anthropic";
+  // Ältere Claude-Modelle (vor 4.6, z. B. Haiku 4.5) kennen weder Effort-Wechsel noch Fallback.
+  const legacy = isClaude && isLegacyClaude(modelId);
   return {
     id: modelId.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60),
     provider,
@@ -40,9 +43,9 @@ function blankModel(provider: "anthropic" | "openai", modelId = "", name = ""): 
       webSearch: true,
       tools: true,
       reasoning: true,
-      perMessageEffort: isClaude || /^gpt-6/.test(modelId),
-      fallbacks: isClaude && !/haiku/.test(modelId),
-      anthropicWebTools: isClaude ? (/haiku/.test(modelId) ? "basic" : "dynamic") : undefined,
+      perMessageEffort: (isClaude && !legacy) || /^gpt-6/.test(modelId),
+      fallbacks: isClaude && !legacy && !/haiku/.test(modelId),
+      anthropicWebTools: isClaude ? (legacy || /haiku/.test(modelId) ? "basic" : "dynamic") : undefined,
     },
     effortMap: { low: "low", medium: "medium", high: "high", max: "max" },
     defaultEffort: "medium",
