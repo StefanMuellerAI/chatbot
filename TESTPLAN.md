@@ -405,7 +405,7 @@ Geschätzte Kosten: unter 0,10 $ pro Lauf.
 ### Y · Fundus (erfundene Beispieldateien und E-Mails)
 
 Neben der Büroklammer öffnet ein Datenbank-Symbol den Fundus: erfundene Word-, Excel- und PowerPoint-Dateien sowie
-E-Mail-Verläufe aus acht Verwaltungen, die sich wie Uploads anhängen lassen (Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md)).
+E-Mail-Verläufe aus neun Verwaltungen, die sich wie Uploads anhängen lassen (Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md)).
 Unit-Tests prüfen zusätzlich Weltmodell, Generator (feste Prüfsummen), Auslesbarkeit, Formeln und den
 „Erfunden“-Wächter über alle Dateien (`tests/unit/library.test.ts`, `tests/unit/extract-mail.test.ts`).
 
@@ -413,7 +413,7 @@ Unit-Tests prüfen zusätzlich Weltmodell, Generator (feste Prüfsummen), Ausles
 |---|---|---|
 | Y01 | Datenbank-Symbol neben der Büroklammer | sichtbar mit Namen und Tooltip, direkt nach der Büroklammer; öffnet den Fundus; fehlt bei ausgeschaltetem Fundus, gesperrt bei Pause (Q21) |
 | Y02 | Dialog schließen per X, Esc und Klick daneben | Fokus zurück auf das Symbol; Reiter und Suche bleiben beim erneuten Öffnen erhalten |
-| Y03 | Katalog | Anzahl je Reiter wie in der API; alle Verwaltungen und ihre Einheiten im Filter; je Typ mindestens 5 Dokumente, mindestens 5 Verläufe, alle Verwaltungsebenen |
+| Y03 | Katalog | Anzahl je Reiter wie in der API; alle Verwaltungen und ihre Einheiten im Filter; mindestens 60 Word-, 50 Excel- und 40 PowerPoint-Dateien und 40 Verläufe, alle Verwaltungsebenen |
 | Y04 | Filter Verwaltung → Einheit (samt Untereinheiten), Typ, Merkmal | Trefferliste und -zahl stimmen; Einheit leert sich beim Wechsel der Verwaltung; „Keine Treffer.“; „Filter zurücksetzen“ |
 | Y05 | Suche nach Titel, Stichwort, Einheit und Person | Groß/klein, ä/ae und ß/ss egal; zusammen mit Filtern |
 | Y06 | Vorschau Word, Excel, PowerPoint | Briefkopf mit Signet, Aktenzeichen, Fiktiv-Hinweis; Tabelle mit formatierten Zahlen und Blattreitern; Folien mit Diagramm und Sprechernotizen; Eckdaten mit Token-Schätzung |

@@ -16,7 +16,8 @@
     "test:coverage": "node tests/e2e/coverage.mjs",
     "docs:handbuch": "node docs/handbuch/erstellen.mjs",
     "check": "npm run typecheck && npm run lint && npm run test",
-    "library": "tsx --conditions=react-server library/build/cli.ts"
+    "library": "tsx --conditions=react-server library/build/cli.ts",
+    "library:check": "tsx --conditions=react-server library/build/check.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",

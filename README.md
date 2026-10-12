@@ -7,8 +7,9 @@ Teilnehmende ohne eigenes ChatGPT- oder Claude-Konto mit aktuellen KI-Modellen a
 - **Thinking-Effort** einstellbar (Niedrig, Mittel, Hoch, Maximal), Gedankengang einblendbar
 - **Websuche** mit Quellenangaben
 - **Datei-Upload**: PDF, Word, Excel/CSV, PowerPoint, E-Mails (`.eml`), Text, Code und Bilder (auch per Drag & Drop oder Einfügen)
-- **Fundus**: erfundene, echt wirkende Word-, Excel- und PowerPoint-Dateien und E-Mail-Verläufe aus acht Verwaltungen zum
-  Anhängen – zum Üben, ohne echte Daten der eigenen Behörde (eigener Schalter im Admin, Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md))
+- **Fundus**: 150 erfundene, echt wirkende Word-, Excel- und PowerPoint-Dateien und 40 E-Mail-Verläufe aus neun
+  Verwaltungen (Schwerpunkt Kommune) zum Anhängen – zum Üben, ohne echte Daten der eigenen Behörde (eigener Schalter im
+  Admin, Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md))
 - **Audio-Transkription** (MP3, M4A, WAV …) und **Spracheingabe** per Mikrofon
 - **Bildgenerierung** im Chat (auch mit Claude) und im Bild-Modus, inkl. Bearbeitung hochgeladener Bilder
 - **Artefakte**: HTML-Seiten, Charts, Mermaid-Diagramme, SVG und Dokumente im Seitenpanel mit Vorschau und Download
@@ -90,6 +91,7 @@ Mock-Provider – damit lässt sich die komplette Oberfläche ohne API-Kosten au
 |---|---|
 | `npm run check` | Typecheck, Lint und Unit-Tests |
 | `npm run library` | Fundus erzeugen (`.library/`); läuft automatisch vor `dev` und `build`, mit `-- --force` neu |
+| `npm run library:check -- <datei>` | einzelne Inhaltsdateien des Fundus prüfen, ohne alles zu erzeugen |
 | `npm run test` | Unit-Tests (Vitest), u. a. Stabilität der Cache-Präfixe |
 | `npm run build` | Produktions-Build (nötig vor den E2E-Tests) |
 | `npm run test:e2e` | Komplette E2E-Suite mit Playwright gegen den Produktions-Build (startet eigene Server) |

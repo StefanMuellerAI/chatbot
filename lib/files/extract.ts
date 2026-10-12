@@ -147,8 +147,8 @@ async function extractSheet(data: Buffer, name: string): Promise<string> {
   for (const sheetName of wb.SheetNames) {
     const ws = wb.Sheets[sheetName];
     if (!ws || !ws["!ref"]) continue;
-    // Formatierte Zahlen aus Arbeitsmappen in deutscher Schreibweise (1.234,56 € statt 1,234.56 €).
-    // CSV und TSV bleiben, wie sie sind – dort steht der Text so in der Datei.
+    // Formatierte Zahlen und Datumsangaben aus Arbeitsmappen in deutscher Schreibweise (1.234,56 € statt 1,234.56 €,
+    // 12.01.2026 statt 1/12/26). CSV und TSV bleiben, wie sie sind – dort steht der Text so in der Datei.
     if (ext !== "csv" && ext !== "tsv") germanNumbers(ws, XLSX.SSF.is_date);
     const range = XLSX.utils.decode_range(ws["!ref"]);
     const rows = range.e.r - range.s.r + 1;
@@ -160,15 +160,31 @@ async function extractSheet(data: Buffer, name: string): Promise<string> {
   return parts.join("\n\n") || "[Die Tabelle ist leer.]";
 }
 
-/** Tauscht Tausender- und Dezimaltrennzeichen formatierter Zahlenzellen (nicht bei Datumsformaten). */
+/**
+ * Tauscht Tausender- und Dezimaltrennzeichen formatierter Zahlenzellen (nicht bei Datumsformaten) und schreibt
+ * Datumszellen als TT.MM.JJJJ – SheetJS zeigt sie sonst im US-Format (m/d/yy), auch wenn Excel sie deutsch anzeigt.
+ */
 export function germanNumbers(ws: Record<string, unknown>, isDate: (fmt: string) => boolean): void {
   for (const [addr, value] of Object.entries(ws)) {
     if (addr.startsWith("!")) continue;
-    const cell = value as { t?: string; w?: string; z?: string | number };
+    const cell = value as { t?: string; v?: unknown; w?: string; z?: string | number };
+    if (cell.t === "d" && cell.v instanceof Date && !Number.isNaN(cell.v.getTime())) {
+      cell.w = germanDate(cell.v);
+      continue;
+    }
     if (cell.t !== "n" || typeof cell.w !== "string") continue;
     if (typeof cell.z === "string" && isDate(cell.z)) continue;
     cell.w = cell.w.replace(/[.,]/g, (c) => (c === "," ? "." : ","));
   }
+}
+
+/** Datum (SheetJS liefert es in UTC) als 12.01.2026, mit Uhrzeit als 12.01.2026 14:30, reine Uhrzeit als 14:30. */
+function germanDate(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const time = `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+  if (date.getUTCFullYear() < 1900) return time;
+  const day = `${pad(date.getUTCDate())}.${pad(date.getUTCMonth() + 1)}.${date.getUTCFullYear()}`;
+  return time === "00:00" ? day : `${day} ${time}`;
 }
 
 function extractPptx(data: Buffer): string {

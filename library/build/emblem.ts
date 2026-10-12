@@ -2,7 +2,7 @@
 // Bewusst keine echten Wappen oder Hoheitszeichen (z. B. kein Adler).
 import { encodePng } from "./png";
 
-export type EmblemSymbol = "tower" | "tree" | "wave" | "chip" | "columns" | "book" | "arch" | "grid";
+export type EmblemSymbol = "tower" | "tree" | "wave" | "chip" | "columns" | "book" | "arch" | "grid" | "bridge";
 
 export interface EmblemSpec {
   symbol: EmblemSymbol;
@@ -183,6 +183,24 @@ function symbol(kind: EmblemSymbol, accent: number[]): Shape[] {
     }
     case "grid":
       return [rect(52, 80, 34, 34), rect(94, 80, 34, 34), rect(52, 122, 34, 34), rect(94, 122, 34, 34, accent)];
+    case "bridge": {
+      // Brücke mit Bogen über einer Furt
+      const arch: Point[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const a = (i / 24) * Math.PI;
+        arch.push([90 - Math.cos(a) * 40, 138 - Math.sin(a) * 26]);
+      }
+      const water = (y0: number): Shape => {
+        const top: Point[] = [];
+        const bottom: Point[] = [];
+        for (let x = 26; x <= 154; x += 4) {
+          top.push([x, y0 + Math.sin((x - 26) / 10) * 3]);
+          bottom.push([x, y0 + 7 + Math.sin((x - 26) / 10) * 3]);
+        }
+        return poly([...top, ...bottom.reverse()], accent);
+      };
+      return [rect(30, 98, 120, 12), poly([[36, 110], [144, 110], [144, 138], ...arch.reverse(), [36, 138]]), water(146), water(160)];
+    }
   }
 }
 

@@ -133,4 +133,23 @@ describe("Zahlen in Arbeitsmappen", () => {
     expect((ws.A2 as { w: string }).w).toBe("30.09.2025");
     expect((ws.A3 as { w: string }).w).toBe("a,b.c");
   });
+
+  it("schreibt Datumszellen deutsch (TT.MM.JJJJ) statt im US-Format", async () => {
+    const ws: Record<string, unknown> = {
+      "!ref": "A1:A3",
+      A1: { t: "d", v: new Date(Date.UTC(2026, 0, 12)) },
+      A2: { t: "d", v: new Date(Date.UTC(2026, 0, 12, 14, 30)) },
+      A3: { t: "d", v: new Date(Date.UTC(1899, 11, 30, 8, 15)) },
+    };
+    germanNumbers(ws, XLSX.SSF.is_date);
+    expect([ws.A1, ws.A2, ws.A3].map((c) => (c as { w: string }).w)).toEqual(["12.01.2026", "12.01.2026 14:30", "08:15"]);
+
+    // Wie eine in Excel gespeicherte Datei mit dem Standard-Datumsformat (Format 14)
+    const sheet = XLSX.utils.aoa_to_sheet([["Frist"], [new Date(Date.UTC(2026, 0, 12))]], { cellDates: true });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, sheet, "Fristen");
+    const text = await extractText(Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" })), "fristen.xlsx", "");
+    expect(text).toContain("12.01.2026");
+    expect(text).not.toContain("1/12/26");
+  });
 });

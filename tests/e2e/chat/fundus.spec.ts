@@ -1,6 +1,7 @@
 import { strFromU8, unzipSync } from "fflate";
 import type { Download, Locator, Page } from "@playwright/test";
 import * as XLSX from "xlsx";
+import { EMPTY_FILTER, filterDocuments, filterThreads, type LibraryFilter } from "../../../lib/library/search";
 import type { LibraryCatalog, LibraryDocument, LibraryThread } from "../../../lib/library/types";
 import { expectAccessible } from "../support/a11y";
 import { expect, test, uniq } from "../support/fixtures";
@@ -38,6 +39,10 @@ async function catalogOf(page: Page): Promise<LibraryCatalog> {
 }
 const doc = (c: LibraryCatalog, id: string): LibraryDocument => c.documents.find((d) => d.id === id)!;
 const thread = (c: LibraryCatalog, id: string): LibraryThread => c.threads.find((t) => t.id === id)!;
+/** Erwartete Treffer – dieselbe Suche, die der Dialog nutzt (geprüft in den Unit-Tests). */
+const docHits = (c: LibraryCatalog, f: Partial<LibraryFilter>) => filterDocuments(c, { ...EMPTY_FILTER, ...f });
+const threadHits = (c: LibraryCatalog, f: Partial<LibraryFilter>) => filterThreads(c, { ...EMPTY_FILTER, ...f });
+const documents = (n: number) => `${n} ${n === 1 ? "Dokument" : "Dokumente"}`;
 
 async function openFundus(page: Page) {
   await fundusButton(page).click();
@@ -76,6 +81,8 @@ test.describe("Y · Fundus", () => {
   });
 
   test("Y02 Dialog schließt per X, Esc und Klick daneben, gibt den Fokus zurück und merkt sich Reiter und Suche", async ({ chat, page }) => {
+    const hits = threadHits(await catalogOf(page), { query: "Bieterfrage" }).length;
+    expect(hits).toBeGreaterThanOrEqual(1);
     const button = fundusButton(page);
     await button.focus();
     await page.keyboard.press("Enter");
@@ -91,21 +98,23 @@ test.describe("Y · Fundus", () => {
     await button.click();
     await tab(page, "E-Mails").click();
     await search(page).fill("Bieterfrage");
-    await expect(threadList(page).getByRole("option")).toHaveCount(1);
+    await expect(threadList(page).getByRole("option")).toHaveCount(hits);
     await page.mouse.click(5, 5);
     await expect(dialog(page)).toBeHidden();
 
     await button.click();
     await expect(tab(page, "E-Mails")).toHaveAttribute("aria-selected", "true");
     await expect(search(page)).toHaveValue("Bieterfrage");
-    await expect(threadList(page).getByRole("option")).toHaveCount(1);
+    await expect(threadList(page).getByRole("option")).toHaveCount(hits);
     void chat;
   });
 
   test("Y03 Katalog: Anzahl je Reiter, alle Verwaltungen und Einheiten, genug von jedem Typ", async ({ chat, page }) => {
     const catalog = await catalogOf(page);
-    for (const type of ["word", "excel", "powerpoint"]) expect(catalog.documents.filter((d) => d.type === type).length, type).toBeGreaterThanOrEqual(5);
-    expect(catalog.threads.length).toBeGreaterThanOrEqual(5);
+    for (const [type, min] of [["word", 60], ["excel", 50], ["powerpoint", 40]] as const) {
+      expect(catalog.documents.filter((d) => d.type === type).length, type).toBeGreaterThanOrEqual(min);
+    }
+    expect(catalog.threads.length).toBeGreaterThanOrEqual(40);
     expect(new Set(catalog.orgs.map((o) => o.level))).toEqual(new Set(["kommune", "kreis", "land", "bund", "it"]));
 
     await openFundus(page);
@@ -139,10 +148,12 @@ test.describe("Y · Fundus", () => {
     await expect(options).toHaveCount(fb.length);
     await expect(count).toHaveText(`${fb.length} Dokumente`);
     // Ein Dezernat zeigt auch die Dokumente seiner Ämter und Abteilungen.
+    const dez5 = docHits(catalog, { orgId: "falkenbrueck", unitId: "fb-dez5" });
+    expect(dez5.length).toBeLessThan(fb.length);
     await units.selectOption("fb-dez5");
-    await expect(options).toHaveCount(1);
+    await expect(options).toHaveCount(dez5.length);
     await expect(docOption(page, IDS.word)).toBeVisible();
-    await expect(count).toHaveText("1 Dokument");
+    await expect(count).toHaveText(documents(dez5.length));
 
     await orgs.selectOption("bzbl");
     await expect(units).toHaveValue("");
@@ -160,6 +171,8 @@ test.describe("Y · Fundus", () => {
 
     await orgs.selectOption("brackenhain");
     await typeChip("Excel").click();
+    await expect(count).toHaveText(documents(docHits(catalog, { orgId: "brackenhain", types: ["excel"] }).length));
+    await search(page).fill("gibt es nirgends");
     await expect(dialog(page).getByText("Keine Treffer.")).toBeVisible();
     await expect(count).toHaveText("0 Dokumente");
     await dialog(page).getByRole("button", { name: "Filter zurücksetzen" }).click();
@@ -172,20 +185,24 @@ test.describe("Y · Fundus", () => {
     await openFundus(page);
     const options = docList(page).getByRole("option");
     await search(page).fill("KIEBITZWEG");
-    await expect(options).toHaveCount(1);
+    await expect(options).toHaveCount(docHits(catalog, { query: "Kiebitzweg" }).length);
     await expect(docOption(page, IDS.word)).toBeVisible();
 
     await search(page).fill("Kaemmerei");
+    await expect(options).toHaveCount(docHits(catalog, { query: "Kämmerei" }).length);
     await expect(docOption(page, IDS.excel)).toBeVisible();
     await search(page).fill("strassenverkehr");
-    await expect(options).toHaveCount(1);
-    await expect(options.first()).toContainText("Zulassungsstelle");
+    await expect(options).toHaveCount(docHits(catalog, { query: "Straßenverkehr" }).length);
+    await expect(docOption(page, "am-zulassungsstelle-fallzahlen-2025")).toBeVisible();
     await search(page).fill("lindqvist");
-    await expect(options.first()).toContainText(doc(catalog, "bzbl-vergabevermerk-notebooks").title);
+    await expect(options.first()).toContainText(docHits(catalog, { query: "lindqvist" })[0].title);
+    await expect(docOption(page, "bzbl-vergabevermerk-notebooks")).toBeVisible();
 
     // Suche und Filter zusammen
     await search(page).fill("Kämmerei");
     await dialog(page).getByRole("group", { name: "Dateityp" }).getByRole("button", { name: "PowerPoint" }).click();
+    await expect(options).toHaveCount(docHits(catalog, { query: "Kämmerei", types: ["powerpoint"] }).length);
+    await search(page).fill("Kämmerei gibt es nirgends");
     await expect(dialog(page).getByText("Keine Treffer.")).toBeVisible();
     void chat;
   });
@@ -376,11 +393,11 @@ test.describe("Y · Fundus", () => {
     await dialog(page).getByRole("button", { name: "Filter zurücksetzen" }).click();
 
     await search(page).fill("kh.wolters");
-    await expect(options).toHaveCount(1);
-    await expect(options.first()).toHaveAttribute("data-id", "bh-beschwerde-laerm-dgh");
+    await expect(options).toHaveCount(threadHits(catalog, { query: "kh.wolters" }).length);
+    await expect(threadOption(page, "bh-beschwerde-laerm-dgh")).toBeVisible();
     await search(page).fill("bieterfrage");
-    await expect(options).toHaveCount(1);
-    await expect(options.first()).toContainText(thread(catalog, IDS.bieterfrage).subject);
+    await expect(options).toHaveCount(threadHits(catalog, { query: "bieterfrage" }).length);
+    await expect(threadOption(page, IDS.bieterfrage)).toContainText(thread(catalog, IDS.bieterfrage).subject);
     void chat;
   });
 

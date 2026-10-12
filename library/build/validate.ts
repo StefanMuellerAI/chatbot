@@ -2,6 +2,7 @@
 import { LIBRARY_ID } from "@/lib/library/types";
 import type { DocSpec, ThreadSpec } from "../types";
 import { ORGS, PERSONS } from "../world";
+import { email, phone } from "./resolve";
 
 export function validateLibrary(docs: DocSpec[], threads: ThreadSpec[]): string[] {
   const problems: string[] = [];
@@ -37,6 +38,23 @@ export function validateLibrary(docs: DocSpec[], threads: ThreadSpec[]): string[
     for (const u of o.units) if (u.parent && !unitOf(o.id, u.parent)) problems.push(`${o.id}/${u.id}: unbekannte übergeordnete Einheit ${u.parent}`);
   }
   const personIds = new Set(PERSONS.map((p) => p.id));
+  // Fehlerhafte Personen meldet die Schleife darunter; hier zählt nur, was sich auflösen lässt.
+  const resolvable = <T>(f: () => T | undefined): T[] => {
+    try {
+      const value = f();
+      return value === undefined ? [] : [value];
+    } catch {
+      return [];
+    }
+  };
+  dupes(
+    PERSONS.flatMap((p) => resolvable(() => email(p))),
+    "Mail-Adresse",
+  );
+  dupes(
+    PERSONS.flatMap((p) => resolvable(() => phone(p))),
+    "Rufnummer",
+  );
   for (const p of PERSONS) {
     if (p.org) {
       if (!orgIds.has(p.org)) problems.push(`${p.id}: unbekannte Verwaltung ${p.org}`);
@@ -54,6 +72,10 @@ export function validateLibrary(docs: DocSpec[], threads: ThreadSpec[]): string[
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) problems.push(`${id}: Datum im Format JJJJ-MM-TT`);
   };
 
+  dupes(
+    docs.map((d) => `${d.fileName}.${d.type}`),
+    "Dateiname",
+  );
   for (const d of docs) {
     checkItem(d.id, d.org, d.unit, d.date);
     if (!personIds.has(d.author)) problems.push(`${d.id}: unbekannte Verfasserin/unbekannter Verfasser ${d.author}`);

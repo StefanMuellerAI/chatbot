@@ -11,6 +11,7 @@ import { LIBRARY_EXTENSION, LIBRARY_MIME, lengthTag, type LibraryCatalog } from 
 import type { ChatMessage } from "@/lib/shared/types";
 import { readManifest } from "@/library/build/build";
 import { computeWorkbook, renderExcel } from "@/library/build/excel";
+import { BLOCKED_TERMS, fictionProblems } from "@/library/build/fiction";
 import { berlinOffset, rfc5322Date } from "@/library/build/format";
 import { evaluate } from "@/library/build/formula";
 import { encodeWord, quotedPrintable, renderMail } from "@/library/build/mail";
@@ -61,14 +62,30 @@ describe("Fundus: Weltmodell und Inhalte", () => {
     );
   });
 
-  it("enthält genug von allem: 8 Verwaltungen aller Ebenen, je Typ mindestens 5 Dokumente, mindestens 5 Verläufe", () => {
-    expect(catalog.orgs).toHaveLength(8);
+  it("enthält genug von allem: 9 Verwaltungen aller Ebenen, 150 Dokumente (60 Word, 50 Excel, 40 PowerPoint), 40 Verläufe", () => {
+    expect(catalog.orgs).toHaveLength(9);
     expect(new Set(catalog.orgs.map((o) => o.level))).toEqual(new Set(["kommune", "kreis", "land", "bund", "it"]));
-    for (const type of ["word", "excel", "powerpoint"] as const) expect(catalog.documents.filter((d) => d.type === type).length).toBeGreaterThanOrEqual(5);
-    expect(catalog.threads.length).toBeGreaterThanOrEqual(5);
+    const byType = (type: string) => catalog.documents.filter((d) => d.type === type).length;
+    expect(byType("word")).toBeGreaterThanOrEqual(60);
+    expect(byType("excel")).toBeGreaterThanOrEqual(50);
+    expect(byType("powerpoint")).toBeGreaterThanOrEqual(40);
+    expect(catalog.threads.length).toBeGreaterThanOrEqual(40);
+    expect(catalog.threads.reduce((sum, t) => sum + t.mails.length, 0)).toBeGreaterThanOrEqual(140);
     expect(catalog.threads.every((t) => t.mails.length >= 2)).toBe(true);
-    // Jede Verwaltung kommt im Fundus vor.
-    for (const o of catalog.orgs) expect([...catalog.documents, ...catalog.threads].some((i) => i.orgId === o.id), o.id).toBe(true);
+    // Jede Verwaltung hat alle drei Dateitypen und E-Mail-Verläufe.
+    for (const o of catalog.orgs) {
+      for (const type of ["word", "excel", "powerpoint"]) expect(catalog.documents.some((d) => d.orgId === o.id && d.type === type), `${o.id}: ${type}`).toBe(true);
+      expect(catalog.threads.filter((t) => t.orgId === o.id).length, o.id).toBeGreaterThanOrEqual(2);
+    }
+    // Schwerpunkt Kommune: Gemeinden, Städte, Landkreis und kommunaler IT-Dienstleister stellen mehr als zwei Drittel.
+    const communal = new Set(catalog.orgs.filter((o) => ["kommune", "kreis", "it"].includes(o.level)).map((o) => o.id));
+    const share = (items: { orgId: string }[]) => items.filter((i) => communal.has(i.orgId)).length / items.length;
+    expect(share(catalog.documents)).toBeGreaterThan(2 / 3);
+    expect(share(catalog.threads)).toBeGreaterThan(2 / 3);
+    // Jedes Merkmal und jede Länge kommt mehrfach vor.
+    for (const tag of ["kurz", "mittel", "lang", "zahlen", "widersprueche", "personendaten", "unstrukturiert"] as const) {
+      expect(catalog.documents.filter((d) => d.tags.includes(tag)).length, tag).toBeGreaterThanOrEqual(10);
+    }
   });
 
   it("jede Datei lässt sich auslesen und enthält ihre Pflichtbegriffe; Token-Schätzung und Länge stimmen", async () => {
@@ -106,29 +123,31 @@ describe("Fundus: Weltmodell und Inhalte", () => {
 });
 
 describe("Fundus: erfunden, aber echt wirkend (Wächter über alle Dateien)", () => {
-  it("nur Adressen auf .example, nur Spielfilm-Rufnummern, Postleitzahlen mit 00, keine gültigen IBANs", async () => {
-    const all = await allTexts();
-    for (const [id, text] of all) {
-      for (const m of text.matchAll(/[\w.+-]+@([\w-]+\.)+[a-z]{2,}/gi)) expect(m[0], id).toMatch(/\.example$/);
-      for (const m of text.matchAll(/\b(?:https?:\/\/|www\.)([^\s/)"']+)/gi)) expect(m[1], id).toMatch(/\.example$/);
-      for (const m of text.matchAll(/\b0\d{2,4} \d{4,6}(?:-\d{1,4})?\b/g)) expect(m[0], id).toMatch(/^(030 23125|069 90009|040 66969)-\d{3}$/);
-      for (const m of text.matchAll(/\b(\d{5}) [A-ZÄÖÜ][a-zäöüß]+/g)) if (Number(m[1]) >= 1000 && !/^20\d\d$/.test(m[1].slice(1))) expect(m[1], `${id}: ${m[0]}`).toMatch(/^00/);
-      for (const m of text.matchAll(/\bDE\d{2}(?: ?\d{4}){4} ?\d{2}\b/g)) expect(ibanValid(m[0].replace(/ /g, "")), id).toBe(false);
-    }
+  it("nur Adressen auf .example, nur Spielfilm-Rufnummern, Postleitzahlen mit 00, keine gültigen IBANs, nichts von der Sperrliste", async () => {
+    const problems = [...(await allTexts())].flatMap(([id, text]) => fictionProblems(id, text));
+    expect(problems).toEqual([]);
   });
 
-  it("nennt keine echten Behörden oder Orte aus der Sperrliste", async () => {
-    const blocked = [
-      "Bundesministerium des Innern",
-      "Bundesverwaltungsamt",
-      "Beschaffungsamt des BMI",
-      "Landesverwaltungsamt",
-      "Ellerbach",
-      "Wiesengrund",
-      "Bundesadler",
-      "ChatGPT",
-    ];
-    for (const [id, text] of await allTexts()) for (const b of blocked) expect(text.includes(b), `${id} nennt „${b}“`).toBe(false);
+  it("der Wächter erkennt Verstöße", () => {
+    const text = [
+      "Mail an p.mustermann@stadt.de, siehe www.beispiel.de",
+      "Telefon 0221 123456 und 069 90009-12",
+      "Rathaus, 50667 Köln",
+      "IBAN DE89 3704 0044 0532 0130 00",
+      BLOCKED_TERMS[0],
+    ].join("\n");
+    expect(fictionProblems("x", text)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Adresse nicht auf .example: p.mustermann@stadt.de"),
+        expect.stringContaining("Webadresse nicht auf .example: www.beispiel.de"),
+        expect.stringContaining("Rufnummer nicht aus den Spielfilm-Bereichen (mit dreistelliger Durchwahl): 0221 123456"),
+        expect.stringContaining("Rufnummer nicht aus den Spielfilm-Bereichen (mit dreistelliger Durchwahl): 069 90009-12"),
+        expect.stringContaining("Postleitzahl muss mit 00 beginnen: 50667 Köln"),
+        expect.stringContaining("gültige IBAN"),
+        expect.stringContaining(`nennt „${BLOCKED_TERMS[0]}“`),
+      ]),
+    );
+    expect(fictionProblems("x", "Rathausplatz 1, 00417 Falkenbrück, Telefon 069 90009-100, IBAN DE00 1234 5678 9012 3456 78, 12.500 Euro")).toEqual([]);
   });
 
   it("Mail-Domains und Rufnummern im Weltmodell folgen den Regeln", () => {
@@ -146,13 +165,6 @@ describe("Fundus: erfunden, aber echt wirkend (Wächter über alle Dateien)", ()
     for (const t of catalog.threads) for (const m of t.mails) expect(readFileSync(filePath(m.id, "eml"), "utf8")).toContain("X-Freebie-Fundus:");
   });
 });
-
-function ibanValid(iban: string): boolean {
-  const moved = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
-  let rest = 0;
-  for (const ch of moved) rest = (rest * 10 + Number(ch)) % 97;
-  return rest === 1;
-}
 
 describe("Fundus: Generator", () => {
   it("erzeugt in jedem Prozess byte-gleiche Dateien (feste Prüfsummen)", async () => {
@@ -221,25 +233,52 @@ describe("Fundus: Suche und Filter", () => {
 
   it("filtert nach Verwaltung, Einheit samt Untereinheiten, Typ, Merkmal und Suchbegriff", () => {
     const fb = catalog.orgs.find((o) => o.id === "falkenbrueck")!;
-    expect(unitWithChildren(fb, "fb-dez5")).toEqual(new Set(["fb-dez5", "fb-amt51", "fb-amt51-kita"]));
+    expect(unitWithChildren(fb, "fb-dez5")).toEqual(new Set(["fb-dez5", "fb-amt50", "fb-amt51", "fb-amt51-kita", "fb-amt51-asd", "fb-amt53"]));
     expect(unitTree(fb)[0]).toEqual({ id: "fb-ob", name: "Büro der Oberbürgermeisterin", depth: 0 });
 
-    const ids = (f: Partial<typeof EMPTY_FILTER>) => filterDocuments(catalog, { ...EMPTY_FILTER, ...f }).map((d) => d.id);
+    const docs = (f: Partial<typeof EMPTY_FILTER>) => filterDocuments(catalog, { ...EMPTY_FILTER, ...f });
+    const ids = (f: Partial<typeof EMPTY_FILTER>) => docs(f).map((d) => d.id);
+    const sameSet = (actual: string[], expected: string[]) => expect([...actual].sort()).toEqual([...expected].sort());
     expect(ids({})).toHaveLength(catalog.documents.length);
-    expect(ids({ orgId: "falkenbrueck", unitId: "fb-dez5" })).toEqual(["fb-beschlussvorlage-kita-nordstadt"]);
-    expect(ids({ orgId: "falkenbrueck", types: ["excel"] })).toEqual(["fb-budgetueberwachung-th51"]);
+
+    // Ein Dezernat zeigt die Dokumente seiner Ämter und Abteilungen – und nur diese.
+    const dez5 = unitWithChildren(fb, "fb-dez5");
+    sameSet(
+      ids({ orgId: "falkenbrueck", unitId: "fb-dez5" }),
+      catalog.documents.filter((d) => d.orgId === "falkenbrueck" && dez5.has(d.unitId)).map((d) => d.id),
+    );
+    expect(ids({ orgId: "falkenbrueck", unitId: "fb-dez5" })).toContain("fb-beschlussvorlage-kita-nordstadt");
+    sameSet(
+      ids({ orgId: "falkenbrueck", types: ["excel"] }),
+      catalog.documents.filter((d) => d.orgId === "falkenbrueck" && d.type === "excel").map((d) => d.id),
+    );
+    sameSet(
+      ids({ tags: ["personendaten", "zahlen"] }),
+      catalog.documents.filter((d) => d.tags.includes("personendaten") && d.tags.includes("zahlen")).map((d) => d.id),
+    );
+    // Suche: Einheit, Umlaute, Person, mehrere Wörter
     expect(ids({ query: "KAEMMEREI" })).toContain("fb-budgetueberwachung-th51");
-    expect(ids({ query: "strassenverkehr" })).toEqual(["am-zulassungsstelle-fallzahlen-2025"]);
-    expect(ids({ query: "lindqvist vergabe" })).toEqual(["bzbl-vergabevermerk-notebooks"]);
-    expect(ids({ tags: ["personendaten"] })).toEqual(["bh-gespraechsnotiz-laerm-dgh"]);
-    expect(ids({ orgId: "brackenhain", types: ["excel"] })).toEqual([]);
+    expect(ids({ query: "strassenverkehr" })).toContain("am-zulassungsstelle-fallzahlen-2025");
+    expect(ids({ query: "lindqvist vergabe" })).toContain("bzbl-vergabevermerk-notebooks");
+    expect(docs({ query: "lindqvist vergabe" }).every((d) => fold(JSON.stringify(d)).includes("lindqvist"))).toBe(true);
+    // Mehrere Wörter: Jedes muss vorkommen, die Trefferliste wird kleiner.
+    const kiebitzweg = ids({ query: "Kiebitzweg" });
+    const both = ids({ query: "Kiebitzweg Beschlussvorlage" });
+    expect(both).toContain("fb-beschlussvorlage-kita-nordstadt");
+    expect(both.length).toBeLessThan(kiebitzweg.length);
+    expect(both.every((id) => kiebitzweg.includes(id) && ids({ query: "Beschlussvorlage" }).includes(id))).toBe(true);
+    expect(ids({ query: "gibt es nirgends xyz" })).toEqual([]);
     // neueste zuerst
     const dates = ids({}).map((id) => catalog.documents.find((d) => d.id === id)!.date);
     expect([...dates].sort().reverse()).toEqual(dates);
 
     const threads = (f: Partial<typeof EMPTY_FILTER>) => filterThreads(catalog, { ...EMPTY_FILTER, ...f }).map((t) => t.id);
     expect(threads({ query: "kh.wolters" })).toEqual(["bh-beschwerde-laerm-dgh"]);
-    expect(threads({ orgId: "bzbl" })).toEqual(["bzbl-bieterfrage-los2"]);
+    sameSet(
+      threads({ orgId: "bzbl" }),
+      catalog.threads.filter((t) => t.orgId === "bzbl").map((t) => t.id),
+    );
+    expect(threads({ orgId: "bzbl" })).toContain("bzbl-bieterfrage-los2");
   });
 });
 

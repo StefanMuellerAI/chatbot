@@ -13,7 +13,7 @@ verhält sie sich wie eine hochgeladene Datei.
 
 | | |
 |---|---|
-| **Umfang** | ca. 150 Dokumente (60 Word, 50 Excel, 40 PowerPoint) und ca. 40 E-Mail-Verläufe (rund 150 E-Mails) aus 8 erfundenen Verwaltungen |
+| **Umfang** | 150 Dokumente (60 Word, 50 Excel, 40 PowerPoint) und 40 E-Mail-Verläufe (rund 150 E-Mails) aus 9 erfundenen Verwaltungen, Schwerpunkt Kommune |
 | **Formate** | echte `.docx`, `.xlsx`, `.pptx` und `.eml`, die sich herunterladen und in Office bzw. Outlook öffnen lassen |
 | **Im Chat** | wie ein Upload: Chip, Token-Schätzung, Verlauf, Bearbeiten, Export, Antwort-Cache |
 | **Kosten** | Es gibt keinen Upload und keinen Blob-Speicher. Die Datei ist für alle gleich, hat also dieselbe Prüfsumme. Darum greifen Datei- und Antwort-Cache über alle Teilnehmenden hinweg. |
@@ -61,22 +61,28 @@ Dokumente und Mails verweisen darauf:
 Das macht den Fundus glaubwürdig. Es ermöglicht außerdem Übungen über mehrere Dateien, z. B. „Stimmen die Zahlen der
 Präsentation mit der Excel-Tabelle überein?“. Dafür sind gezielt Widersprüche eingebaut.
 
-Umgesetzt mit etwas mehr Gewicht auf Land und Bund (Entscheidung 6): drei kommunale Verwaltungen, ein
-IT-Dienstleister, je zwei Behörden von Land und Bund.
+Das Pilotpaket hatte etwas mehr Gewicht auf Land und Bund (Entscheidung 6). Beim Ausbau liegt der Schwerpunkt auf der
+Kommune (Entscheidung 7): vier kommunale Verwaltungen und ein kommunaler IT-Dienstleister stellen gut zwei Drittel der
+Inhalte, dazu je zwei Behörden von Land und Bund. Neu ist die Stadt Rabensfurt als typische Mittelstadt mit
+Fachbereichen.
 
 | Ebene | Name | Einheiten (Auszug) |
 |---|---|---|
-| Kreisfreie Großstadt | Stadt Falkenbrück | 5 Dezernate mit Hauptamt, Personalamt, IT, Kämmerei, Ordnungsamt, Bürgeramt, Jugendamt, Stadtplanung, Bauaufsicht; Presse |
-| Landkreis | Landkreis Altmoorland (Sitz: Altmoor) | Personal, Finanzen, Gesundheitsamt, Jugendamt, Zulassungsstelle, Ausländerbehörde, Bauaufsicht |
-| Kreisangehörige Gemeinde | Gemeinde Brackenhain | Hauptamt, Bauamt, Ordnungsamt, Kämmerei |
-| Kommunaler IT-Dienstleister | Zweckverband Kommunale IT Altmoor | Service Desk, Rechenzentrum, E-Akte, Informationssicherheit |
+| Kreisfreie Großstadt | Stadt Falkenbrück | 6 Dezernate mit Hauptamt, Personalamt, IT, Kämmerei, Stadtkasse, Liegenschaften, Ordnungsamt, Bürgeramt, Standesamt, Feuerwehr, Schulen, Kultur, Bibliothek, Sport, Sozialamt, Jugendamt, Gesundheitsamt, Stadtplanung, Bauaufsicht, Tiefbau, Grünflächen, Klimaschutz; Presse, Datenschutz, Gleichstellung, Rechnungsprüfung, Personalrat |
+| Landkreis | Landkreis Altmoorland (Sitz: Altmoor) | Kreistag, Personal, Finanzen, Kommunalaufsicht, Gesundheitsamt, Jugendamt, Soziales, Schülerbeförderung, Zulassungsstelle, Ausländerbehörde, Bevölkerungsschutz und Rettungsdienst, Veterinäramt, Bauaufsicht, Naturschutz, ÖPNV, Abfallwirtschaft |
+| Große kreisangehörige Stadt | Stadt Rabensfurt (neu) | 5 Fachbereiche mit Teams: Zentrale Dienste, Finanzen, Bürgerdienste und Ordnung, Bildung, Soziales und Kultur, Stadtentwicklung und Bauen; Stabsstelle Kommunikation |
+| Kreisangehörige Gemeinde | Gemeinde Brackenhain | Hauptamt, Kindergarten, Bauamt mit Bauhof, Ordnungsamt mit Freiwilliger Feuerwehr, Kämmerei |
+| Kommunaler IT-Dienstleister | Zweckverband Kommunale IT Altmoor | Service Desk, Rechenzentrum, Netze, E-Akte, Onlinedienste, Fachverfahren, Schulung, Informationssicherheit, Kaufmännische Dienste |
 | Landesministerium | Ministerium für Kommunales und Verwaltungsentwicklung (Sitz: Rhedenburg) | Zentralabteilung, Kommunalaufsicht, Verwaltungsmodernisierung mit Referat KI |
 | Landesoberbehörde | Landesamt für Personalgewinnung und Fortbildung | Personalgewinnung, Fortbildung, Digitale Kompetenzen |
 | Bundesministerium | Bundesministerium für Verwaltungsdienste und Bürgerservice | Zentralabteilung, Bürgerservice, Digitale Verwaltung mit Referat KI |
 | Bundesoberbehörde | Bundesamt für zentrale Beschaffung und Liegenschaften | Zentrale Dienste, Beschaffung, Liegenschaften |
 
 Alle Namen wurden per Websuche geprüft. „Ellerbach“ gab es als Gemeinde und wurde ersetzt; Land und Bund tragen
-Fantasienamen ohne Bezug zu echten Ressortzuschnitten.
+Fantasienamen ohne Bezug zu echten Ressortzuschnitten. Für den Ausbau kamen Rabensfurt und die Gemeinden Fennhusen,
+Torfkamp, Schilfwerder, Lütjenbrook und Krähenwerder im Landkreis Altmoorland dazu (ebenfalls per Websuche geprüft).
+Gemeinsame Weltfakten (Einwohnerzahlen, Haushaltszahlen, Kreisumlage, Mitglieder des Zweckverbands, Beitritt
+Rabensfurts) halten die Inhalte über Dateien und Verwaltungen hinweg stimmig.
 
 ### 3.2 Was in den Dateien steckt
 
@@ -118,7 +124,8 @@ Dateien.
   `library/world/`, `library/content/documents/<verwaltung>/` und `library/content/mails/`. So lassen sie sich als
   Text prüfen und es liegen keine Binärdateien im Repo (wie bei den Testdateien).
 - **Schreiben in Paketen:** Ich schreibe die Inhalte in Paketen je Verwaltung. Zuerst kommt ein **Pilotpaket**
-  (15 Dokumente, 5 Verläufe), damit du Ton, Optik und Realismus abnehmen kannst. Danach folgt die volle Breite.
+  (15 Dokumente, 5 Verläufe), damit du Ton, Optik und Realismus abnehmen kannst. Danach folgt die volle Breite – je
+  Verwaltung bzw. Dezernatsgruppe eine eigene Datei, die `npm run library:check` einzeln prüft.
 - **Generator:** Er erzeugt beim Build (`prebuild`, also auch auf Vercel und in der CI) die echten Dateien nach
   `.library/` (in `.gitignore`). Dazu schreibt er ein `manifest.json` mit Metadaten, Prüfsumme, Token-Schätzung und
   Vorschau-Daten.
@@ -313,8 +320,8 @@ Inhalt und nicht nur den Chip.
 | 1 · Grundlage | Weltmodell; Generator für Word, Excel, PowerPoint und E-Mail; feste Prüfsummen; `.eml` auslesen; PowerPoint-Diagramme; **Pilotpaket** mit 15 Dokumenten und 5 Verläufen; Unit-Tests | erledigt |
 | 2 · Server | Katalog, Vorschau, Download, Anhängen, Schalter, Rückfall in `prepare.ts`; Y21, Q21 | erledigt |
 | 3 · Oberfläche | Datenbank-Symbol, Dialog mit beiden Reitern, Vorschauen, Mehrfachauswahl, Chips; Y01–Y20 | erledigt |
-| **Abnahme Pilot** | Du schaust dir Pilotpaket und Dialog an: Optik, Ton und Realismus. Erst danach entsteht die Masse. | offen |
-| 4 · Volle Breite | alle 8 Verwaltungen, ca. 150 Dokumente und 40 Verläufe; Wächter- und Auslesetests laufen über alles | nach der Abnahme |
+| **Abnahme Pilot** | Du schaust dir Pilotpaket und Dialog an: Optik, Ton und Realismus. Erst danach entsteht die Masse. | erledigt (Ausbau beauftragt am 12.10.2026) |
+| 4 · Volle Breite | 9 Verwaltungen, 150 Dokumente und 40 Verläufe, Schwerpunkt Kommune; Wächter- und Auslesetests laufen über alles | erledigt |
 | 5 · Abschluss | `TESTPLAN.md`, `coverage.json`, `README.md`, Handbuch (Kapitel 2.9 mit Screenshots), Live-Smoke X08, Stabilitätslauf, CI in drei Browsern | Doku und Tests erledigt; Live-Smoke nach dem Deploy |
 
 **Pilotpaket (umgesetzt)**
@@ -330,6 +337,33 @@ Inhalt und nicht nur den Chip.
 | Bundesministerium (BMVB) | KI-Assistenz Sachstand (PowerPoint), Personalbedarfsermittlung (Excel) | – |
 | Bundesamt (BZBL) | Vergabevermerk Notebooks (Word), Energiebericht (PowerPoint) | Bieterfrage – Frist im Verlauf passt nicht zum Vergabevermerk |
 
+**Volle Breite (umgesetzt am 12. Oktober 2026)**
+
+| Verwaltung | Ebene | Word | Excel | PowerPoint | Dokumente | Verläufe | Mails |
+|---|---|---|---|---|---|---|---|
+| Stadt Falkenbrück | Kommune | 14 | 11 | 9 | 34 | 9 | 39 |
+| Landkreis Altmoorland | Landkreis | 10 | 8 | 6 | 24 | 7 | 32 |
+| Stadt Rabensfurt (neu) | Kommune | 7 | 6 | 5 | 18 | 5 | 22 |
+| Gemeinde Brackenhain | Kommune | 7 | 4 | 3 | 14 | 5 | 21 |
+| Zweckverband Kommunale IT Altmoor | IT-Dienstleister | 4 | 6 | 4 | 14 | 4 | 18 |
+| Ministerium (MKV) | Land | 6 | 3 | 3 | 12 | 3 | 12 |
+| Landesamt (LPF) | Land | 3 | 4 | 3 | 10 | 2 | 8 |
+| Bundesministerium (BMVB) | Bund | 5 | 4 | 3 | 12 | 2 | 9 |
+| Bundesamt (BZBL) | Bund | 4 | 4 | 4 | 12 | 3 | 12 |
+| **Summe** | | **60** | **50** | **40** | **150** | **40** | **173** |
+
+- **Schwerpunkt Kommune:** 104 der 150 Dokumente (69 %) und 30 der 40 Verläufe (75 %) stammen aus Kommunen, Landkreis
+  und kommunalem IT-Dienstleister. Der Unit-Test verlangt mehr als zwei Drittel.
+- **Vielfalt:** rund 90 verschiedene Dokumentarten, von der Haushaltssatzung über Allgemeinverfügung, Bescheid,
+  Niederschrift, Feuerwehrbedarfsplan, Nahverkehrsplan und Datenschutz-Folgenabschätzung bis zur Telefonnotiz; Daten
+  von Januar 2025 bis September 2026.
+- **Merkmale der Dokumente:** 36 kurz, 79 mittel, 35 lang (bis rund 8.000 Tokens); 83 mit Zahlen, 27 mit
+  Widersprüchen, 19 mit fiktiven Personendaten, 16 unstrukturiert. Jeder Widerspruch ist in der Kurzbeschreibung
+  benannt.
+- **Zusammenhang:** gemeinsame Weltfakten (Einwohner, Haushalte, Kreisumlage, Beitritt Rabensfurts zum Zweckverband,
+  Kita Kiebitzweg u. a.) und Verläufe über Verwaltungsgrenzen hinweg, z. B. Kommunalaufsicht und Gemeinde, Zweckverband
+  und Mitglieder, Ministerium und Kämmerei.
+
 **Abweichungen bei der Umsetzung**
 
 - **Kein Lesen über `getFile`:** Fundus-Dateien werden nur über die eigenen Routen gelesen (`lib/library/catalog.ts`).
@@ -338,6 +372,10 @@ Inhalt und nicht nur den Chip.
   (1.234,50 €), Foliennummern werden nicht mehr als Inhalt gelesen, Diagrammtitel und Achseneinheit getrennt.
 - **Generator:** `pptxgenjs` schreibt bei Fettdruck mitten im Absatz ungültiges XML – der Generator korrigiert das beim
   Neupacken, sonst böte PowerPoint eine Reparatur an.
+- **Datumsangaben aus Excel (gilt auch für Uploads):** Datumszellen erscheinen beim Auslesen als 12.01.2026 statt im
+  US-Format 1/12/26.
+- **Prüfskript:** `npm run library:check -- <datei>` prüft einzelne Inhaltsdateien im Speicher; so konnten die
+  Inhalte je Verwaltung parallel entstehen. Neue Personen kamen danach gesammelt in `world.ts`.
 - **Barrierefreiheit:** Die Tabellenvorschau ist per Tastatur scrollbar; farbige Typ-Beschriftungen sind im Dunkelmodus
   durch neutrale Schrift mit farbigem Symbol ersetzt (axe, Y19).
 
@@ -361,3 +399,6 @@ und Bund verschoben.
 4. **E-Mail-Adressen auf `.example`.**
 5. **Fundus unabhängig von Uploads**, mit eigenem Schalter im Admin (standardmäßig an).
 6. **Schwerpunkt:** drei kommunale Verwaltungen, ein IT-Dienstleister, je zwei Behörden von Land und Bund.
+7. **Ausbau (12. Oktober 2026):** 150 Dokumente und 40 Verläufe, möglichst vielfältig und gut verteilt, mit Schwerpunkt
+   Kommune. Dafür kommt die Stadt Rabensfurt als vierte kommunale Verwaltung dazu; gut zwei Drittel der Inhalte stammen
+   aus Kommunen, Landkreis und kommunalem IT-Dienstleister.
