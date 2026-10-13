@@ -91,6 +91,8 @@ export interface FeatureFlags {
   mailbox: boolean;
   /** Fundus: erfundene Beispieldateien und E-Mails zum Anhängen. */
   library: boolean;
+  /** Gruppenchats: gemeinsam mit der eigenen Gruppe schreiben und Freebie mit @Freebie fragen. */
+  groupChats: boolean;
 }
 
 export type AttachmentKind = "image" | "document" | "transcript";

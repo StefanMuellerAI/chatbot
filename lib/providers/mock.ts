@@ -1,5 +1,6 @@
 import "server-only";
 import type { PreparedPart } from "@/lib/chat/prepare";
+import { GROUPCHAT_MAILBOX_BLOCKED } from "@/lib/shared/groupchat";
 import type { ProviderRequest, ProviderResult } from "./types";
 import { emptyUsage } from "./types";
 
@@ -24,6 +25,8 @@ import { emptyUsage } from "./types";
  *   #postfach-erzwingen ruft die Postfach-Werkzeuge auch ohne Verbindung auf (Server muss ablehnen)
  *   #mail-lesen:ID      liest eine bestimmte Mail
  *   #senden:a,b         verschickt eine Mail an a und b (mit #anzahl:N mehrfach)
+ *
+ * Im Gruppenchat gilt der letzte Beitrag als Nachricht; die Diagnose nennt Zahl und Autoren der Beiträge.
  */
 export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
   const users = req.messages.filter((m) => m.role === "user");
@@ -31,7 +34,11 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
   const parts: PreparedPart[] = last && last.role === "user" ? last.parts : [];
   // Nur der eigene Text der Nutzerin bzw. des Nutzers (letzter Textteil, ohne Kontext und Dateien).
   const textParts = parts.filter((p) => p.type === "text");
-  const lastText = (textParts[textParts.length - 1] as { text: string } | undefined)?.text.split("\n\n").pop() ?? "";
+  // Gruppenchat: Beiträge der letzten Runde; der letzte (mit „@Freebie“) ist die eigentliche Frage.
+  const posts = req.groupChat ? groupPosts(parts) : [];
+  const lastText = posts.length
+    ? posts[posts.length - 1].text
+    : ((textParts[textParts.length - 1] as { text: string } | undefined)?.text.split("\n\n").pop() ?? "");
   const lower = lastText.toLowerCase();
   // Ganze Stichwörter: „#lang“ soll nicht auf „#langsam“ ansprechen.
   const flag = (name: string) => new RegExp(`(^|\\s)${name}(?=\\s|$)`).test(lower);
@@ -126,7 +133,11 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
     };
     if ((sendTo || readId || asks) && !req.mailboxConnected && !force) {
       mailHandled = true;
-      await say("Der Posteingang ist in diesem Chat nicht verbunden. Du kannst ihn unten im Eingabefeld unter „Verbindungen“ einschalten.");
+      await say(
+        req.groupChat
+          ? GROUPCHAT_MAILBOX_BLOCKED
+          : "Der Posteingang ist in diesem Chat nicht verbunden. Du kannst ihn unten im Eingabefeld unter „Verbindungen“ einschalten.",
+      );
     } else if (sendTo) {
       mailHandled = true;
       const count = Math.min(Number(/#anzahl:(\d+)/.exec(lower)?.[1] ?? 1), 10);
@@ -181,7 +192,7 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
       `Hier ist der Ablauf als Diagramm:\n\n<artifact id="ablauf" type="mermaid" title="Ablauf">\nflowchart LR\n  A["Frage stellen"] --> B["Freebie denkt nach"]\n  B --> C["Antwort lesen"]\n</artifact>\n`,
     );
   } else if (!imageMade && !mailHandled) {
-    await say(diagnosis(req, parts, lastText));
+    await say(diagnosis(req, parts, lastText, posts));
     // Tilden-Zaun: Dateiinhalte enthalten selbst ```-Blöcke (z. B. Tabellen als CSV).
     if (flag("#zeige-dateien")) await say(`\n\n~~~~text\n${fileContents(parts)}\n~~~~`);
   }
@@ -211,7 +222,7 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
 }
 
 /** Zeigt, was beim Modell ankommt – so wird jede Einstellung im Chat sichtbar. */
-function diagnosis(req: ProviderRequest, parts: PreparedPart[], lastText: string): string {
+function diagnosis(req: ProviderRequest, parts: PreparedPart[], lastText: string, posts: { author: string; text: string }[]): string {
   const last = req.messages[req.messages.length - 1];
   const files = parts.flatMap((p) =>
     p.type === "text"
@@ -234,13 +245,23 @@ function diagnosis(req: ProviderRequest, parts: PreparedPart[], lastText: string
     ["Effort", last?.role === "user" ? last.effort : "-"],
     ["Websuche", req.tools.webSearch && last?.role === "user" && last.webSearch ? "an" : "aus"],
     ["Bild-Werkzeug", req.tools.generateImage ? "an" : "aus"],
-    ["Posteingang", req.tools.mailbox ? (req.mailboxConnected ? "verbunden" : "nicht verbunden") : "aus"],
+    ["Posteingang", req.groupChat ? "im Gruppenchat nicht verfügbar" : req.tools.mailbox ? (req.mailboxConnected ? "verbunden" : "nicht verbunden") : "aus"],
     ["Artefakte", req.systemPrompt.includes("# Artefakte") ? "an" : "aus"],
     ["Vorlage", req.presetPrompt ? req.presetPrompt.slice(0, 50).replace(/\s+/g, " ") : "keine"],
     ["Kursleitung", req.systemPrompt.includes("# Hinweise der Kursleitung") ? "ja" : "nein"],
   ];
+  if (req.groupChat) {
+    const authors = [...new Set(posts.map((p) => p.author))];
+    rows.splice(2, 0, ["Gruppenchat", `${posts.length} ${posts.length === 1 ? "Beitrag" : "Beiträge"} von ${authors.join(", ")}`]);
+  }
   const table = rows.map(([k, v]) => `| ${k} | ${String(v).replace(/\|/g, "/")} |`).join("\n");
   return `**Testmodus:** Ich bin der Mock-Provider von Freebie.\n\nDu hast geschrieben:\n\n> ${quote}\n\n| Eigenschaft | Wert |\n|---|---|\n${table}\n\nFormel-Test: $E = mc^2$`;
+}
+
+/** Beiträge eines Gruppenchats aus der letzten Nutzernachricht (Autor und Text). */
+function groupPosts(parts: PreparedPart[]): { author: string; text: string }[] {
+  const text = parts.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n\n");
+  return [...text.matchAll(/<nachricht von="([^"]+)" zeit="[^"]*">\n([\s\S]*?)\n<\/nachricht>/g)].map((m) => ({ author: m[1], text: m[2] }));
 }
 
 /** Gelesene Mails als Tabelle (Von, Betreff, erste Textzeile) – so prüfen die Tests, was Freebie sah. */

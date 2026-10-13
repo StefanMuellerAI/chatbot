@@ -2,7 +2,8 @@ import "server-only";
 import { inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
 import type { ModelRow } from "@/lib/models";
-import type { Attachment, ChatMessage, Effort, NativeTurn } from "@/lib/shared/types";
+import type { Attachment, ChatMessage, Effort, GeneratedImage, NativeTurn } from "@/lib/shared/types";
+import { formatTime } from "@/lib/events/window";
 import { sniffImageMime } from "@/lib/files/sniff";
 import { libraryText } from "@/lib/library/catalog";
 import { getFile } from "@/lib/storage";
@@ -77,6 +78,80 @@ export async function prepareMessages(
       webSearch: m.webSearch ?? true,
     });
   }
+  return prepared;
+}
+
+/** Beitrag einer Person im Gruppenchat (so, wie er gespeichert ist). */
+export interface GroupPost {
+  kind: "person";
+  author: string;
+  text: string;
+  attachments: Attachment[];
+  /** Beim Posten festgehaltenes Datum. */
+  contextDate: string | null;
+  createdAt: Date;
+}
+
+/** Frühere Antwort von Freebie im Gruppenchat; Denktiefe und Websuche gelten für die Runde davor. */
+export interface GroupAnswer {
+  kind: "freebie";
+  text: string;
+  native?: NativeTurn;
+  images?: GeneratedImage[];
+  effort: Effort | null;
+  webSearch: boolean | null;
+}
+
+/** Ein Beitrag darf den Rahmen nicht schließen oder einen fremden Beitrag vortäuschen. */
+function escapePost(text: string): string {
+  return text.replace(/<\/?nachricht\b/gi, (t) => t.replace("<", "‹"));
+}
+
+/**
+ * Baut aus einem Gruppenchat deterministische Runden: Alle Beiträge zwischen zwei Antworten von Freebie
+ * werden zu einer Nutzernachricht, jeder mit Autor und Uhrzeit (beim Posten festgehalten). Der Verlauf ist
+ * append-only, frühere Runden bleiben so byte-gleich (Prompt Caching). Antworten ohne Text (Fehler) fallen
+ * weg; die Beiträge davor und danach bilden dann eine Runde. `current` gilt für die letzte, offene Runde.
+ */
+export async function prepareGroupTurns(
+  items: (GroupPost | GroupAnswer)[],
+  model: ModelRow,
+  opts: { nativePdf: boolean; current: { effort: Effort; webSearch: boolean } },
+): Promise<PreparedMessage[]> {
+  const shas = new Set<string>();
+  for (const item of items) {
+    if (item.kind === "person") for (const a of item.attachments) if (a.kind !== "image") shas.add(a.sha256);
+  }
+  const texts = await loadExtractedTexts([...shas]);
+
+  const prepared: PreparedMessage[] = [];
+  let posts: GroupPost[] = [];
+  const flush = async (settings: { effort: Effort; webSearch: boolean }) => {
+    if (posts.length === 0) return;
+    const parts: PreparedPart[] = [];
+    const date = posts.find((p) => p.contextDate)?.contextDate;
+    if (date) parts.push({ type: "text", text: `[Kontext: Heute ist ${date}.]` });
+    for (const post of posts) {
+      for (const a of post.attachments) parts.push(...(await attachmentParts(a, model, texts, opts)));
+      const body = post.text.trim() ? escapePost(post.text) : "(Siehe Anhang.)";
+      parts.push({ type: "text", text: `<nachricht von="${escapeAttr(post.author)}" zeit="${formatTime(post.createdAt)}">\n${body}\n</nachricht>` });
+    }
+    prepared.push({ role: "user", parts: mergeTextParts(parts), effort: settings.effort, webSearch: settings.webSearch });
+    posts = [];
+  };
+  for (const item of items) {
+    if (item.kind === "person") {
+      posts.push(item);
+      continue;
+    }
+    if (!item.text) continue;
+    await flush({ effort: item.effort ?? "medium", webSearch: item.webSearch ?? true });
+    // Bild-IDs mitgeben, damit das Modell Bilder später weiterbearbeiten kann (wie im privaten Chat).
+    const ids = (item.images ?? []).map((img) => img.id);
+    const text = ids.length ? `${item.text}\n\n[Erzeugte Bilder, Bild-IDs: ${ids.join(", ")}]` : item.text;
+    prepared.push({ role: "assistant", text, native: item.native });
+  }
+  await flush(opts.current);
   return prepared;
 }
 

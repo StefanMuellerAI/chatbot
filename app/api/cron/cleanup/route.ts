@@ -4,6 +4,7 @@ import { deleteExpiredAnswers } from "@/lib/chat/answer-cache";
 import { errorResponse } from "@/lib/auth/session";
 import { getDb, schema } from "@/lib/db/client";
 import { purgeExpiredGuests, purgeOldEvents } from "@/lib/events/store";
+import { purgeGroupChats } from "@/lib/groupchat/store";
 import { purgeMail } from "@/lib/mail/store";
 import { getSettings } from "@/lib/settings";
 import { deleteExpiredFiles } from "@/lib/storage";
@@ -35,6 +36,8 @@ export async function GET(request: Request) {
     // Posteingänge beendeter Termine (die meisten sind schon beim Abmelden weg). Vor den Zugängen,
     // sonst verschwinden die Mails der Gäste unbemerkt mit ihnen und die Zahl stimmt nicht.
     const deletedMails = await purgeMail();
+    // Gruppenchats beendeter Termine (gestartet von Gästen verschwinden sie sonst unbemerkt mit den Zugängen).
+    const deletedGroupChats = await purgeGroupChats();
     // Zugänge beendeter Termine löschen; Termine selbst bleiben 90 Tage in der Statistik.
     const deletedGuests = await purgeExpiredGuests();
     const deletedEvents = await purgeOldEvents();
@@ -46,6 +49,7 @@ export async function GET(request: Request) {
       deletedGuests,
       deletedEvents,
       deletedMails,
+      deletedGroupChats,
     });
   } catch (err) {
     return errorResponse(err);

@@ -53,6 +53,8 @@ export interface ProviderRequest {
   customTools: CustomTool[];
   /** Ob der Posteingang für die aktuelle Nachricht verbunden ist (nur zur Anzeige im Mock). */
   mailboxConnected?: boolean;
+  /** Antwort in einem Gruppenchat (nur zur Anzeige im Mock). */
+  groupChat?: boolean;
   emit: (event: StreamEvent) => void;
 }
 

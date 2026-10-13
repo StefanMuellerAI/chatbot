@@ -207,3 +207,82 @@ export const mails = pgTable(
   },
   (t) => [index("mails_owner_idx").on(t.owner, t.folder, t.sentAt), index("mails_event_idx").on(t.eventId)],
 );
+
+/**
+ * Gruppenchats: gehören zu genau einer Gruppe eines Termins. `owner` ist die Gast-ID der Person,
+ * die den Chat gestartet hat, oder „admin“ (Kursleitung). Jede Änderung erhöht `version` – in
+ * derselben Anweisung, die die Änderung schreibt (Grundlage der Abfrage „alles seit Stand n“).
+ */
+export const groupChats = pgTable(
+  "group_chats",
+  {
+    id: text("id").primaryKey(),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => events.id, { onDelete: "cascade" }),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => eventGroups.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    owner: text("owner").notNull(),
+    /** Gestartet von einem Gast: wird er gelöscht, ist sein Chat weg. */
+    ownerGuestId: text("owner_guest_id").references(() => guests.id, { onDelete: "cascade" }),
+    ownerName: text("owner_name").notNull(),
+    version: integer("version").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("group_chats_event_idx").on(t.eventId)],
+);
+
+/** Mitglieder: `account` ist die Gast-ID oder „admin“; `left_version` gesetzt = verlassen bzw. entfernt. */
+export const groupChatMembers = pgTable(
+  "group_chat_members",
+  {
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => groupChats.id, { onDelete: "cascade" }),
+    account: text("account").notNull(),
+    guestId: text("guest_id").references(() => guests.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Bis zu diesem Stand darf eine Person nach dem Verlassen oder Entfernen weiter lesen. */
+    leftVersion: integer("left_version"),
+    /** Verlassener Chat „aus meiner Liste entfernt“. */
+    hidden: boolean("hidden").notNull().default(false),
+    readVersion: integer("read_version").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.chatId, t.account] }), index("group_chat_members_account_idx").on(t.account)],
+);
+
+/** Beiträge, Antworten von Freebie und Systemzeilen eines Gruppenchats. */
+export const groupChatMessages = pgTable(
+  "group_chat_messages",
+  {
+    id: text("id").primaryKey(),
+    chatId: text("chat_id")
+      .notNull()
+      .references(() => groupChats.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    version: integer("version").notNull(),
+    /** person, freebie oder system */
+    kind: text("kind").notNull(),
+    author: text("author"),
+    authorName: text("author_name"),
+    text: text("text").notNull().default(""),
+    attachments: jsonb("attachments"),
+    contextDate: text("context_date"),
+    system: jsonb("system"),
+    /** Freebie: pending, done, stopped oder error; dazu Einstellungen und Ergebnis der Antwort. */
+    status: text("status"),
+    askedBy: text("asked_by"),
+    modelId: text("model_id"),
+    effort: text("effort"),
+    webSearch: boolean("web_search"),
+    answer: jsonb("answer"),
+    native: jsonb("native"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("group_chat_messages_chat_idx").on(t.chatId, t.seq), index("group_chat_messages_version_idx").on(t.chatId, t.version)],
+);

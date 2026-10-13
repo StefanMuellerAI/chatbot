@@ -31,6 +31,16 @@ export async function requireMailbox(opts: { write?: boolean } = {}): Promise<Ap
   return settings;
 }
 
+/**
+ * Gruppenchats: Schalter „Gruppenchats“ muss an sein. Bei Not-Aus bleibt Lesen möglich, Schreiben nicht.
+ */
+export async function requireGroupChats(opts: { write?: boolean } = {}): Promise<AppSettings> {
+  const settings = await getSettings();
+  if (!settings.features.groupChats) throw new HttpError(403, "Gruppenchats sind deaktiviert.");
+  if (opts.write && settings.paused) throw new HttpError(503, settings.pausedMessage);
+  return settings;
+}
+
 export async function requireFeature(feature: GuardedFeature): Promise<AppSettings> {
   const settings = await getSettings();
   if (settings.paused) throw new HttpError(503, settings.pausedMessage);

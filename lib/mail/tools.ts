@@ -60,10 +60,17 @@ const SendInput = z.object({
  * eingeschaltet ist (fester Präfix für das Prompt Caching); ob er im Chat verbunden ist, prüfen
  * sie bei jedem Aufruf. Gearbeitet wird immer mit dem Postfach der fragenden Person.
  */
-export function mailboxTools(ctx: { box: Mailbox; connected: boolean; emit: (event: StreamEvent) => void }): CustomTool[] {
+export function mailboxTools(ctx: {
+  box: Mailbox;
+  connected: boolean;
+  emit: (event: StreamEvent) => void;
+  /** Gesetzt, wo der Posteingang nie verbunden sein darf (Gruppenchat) – die Werkzeuge melden diesen Text. */
+  blocked?: string;
+}): CustomTool[] {
   let sentThisAnswer = 0;
   const seenRead = new Set<string>();
-  const guard = (): ToolOutput | null => (ctx.connected ? null : { content: NOT_CONNECTED, isError: true });
+  const guard = (): ToolOutput | null =>
+    ctx.blocked ? { content: ctx.blocked, isError: true } : ctx.connected ? null : { content: NOT_CONNECTED, isError: true };
 
   const list: CustomTool = {
     name: "mailbox_list",

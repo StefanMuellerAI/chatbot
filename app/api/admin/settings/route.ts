@@ -40,6 +40,7 @@ const Patch = z
         showCost: z.boolean(),
         mailbox: z.boolean(),
         library: z.boolean(),
+        groupChats: z.boolean(),
       })
       .partial()
       .strict(),
