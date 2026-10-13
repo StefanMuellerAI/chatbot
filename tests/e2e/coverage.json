@@ -32,7 +32,8 @@
     "features.mailbox": ["Q22"],
     "mailWelcomeSubject": ["Q23", "Z01"],
     "mailWelcomeText": ["Q23"],
-    "features.library": ["Q21", "Y01"]
+    "features.library": ["Q21", "Y01"],
+    "features.groupChats": ["Q24"]
   },
   "routes": {
     "GET /api/admin/events": ["T01", "T08", "T17", "U01"],
@@ -81,6 +82,15 @@
     "PUT /api/mail": ["Z03", "Z16"],
     "DELETE /api/mail": ["Z03", "Z11", "Z16"],
     "GET /api/mail/status": ["Z02", "Z16", "W05"],
+    "GET /api/status": ["GC02", "GC08", "GC12", "Q24", "U01"],
+    "GET /api/groupchats": ["GC10", "GC14", "GC18", "Q24", "U01"],
+    "POST /api/groupchats": ["GC01", "GC09", "GC10", "GC18", "GC20", "U01", "U03"],
+    "GET /api/groupchats/members": ["GC01", "GC09", "GC10", "Q24", "U01"],
+    "GET /api/groupchats/[id]": ["GC03", "GC07", "GC12", "GC18", "U01"],
+    "PUT /api/groupchats/[id]": ["GC07", "GC18", "GC20", "U01", "U03"],
+    "DELETE /api/groupchats/[id]": ["GC08", "GC18", "GC20", "U01"],
+    "POST /api/groupchats/[id]/messages": ["GC03", "GC07", "GC18", "W06", "U01", "U03"],
+    "POST /api/groupchats/[id]/freebie": ["GC04", "GC05", "GC06", "GC12", "GC18", "V08", "W06", "U01", "U03"],
     "GET /api/mail/contacts": ["Z05", "Z13", "Z16"],
     "GET /api/library": ["Y03", "Y11", "Y21"],
     "GET /api/library/[id]": ["Y06", "Y13", "Y21"],
@@ -204,6 +214,23 @@
     "Fundus: Anhänge mitnehmen": ["Y16"],
     "Fundus: Erneut versuchen": ["Y11"],
     "Fundus: Filter-Knopf und Zurück zur Liste (Handy)": ["Y20"],
-    "Admin: Schalter Fundus": ["Q21"]
+    "Admin: Schalter Fundus": ["Q21"],
+    "Seitenleiste: Symbol „Neuer Gruppenchat“": ["GC01", "GC09", "GC16", "Q24"],
+    "Seitenleiste: Abschnitt „Gruppenchats“ mit Punkt „Neues“ und „verlassen“": ["GC02", "GC07", "GC08", "GC19", "E04", "Q24"],
+    "Seitenleiste: Punkt am Reiter „Chat“ bei Neuem im Gruppenchat": ["GC02"],
+    "Dialog Neuer Gruppenchat: Name, Personen suchen, Alle auswählen, Chat starten": ["GC01", "GC17"],
+    "Dialog Neuer Gruppenchat: Auswahl „Gruppe“ (Kursleitung)": ["GC09"],
+    "Gruppenchat: Mitglieder (Avatare bzw. Personen-Knopf)": ["GC07", "GC16", "GC17"],
+    "Dialog Mitglieder: Personen einladen, Entfernen, Umbenennen": ["GC07"],
+    "Dialog Mitglieder: Chat verlassen, Für alle löschen (mit Rückfrage)": ["GC08", "E06"],
+    "Gruppenchat: Vorschlagsliste @Freebie (Maus und Tastatur)": ["GC04", "GC16", "GC17"],
+    "Gruppenchat: Beiträge, Systemzeilen, „Freebie antwortet …“": ["GC03", "GC04", "GC07"],
+    "Gruppenchat: Stoppen und Neu generieren": ["GC06"],
+    "Gruppenchat: Aus meiner Liste entfernen": ["GC08"],
+    "Gruppenchat: Beispiele im leeren Chat": ["GC01"],
+    "Gruppenchat: Anhänge, Artefakte": ["GC11"],
+    "Gruppenchat: Markdown-Export": ["GC15"],
+    "Chat: Hinweis „… hat dich in … eingeladen“ mit „Öffnen“": ["GC02", "GC16", "GC19"],
+    "Admin: Schalter Gruppenchats": ["Q24"]
   }
 }

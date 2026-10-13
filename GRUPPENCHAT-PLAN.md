@@ -1,7 +1,7 @@
 # Plan: Gruppenchats – gemeinsam mit Freebie arbeiten
 
-Stand: 13. Oktober 2026, **nur geplant, nicht umgesetzt** · Entscheidungen getroffen (Abschnitt 16) · klickbarer
-Entwurf zur Abnahme der Optik: [Artifact](https://claude.ai/artifact/QYLEroNXYKsXPjN4ssdd9b) · Grundlage: aktueller Code
+Stand: 13. Oktober 2026, **umgesetzt** (Phasen 1–4, Stand und Abweichungen in Abschnitt 14) · Entscheidungen getroffen
+(Abschnitt 16) · klickbarer Entwurf, abgenommen: [Artifact](https://claude.ai/artifact/QYLEroNXYKsXPjN4ssdd9b) · Grundlage: aktueller Code
 (Chat in `components/chat`, Ablauf in `lib/chat`, Verlauf im Browser in `lib/client/db.ts`), Gast-Zugänge aus
 [ZUGANG-PLAN.md](ZUGANG-PLAN.md), Posteingang aus [POSTEINGANG-PLAN.md](POSTEINGANG-PLAN.md), E2E-Suite aus
 [TESTPLAN.md](TESTPLAN.md), Handbuch unter [docs/handbuch](docs/handbuch/README.md)
@@ -373,7 +373,7 @@ Wie beim Posteingang gibt es keinen Server-Push (auf Vercel teuer). Der Browser 
 | `POST /api/groupchats` | starten (Name, Mitglieder) |
 | `GET /api/groupchats/members` | Auswahl: für Gäste die eigene Gruppe, für die Kursleitung die Gruppen laufender Termine (unabhängig vom Schalter „Posteingang“) |
 | `GET /api/groupchats/[id]` | Chat mit Mitgliedern und Beiträgen; mit `?since=` nur die Änderungen; nach dem Verlassen nur bis `left_version` |
-| `PUT /api/groupchats/[id]` | umbenennen, einladen, entfernen (nur startende Person); „gelesen bis“ (alle) |
+| `PUT /api/groupchats/[id]` | umbenennen, einladen, entfernen (nur startende Person); „gelesen bis“ setzt das Abrufen mit `GET` (siehe Abschnitt 14) |
 | `DELETE /api/groupchats/[id]` | verlassen (nicht die startende Person); mit `?forAll=1` für alle löschen (nur startende Person); mit `?hide=1` einen verlassenen Chat aus der eigenen Liste entfernen |
 | `POST /api/groupchats/[id]/messages` | Beitrag posten (Text, Anhänge) |
 | `POST /api/groupchats/[id]/freebie` | Freebie antworten lassen (Stream im selben Format wie `/api/chat`); mit `regenerate` neu generieren |
@@ -556,7 +556,7 @@ bisherigen IDs bleiben gültig.
 
 | Phase | Inhalt | Tests |
 |---|---|---|
-| 0 · Abnahme | Entscheidungen (Abschnitt 16, getroffen), klickbarer Entwurf der Optik (gebaut, wartet auf Abnahme) | – |
+| 0 · Abnahme | Entscheidungen (Abschnitt 16, getroffen), klickbarer Entwurf der Optik (abgenommen) | – |
 | 1 · Grundlage | Tabellen, Speicher (Rechte, Mitglieder, Beiträge, Zähler, Sperre, Grenzen, Aufräumen), API, Schalter, gemeinsame Statusabfrage, `coverage.mjs` | Unit-Tests; GC10, GC18, GC20, Q24, U01–U03 |
 | 2 · Oberfläche | Seitenleiste, Start- und Mitglieder-Dialog, Gruppenchat-Ansicht mit Namen und Avataren, Abfrage, „Neues“, Hinweise, Verlassen und „Für alle löschen“, Dialog der Kursleitung, Handy und Tablet | GC01–GC03, GC07–GC09, GC13, GC16, GC17, GC19 |
 | 3 · Freebie im Gruppenchat | `@`-Vorschläge, Aufbereitung mit Autoren, Prompt-Abschnitt, Sperre, Stoppen und Neu generieren, Cache-Ausnahmen, Posteingang-Sperre, Mock | GC04–GC06, GC11, GC12, V05, V08 |
@@ -575,6 +575,35 @@ bisherigen IDs bleiben gültig.
 - **Danach:** Merge, CI in drei Browsern, Live-Smoke mit X10.
 - **Gesamt:** realistisch **1–2 Tage nach der Abnahme des Entwurfs** einsatzbereit für die nächste Schulung.
 
+**Stand der Umsetzung (13. Oktober 2026)**
+
+| Phase | Stand |
+|---|---|
+| 0 · Abnahme | erledigt: Entwurf abgenommen; der Einladungshinweis bricht jetzt auf dem Handy um, statt die Blase zu sprengen |
+| 1 · Grundlage | erledigt: Tabellen, `lib/groupchat/store.ts`, API, Schalter, `/api/status`, `coverage.mjs` mit zweistelligen Kürzeln |
+| 2 · Oberfläche | erledigt: `components/groupchat` (Ansicht, Dialoge, Abfrage), Seitenleiste, `useAppStatus` statt `useMailbox` |
+| 3 · Freebie im Gruppenchat | erledigt: Runden mit Autor und Uhrzeit (`prepareGroupTurns`), Prompt-Abschnitt, Sperre, Stoppen, Neu generieren, Posteingang gesperrt, Mock-Diagnose |
+| 4 · Abschluss | erledigt: E2E-Tests GC01–GC20, Q24, V08, W06, X10 und angepasste IDs, Doku, beide Handbücher; Stabilitätslauf siehe `TESTPLAN.md` Abschnitt 8. X10 läuft nach dem Merge mit dem echten Passwort |
+
+**Abweichungen vom Plan**
+
+- **Werkzeuge ohne persönliche Adresse:** Das Werkzeug „E-Mail senden“ nannte die Adresse der fragenden Person. Im
+  Gruppenchat fragen verschiedene Mitglieder – jede Frage hätte den Prompt-Cache gebrochen. Dort steht die Adresse
+  jetzt nicht mehr in der Beschreibung (von V08 gefunden, Fehler 42 im Testplan).
+- **„Gelesen bis“** setzt der Server beim Abrufen des Chats (`GET`), nicht über ein eigenes `PUT`. Eigene Beiträge
+  zählen dadurch nie als neu.
+- **Speichern nach Verbindungsabbruch** über `after()` aus `next/server` (Next.js 16) statt `waitUntil`.
+- **„Neu generieren“** nach einem späteren Beitrag ergibt 400 mit Meldung, nicht 409 – es läuft ja nichts.
+- **Seitenleiste:** Gruppenchats haben dort keinen Papierkorb. Verlassen und „Für alle löschen“ liegen im
+  Mitglieder-Dialog, die Rückfragen stehen direkt im Dialog statt in einem Browser-Fenster.
+- **Name nach dem Verlassen:** Wer gegangen ist, sieht den aktuellen Namen des Chats (nicht den beim Verlassen).
+- **Abmelden:** Der Satz „Deine Gruppenchats bleiben für deine Gruppe bis zum Termin-Ende bestehen.“ erscheint nur,
+  wenn man in einem Gruppenchat ist. So bleibt die Rückfrage für alle anderen wie bisher.
+- **`/api/mail/status`** bleibt bestehen (Tests und W05); der Chat nutzt die gemeinsame Abfrage `/api/status`.
+- **Mock:** neues Stichwort `#warten:N` (N Sekunden Denkpause), damit die Tests den Zwischenstand
+  „Freebie antwortet …“ bei den anderen sicher sehen.
+- **X10** legt einen eigenen Termin mit zwei Gästen an; der übrige Live-Smoke bleibt bei einem Gast.
+
 **Risiken und wie der Plan sie abfängt**
 
 | Risiko | Abfangen |
@@ -582,7 +611,7 @@ bisherigen IDs bleiben gültig.
 | Zwei Personen rufen gleichzeitig `@Freebie` | eindeutiger Teilindex als Sperre, 409 mit Meldung (GC05, W06) |
 | Prompt-Cache bricht mit mehreren Autoren | deterministische Runden, Unit-Tests und V08 über drei Runden |
 | Viele Abfragen auf Vercel | Abfrage nur bei sichtbarem Tab, langsamer bei Ruhe, Status in einer gemeinsamen Anfrage (W06) |
-| Fragende Person schließt den Tab mitten in der Antwort | Speichern mit `waitUntil`, Frist für hängengebliebene Antworten (GC06) |
+| Fragende Person schließt den Tab mitten in der Antwort | Speichern mit `after()` aus `next/server`, Frist für hängengebliebene Antworten (GC06) |
 | Bestehende Tests | private Chats bleiben unverändert; betroffene IDs sind oben einzeln aufgeführt und werden angepasst, nicht gelockert |
 
 ## 15. Bewusst nicht enthalten (später möglich)
@@ -613,7 +642,7 @@ Getroffen am 13. Oktober 2026:
 | 8 | Eigene Beiträge löschbar? | **Nein, erst einmal nicht** (abweichend von meiner Empfehlung) |
 | 9 | Schalter „Gruppenchats“ standardmäßig an? | **Ja** |
 
-**Meine Annahmen dazu (im Entwurf so umgesetzt, bitte bei der Abnahme bestätigen oder korrigieren):**
+**Meine Annahmen dazu (mit dem Entwurf abgenommen und so umgesetzt):**
 
 - **Entfernen** wirkt wie Verlassen: Die entfernte Person liest bis zum Zeitpunkt des Entfernens, schreibt nicht mehr.
 - **Verlassene Chats** bleiben in der Seitenleiste mit „verlassen“ und lassen sich mit „Aus meiner Liste entfernen“

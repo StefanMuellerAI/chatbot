@@ -44,7 +44,7 @@ test.describe("GC · Gruppenchats über die API", () => {
     await apiA.dispose();
   });
 
-  test("GC12 Datenschutz: Posteingang nie verbunden, nie aus dem Antwort-Cache; fremde Chats 404, Nicht-Mitglieder erfahren nichts", async ({ admin, baseURL, ip }) => {
+  test("GC12/M03 Datenschutz: Posteingang nie verbunden, nie aus dem Antwort-Cache; fremde Chats 404, Nicht-Mitglieder erfahren nichts", async ({ admin, baseURL, ip }) => {
     const {
       guests: [a, b, c],
     } = await mailGroup(admin, 3);

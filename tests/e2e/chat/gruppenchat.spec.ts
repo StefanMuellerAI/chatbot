@@ -69,7 +69,11 @@ test.describe("GC · Gruppenchats", () => {
     await expect(gA.entry(title)).toHaveAttribute("aria-current", "page");
     await expect(gA.membersButton).toHaveAccessibleName("Mitglieder (3)");
     await expect(gA.notes.filter({ hasText: `Du hast ${b.username} und ${c.username} eingeladen` })).toBeVisible();
-    await expect(chatA.page.getByRole("region", { name: "So funktioniert euer Gruppenchat" })).toBeVisible();
+    const guide = chatA.page.getByRole("region", { name: "So funktioniert euer Gruppenchat" });
+    await guide.getByRole("button", { name: "@Freebie fasse unsere Notizen zusammen" }).click();
+    await expect(gA.composer).toHaveValue("@Freebie fasse unsere Notizen zusammen ");
+    await expect(gA.composer).toBeFocused();
+    await gA.composer.fill("");
     await expect(gA.composer).toHaveAttribute("placeholder", "Schreib der Gruppe … – mit @Freebie fragst du Freebie");
     await expect(chatA.page.getByText("Alle Mitglieder sehen, was du hier schreibst. Bitte keine echten oder vertraulichen Daten.")).toBeVisible();
 
@@ -423,6 +427,37 @@ async function startInvite(chat: ChatPage, id: string, people: string[]) {
 }
 
 test.describe("GC · Gruppenchats: Kursleitung, Anhänge, Abmelden, Export", () => {
+  test("E04/E06 Seitenleiste: Gruppenchats oben, Suche findet sie am Namen; statt Papierkorb „Verlassen“ bzw. „Für alle löschen“", async ({ browser, baseURL, ip, admin }) => {
+    const { b, chatA, chatB, gA } = await trio(admin, browser, baseURL!, ip);
+    const title = `Suchbar ${uniq()}`;
+    await startGroupChat(chatA.page.request, title, [b.username]);
+    await chatA.ask(`Privat ${uniq()}`);
+    await chatA.page.reload();
+    const nav = gA.section;
+    // Abschnitt „Gruppenchats“ steht über den Datumsgruppen.
+    const top = async (label: string) => (await nav.getByText(label, { exact: true }).boundingBox())!.y;
+    expect(await top("Gruppenchats")).toBeLessThan(await top("Heute"));
+    await expect(nav.getByRole("button", { name: `Chat „${title}“ löschen` })).toHaveCount(0);
+    const search = chatA.page.getByRole("searchbox", { name: "Chats durchsuchen" });
+    await search.fill(title.slice(0, 10).toUpperCase());
+    await expect(gA.entry(title)).toBeVisible();
+    await expect(nav.getByRole("button", { name: /^Privat / })).toHaveCount(0);
+    await search.fill("gibt es nicht");
+    await expect(gA.entry(title)).toHaveCount(0);
+    await expect(nav).toContainText("Keine Treffer.");
+    await search.fill("");
+    // Löschen im Mitglieder-Dialog: „Für alle löschen“ (startende Person) bzw. „Chat verlassen“.
+    await gA.open(title);
+    await gA.membersButton.click();
+    await expect(gA.membersDialog.getByRole("button", { name: "Für alle löschen" })).toBeVisible();
+    await chatA.page.keyboard.press("Escape");
+    const gB = GroupChatPage.of(chatB);
+    await chatB.page.reload();
+    await gB.open(title);
+    await gB.membersButton.click();
+    await expect(gB.membersDialog.getByRole("button", { name: "Chat verlassen" })).toBeVisible();
+  });
+
   test("GC09 Kursleitung führt vor: Auswahl „Gruppe“, nur Personen dieser Gruppe; Abmelden lässt ihre Gruppenchats bestehen", async ({ browser, baseURL, ip, admin }) => {
     const { guests, others, eventName } = await mailGroup(admin, 2, 1);
     const [a, b] = guests;
@@ -468,7 +503,7 @@ test.describe("GC · Gruppenchats: Kursleitung, Anhänge, Abmelden, Export", () 
     await apiA.dispose();
   });
 
-  test("GC11 Anhänge und Artefakte sehen alle; „Verbindungen“ und „Bild-Modus“ gibt es im Gruppenchat nicht", async ({ browser, baseURL, ip, admin }) => {
+  test("GC11/Z10 Anhänge und Artefakte sehen alle; „Verbindungen“ und „Bild-Modus“ gibt es im Gruppenchat nicht", async ({ browser, baseURL, ip, admin }) => {
     const { b, chatA, chatB, gA, gB } = await trio(admin, browser, baseURL!, ip);
     const title = `Dateien ${uniq()}`;
     await startGroupChat(chatA.page.request, title, [b.username]);
@@ -503,7 +538,7 @@ test.describe("GC · Gruppenchats: Kursleitung, Anhänge, Abmelden, Export", () 
     await expect(chatA.page.locator("iframe").first()).toBeVisible();
   });
 
-  test("GC13 Abmelden: Rückfrage nennt die Gruppenchats; nach erneuter Anmeldung sind sie wieder da, der nächste Gast am Gerät sieht sie nicht", async ({ browser, baseURL, ip, admin }) => {
+  test("GC13/A10 Abmelden: Rückfrage nennt die Gruppenchats; nach erneuter Anmeldung sind sie wieder da, der nächste Gast am Gerät sieht sie nicht", async ({ browser, baseURL, ip, admin }) => {
     const { a, b, c, chatA } = await trio(admin, browser, baseURL!, ip);
     const title = `Bleibt ${uniq()}`;
     const { id } = await startGroupChat(chatA.page.request, title, [b.username]);
@@ -535,7 +570,7 @@ test.describe("GC · Gruppenchats: Kursleitung, Anhänge, Abmelden, Export", () 
     await expect(g2.mine).toContainText("Notiz vor dem Abmelden");
   });
 
-  test("GC15 Export nimmt die Gruppenchats mit; Import ergibt private Chats mit Autoren; Markdown nennt die Autoren", async ({ browser, baseURL, ip, admin }, testInfo) => {
+  test("GC15/E08 Export nimmt die Gruppenchats mit; Import ergibt private Chats mit Autoren; Markdown nennt die Autoren", async ({ browser, baseURL, ip, admin }, testInfo) => {
     const { a, b, chatA, chatB, gA } = await trio(admin, browser, baseURL!, ip);
     const title = `Export ${uniq()}`;
     const { id } = await startGroupChat(chatA.page.request, title, [b.username]);
@@ -582,7 +617,7 @@ test.describe("GC · Gruppenchats: Kursleitung, Anhänge, Abmelden, Export", () 
 });
 
 test.describe("GC · Gruppenchats auf Handy und Tablet, Barrierefreiheit, Abfrage", () => {
-  test("GC16 Handy: Abschnitt in der Leiste, Dialoge im Vollbild, Personen-Knopf, Vorschläge erreichbar, Hinweis passt auf den Bildschirm @mobil", async ({ admin, page, browser, baseURL, ip }) => {
+  test("GC16/N01 Handy: Abschnitt in der Leiste, Dialoge im Vollbild, Personen-Knopf, Vorschläge erreichbar, Hinweis passt auf den Bildschirm @mobil", async ({ admin, page, browser, baseURL, ip }) => {
     const { guests } = await mailGroup(admin, 2);
     const [a, b] = guests;
     await loginUser(page, { guest: b });
@@ -634,7 +669,7 @@ test.describe("GC · Gruppenchats auf Handy und Tablet, Barrierefreiheit, Abfrag
     void browser;
   });
 
-  test("GC16 Tablet: Abschnitt in der Leiste, Kopfzeile mit Avataren, Eingabe erreichbar @tablet", async ({ admin, page }) => {
+  test("GC16/N01 Tablet: Abschnitt in der Leiste, Kopfzeile mit Avataren, Eingabe erreichbar @tablet", async ({ admin, page }) => {
     const { guests } = await mailGroup(admin, 2);
     const [a, b] = guests;
     await loginUser(page, { guest: a });
@@ -651,7 +686,7 @@ test.describe("GC · Gruppenchats auf Handy und Tablet, Barrierefreiheit, Abfrag
   });
 
   for (const scheme of ["light", "dark"] as const) {
-    test(`GC17 Start- und Mitglieder-Dialog, Vorschläge und Gruppenchat sind barrierearm (${scheme === "light" ? "hell" : "dunkel"})`, async ({ browser, baseURL, ip, admin }, testInfo) => {
+    test(`GC17/N03 Start- und Mitglieder-Dialog, Vorschläge und Gruppenchat sind barrierearm (${scheme === "light" ? "hell" : "dunkel"})`, async ({ browser, baseURL, ip, admin }, testInfo) => {
       const { b, chatA, chatB, gA } = await trio(admin, browser, baseURL!, ip);
       await chatA.page.emulateMedia({ colorScheme: scheme });
       await gA.newButton.click();
