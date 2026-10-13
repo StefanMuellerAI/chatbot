@@ -50,3 +50,6 @@ für Teilnehmende.
 - Im Testmodus entstehen keine Kosten. Für Übersicht und Termine setzt das Skript im Browser deshalb
   Beispielzahlen und den Systemstatus einer Live-Installation ein. Die Druckkärtchen zeigen „freebie.stefanai.de“.
 - Der Bild-Modus liefert im Testmodus ein Platzhalterbild. Die Bildunterschrift im Handbuch sagt das.
+- Für den Gruppenchat (`c33`–`c37`) starten Beispiel-Gäste der Gruppe „Vormittag“ einen Chat und posten Notizen über
+  die API. Die Antwort des Testmodus ersetzt das Skript im Browser durch ein Beispielprotokoll (`groupAnswer` in
+  `beispieldaten.mjs`), so wie es bei Übersicht und Terminen Beispielzahlen einsetzt.
