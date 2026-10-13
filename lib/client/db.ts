@@ -1,6 +1,7 @@
 "use client";
 import Dexie, { type EntityTable } from "dexie";
 import type { ChatMessage, ConnectionId, Effort, MailRef } from "@/lib/shared/types";
+import { groupChatsForExport } from "./groupchat";
 
 export interface Conversation {
   id: string;
@@ -131,7 +132,9 @@ export async function appendMessages(id: string, messages: ChatMessage[], patch:
 
 export async function exportAll(): Promise<string> {
   const all = await db.conversations.toArray();
-  return JSON.stringify({ app: "freebie", version: 1, exportedAt: new Date().toISOString(), conversations: all }, null, 2);
+  // Gruppenchats liegen auf dem Server: als Kopie mit Autoren dabei (beim Import werden sie zu privaten Chats).
+  const groups = await groupChatsForExport();
+  return JSON.stringify({ app: "freebie", version: 1, exportedAt: new Date().toISOString(), conversations: [...all, ...groups] }, null, 2);
 }
 
 /** Alle Chats des Kontos als JSON-Datei herunterladen. */
@@ -181,6 +184,7 @@ function normalizeConversation(v: unknown): Conversation | null {
       };
       // Verbindungen und Mail-Karten nur in gültiger Form übernehmen – sonst stürzt die Anzeige ab.
       if ("connections" in m) msg.connections = connectionList(m.connections);
+      if ("author" in m) msg.author = typeof m.author === "string" && m.author ? m.author.slice(0, 60) : undefined;
       if ("mails" in m) msg.mails = isRecord(m.mails) ? { read: mailRefs(m.mails.read), sent: mailRefs(m.mails.sent) } : undefined;
       return msg;
     }) as unknown as ChatMessage[];

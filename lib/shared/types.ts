@@ -169,6 +169,8 @@ export interface ChatMessage {
   webSearch?: boolean;
   /** Verbindungen, die für diese Nachricht eingeschaltet waren. */
   connections?: ConnectionId[];
+  /** Aus einem Gruppenchat übernommen: wer den Beitrag geschrieben hat (nur Anzeige und Export). */
+  author?: string;
   // Assistenten-Nachricht
   modelId?: string;
   thinking?: string;

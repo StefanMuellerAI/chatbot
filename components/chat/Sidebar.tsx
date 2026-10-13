@@ -1,8 +1,9 @@
 "use client";
-import { Check, Copy, Download, Inbox, LogOut, Mail, MessageSquare, MessageSquarePlus, Monitor, Moon, Search, Send, Settings, SquarePen, Sun, Trash2, Upload, X } from "lucide-react";
+import { Check, Copy, Download, Inbox, LogOut, Mail, MessageSquare, MessageSquarePlus, Monitor, Moon, Plus, Search, Send, Settings, SquarePen, Sun, Trash2, Upload, Users, X } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { mailAddress, type MailFolder } from "@/lib/shared/mail";
+import type { GroupChatSummary } from "@/lib/shared/groupchat";
 import { downloadExport, forgetCurrentGuest, importAll, type Conversation } from "@/lib/client/db";
 import { formatTime } from "@/lib/events/window";
 import type { AccountInfo } from "@/lib/shared/types";
@@ -22,6 +23,7 @@ export function Sidebar({
   onTheme,
   onClose,
   mail,
+  groups: groupChats,
 }: {
   account: AccountInfo;
   conversations: Conversation[];
@@ -36,11 +38,14 @@ export function Sidebar({
   onClose?: () => void;
   /** Posteingang (nur wenn eingeschaltet). */
   mail?: SidebarMail;
+  /** Gruppenchats (nur wenn eingeschaltet). */
+  groups?: SidebarGroups;
 }) {
   const busyTitle = busy ? "Während einer Antwort nicht möglich" : undefined;
   const [query, setQuery] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
   const groups = useMemo(() => groupByDate(filterConversations(conversations, query)), [conversations, query]);
+  const shared = useMemo(() => filterGroupChats(groupChats?.chats ?? [], query), [groupChats?.chats, query]);
 
   return (
     <aside className="flex h-full w-full flex-col bg-[#120e1d] text-[#efeaf9]">
@@ -58,15 +63,35 @@ export function Sidebar({
       ) : (
         <>
           <div className="px-3">
-            <button
-              type="button"
-              onClick={onNew}
-              disabled={busy}
-              title={busyTitle}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-gradient px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:opacity-95 disabled:opacity-50"
-            >
-              <MessageSquarePlus className="h-4.5 w-4.5" /> Neuer Chat
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onNew}
+                disabled={busy}
+                title={busyTitle}
+                className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-brand-gradient px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/20 transition hover:opacity-95 disabled:opacity-50"
+              >
+                <MessageSquarePlus className="h-4.5 w-4.5" /> Neuer Chat
+              </button>
+              {groupChats && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    groupChats.onNew();
+                    onClose?.();
+                  }}
+                  disabled={busy}
+                  aria-label="Neuer Gruppenchat"
+                  title={busyTitle ?? "Neuer Gruppenchat"}
+                  className="relative grid w-11 shrink-0 place-items-center rounded-full border border-white/16 bg-white/8 text-white transition hover:bg-white/14 disabled:opacity-50"
+                >
+                  <Users className="h-4.5 w-4.5" />
+                  <span aria-hidden="true" className="absolute -top-1 -right-1 grid h-4.5 w-4.5 place-items-center rounded-full border-2 border-[#120e1d] bg-brand-gradient">
+                    <Plus className="h-2.5 w-2.5" strokeWidth={4} />
+                  </span>
+                </button>
+              )}
+            </div>
             <label className="mt-3 flex items-center gap-2 rounded-full bg-white/8 px-3 py-2 text-sm text-white/70 focus-within:bg-white/12">
               <Search className="h-4 w-4" />
               <input
@@ -80,7 +105,36 @@ export function Sidebar({
             </label>
           </div>
           <nav className="mt-3 min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Chatverlauf">
-            {groups.length === 0 && <p className="px-3 py-6 text-center text-sm text-white/65">{query ? "Keine Treffer." : "Noch keine Chats."}</p>}
+            {shared.length > 0 && groupChats && (
+              <div className="mb-3">
+                <div className="px-3 pt-2 pb-1 text-[0.7rem] font-semibold tracking-[0.12em] text-white/60 uppercase">Gruppenchats</div>
+                {shared.map((g) => {
+                  const current = g.id === groupChats.activeId;
+                  const unread = g.unread && !current;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => groupChats.onSelect(g.id)}
+                      disabled={busy && !current}
+                      title={busy && !current ? busyTitle : undefined}
+                      aria-current={current ? "page" : undefined}
+                      aria-label={`${g.title}${g.left ? ", verlassen" : ""}${unread ? ", neue Nachrichten" : ""}`}
+                      className={cn(
+                        "flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed",
+                        current ? "bg-white/12 text-white" : "text-white/75 hover:bg-white/6 hover:text-white",
+                      )}
+                    >
+                      <Users className="h-4 w-4 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{g.title}</span>
+                      {g.left && <span className="shrink-0 text-[0.7rem] text-white/60">verlassen</span>}
+                      {unread && <span aria-hidden="true" className="h-2.25 w-2.25 shrink-0 rounded-full bg-brand-gradient" />}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {groups.length === 0 && shared.length === 0 && <p className="px-3 py-6 text-center text-sm text-white/65">{query ? "Keine Treffer." : "Noch keine Chats."}</p>}
             {groups.map(([label, items]) => (
               <div key={label} className="mb-3">
                 <div className="px-3 pt-2 pb-1 text-[0.7rem] font-semibold tracking-[0.12em] text-white/60 uppercase">{label}</div>
@@ -184,7 +238,7 @@ export function Sidebar({
           <SideAction
             onClick={async () => {
               // Gast-Chats bleiben nicht auf (oft gemeinsam genutzten) Schulungsrechnern liegen; das Postfach wird geleert.
-              const question = logoutQuestion(account.role, mail);
+              const question = logoutQuestion(account.role, mail, Boolean(groupChats?.chats?.some((g) => !g.left)));
               if (question && !confirm(question)) return;
               try {
                 await fetch("/api/auth/logout", { method: "POST" });
@@ -212,25 +266,37 @@ export interface SidebarMail {
   folder: MailFolder;
   onFolder: (folder: MailFolder) => void;
   onNewMail: () => void;
+  /** Neues in einem Gruppenchat (Punkt am Reiter „Chat“, solange der Posteingang offen ist). */
+  chatUnread?: boolean;
+}
+
+export interface SidebarGroups {
+  /** Null, solange die erste Statusabfrage läuft. */
+  chats: GroupChatSummary[] | null;
+  activeId: string | null;
+  onSelect: (id: string) => void;
+  onNew: () => void;
 }
 
 /** Rückfrage beim Abmelden – null heißt: ohne Rückfrage. */
-function logoutQuestion(role: AccountInfo["role"], mail?: SidebarMail): string | null {
+function logoutQuestion(role: AccountInfo["role"], mail?: SidebarMail, inGroupChats = false): string | null {
+  // Gruppenchats liegen auf dem Server und bleiben – das sagen wir nur, wenn man in einem ist.
+  const groups = inGroupChats ? " Deine Gruppenchats bleiben für deine Gruppe bis zum Termin-Ende bestehen." : "";
   if (role === "guest") {
     return mail
-      ? "Beim Abmelden werden deine Chats von diesem Gerät gelöscht und dein Posteingang wird geleert. Wenn du Chats behalten möchtest, vorher „Export“ wählen. Jetzt abmelden?"
-      : "Beim Abmelden werden deine Chats von diesem Gerät gelöscht. Wenn du sie behalten möchtest, vorher „Export“ wählen. Jetzt abmelden?";
+      ? `Beim Abmelden werden deine Chats von diesem Gerät gelöscht und dein Posteingang wird geleert. Wenn du Chats behalten möchtest, vorher „Export“ wählen.${groups} Jetzt abmelden?`
+      : `Beim Abmelden werden deine Chats von diesem Gerät gelöscht. Wenn du sie behalten möchtest, vorher „Export“ wählen.${groups} Jetzt abmelden?`;
   }
   return mail && mail.total > 0 ? "Beim Abmelden wird dein Posteingang geleert. Jetzt abmelden?" : null;
 }
 
 /** Umschalter „Chat | Posteingang“ mit der Zahl ungelesener Mails. */
 function ViewSwitch({ mail, onClose }: { mail: SidebarMail; onClose?: () => void }) {
-  const tab = (view: "chat" | "mail", label: string, icon: React.ReactNode, badge?: number) => (
+  const tab = (view: "chat" | "mail", label: string, icon: React.ReactNode, badge?: number, dot?: boolean) => (
     <button
       type="button"
       aria-pressed={mail.view === view}
-      aria-label={badge ? `${label}, ${badge} ungelesen` : label}
+      aria-label={badge ? `${label}, ${badge} ungelesen` : dot ? `${label}, neue Nachrichten` : label}
       onClick={() => {
         mail.onView(view);
         onClose?.();
@@ -243,11 +309,12 @@ function ViewSwitch({ mail, onClose }: { mail: SidebarMail; onClose?: () => void
       {icon}
       {label}
       {badge ? <span className="grid h-5 min-w-5 place-items-center rounded-full bg-brand-gradient px-1.5 text-[0.7rem] font-bold text-white">{badge}</span> : null}
+      {dot ? <span aria-hidden="true" className="h-2 w-2 rounded-full bg-brand-gradient" /> : null}
     </button>
   );
   return (
     <div role="group" aria-label="Ansicht wechseln" className="mx-3 mb-3 flex gap-1 rounded-full bg-white/7 p-1">
-      {tab("chat", "Chat", <MessageSquare className="h-4 w-4" />)}
+      {tab("chat", "Chat", <MessageSquare className="h-4 w-4" />, undefined, mail.view === "mail" && mail.chatUnread)}
       {tab("mail", "Posteingang", <Mail className="h-4 w-4" />, mail.unread)}
     </div>
   );
@@ -328,6 +395,11 @@ function filterConversations(list: Conversation[], query: string): Conversation[
   const q = query.trim().toLowerCase();
   if (!q) return list;
   return list.filter((c) => (c.title ?? "").toLowerCase().includes(q) || (c.messages ?? []).some((m) => (m.text ?? "").toLowerCase().includes(q)));
+}
+
+function filterGroupChats(list: GroupChatSummary[], query: string): GroupChatSummary[] {
+  const q = query.trim().toLowerCase();
+  return q ? list.filter((g) => g.title.toLowerCase().includes(q)) : list;
 }
 
 function groupByDate(list: Conversation[]): [string, Conversation[]][] {

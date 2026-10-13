@@ -156,6 +156,7 @@ function toMessage(row: MessageRow): GroupChatMessage {
   const base: GroupChatMessage = {
     id: row.id,
     seq: row.seq,
+    version: row.version,
     kind: row.kind as GroupChatMessage["kind"],
     author: row.authorName,
     text: row.text,

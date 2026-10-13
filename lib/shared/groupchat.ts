@@ -54,6 +54,8 @@ export type GroupAnswerStatus = "pending" | "done" | "stopped" | "error";
 export interface GroupChatMessage {
   id: string;
   seq: number;
+  /** Stand der letzten Änderung (neuere Stände ersetzen ältere beim Zusammenführen). */
+  version: number;
   kind: "person" | "freebie" | "system";
   /** Benutzername bzw. „kursleitung“ (bei Freebie und Systemzeilen leer bzw. die auslösende Person). */
   author: string | null;

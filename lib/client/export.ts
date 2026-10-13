@@ -1,5 +1,5 @@
 "use client";
-import { mailAddress } from "@/lib/shared/mail";
+import { mailAddress, mailName } from "@/lib/shared/mail";
 import type { Conversation } from "./db";
 
 /** Ein Gespräch als Markdown-Datei (inkl. Quellen und Anhänge). */
@@ -7,7 +7,7 @@ export function conversationToMarkdown(c: Conversation, modelName: (id?: string)
   const lines: string[] = [`# ${c.title || "Freebie-Chat"}`, "", `_Exportiert aus Freebie am ${new Date().toLocaleString("de-DE")}_`, ""];
   for (const m of c.messages) {
     if (m.role === "user") {
-      lines.push("## Du", "");
+      lines.push(m.author ? `## ${mailName(m.author)}` : "## Du", "");
       for (const a of m.attachments ?? []) lines.push(`> 📎 ${a.name}${a.libraryId ? " (Fundus)" : ""}`);
       if (m.attachments?.length) lines.push("");
       lines.push(m.text, "");
