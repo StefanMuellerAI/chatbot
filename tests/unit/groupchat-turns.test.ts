@@ -135,7 +135,7 @@ describe("Gruppenchat: Caching-Vertrag über drei Runden", () => {
     expect(b.prompt_cache_key).toBe(a.prompt_cache_key);
   });
 
-  it("die Werkzeuge sind dieselben wie im privaten Chat – der Posteingang meldet im Gruppenchat nur, dass er nicht verfügbar ist", async () => {
+  it("die Werkzeuge sind für alle Mitglieder gleich und dieselben wie im privaten Chat – der Posteingang meldet nur, dass er nicht verfügbar ist", async () => {
     const privateTools = [imageTool(async () => ({ ok: false, error: "x" }), () => {}), ...mailboxTools({ box, connected: true, emit: () => {} })].sort((a, b) =>
       a.name < b.name ? -1 : 1,
     );
@@ -143,7 +143,13 @@ describe("Gruppenchat: Caching-Vertrag über drei Runden", () => {
     const personal = buildAnthropicRequest(
       request(sonnet, await turns(round1), { tools: { webSearch: true, generateImage: true, mailbox: true }, customTools: privateTools }),
     ).params.tools;
-    expect(JSON.stringify(group)).toBe(JSON.stringify(personal));
+    const names = (tools: unknown) => (tools as { name: string }[]).map((t) => t.name);
+    expect(names(group)).toEqual(names(personal));
+    // Ein anderes Mitglied fragt: byte-gleiche Werkzeuge (die eigene Adresse steht im Gruppenchat nicht darin).
+    const other = mailboxTools({ box: { ...box, owner: "g2", local: "wolke83", guestId: "g2" }, connected: false, emit: () => {}, blocked: GROUPCHAT_MAILBOX_BLOCKED });
+    const mine = mailboxTools({ box, connected: false, emit: () => {}, blocked: GROUPCHAT_MAILBOX_BLOCKED });
+    expect(JSON.stringify(other.map((t) => [t.name, t.description, t.schema]))).toBe(JSON.stringify(mine.map((t) => [t.name, t.description, t.schema])));
+    expect(JSON.stringify(group)).not.toContain("fuchs27@");
     const blocked = mailboxTools({ box, connected: true, emit: () => {}, blocked: GROUPCHAT_MAILBOX_BLOCKED });
     for (const tool of blocked) {
       expect(await tool.run({ folder: "inbox", unread_only: false, query: "", limit: 5, ids: ["x"], to: ["a"], cc: [], subject: "", body: "", in_reply_to: "" })).toEqual({

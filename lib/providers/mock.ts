@@ -10,7 +10,7 @@ import { emptyUsage } from "./types";
  *
  * Steuerung über Stichwörter in der Nachricht (nur im Testmodus wirksam):
  *   #langsam            langsamer Stream (zum Testen von „Stoppen“)
- *   #warten             3 Sekunden Denkpause vor dem ersten Text
+ *   #warten             3 Sekunden Denkpause vor dem ersten Text (#warten:N: N Sekunden, höchstens 20)
  *   #fehler:NNN         Anbieterfehler mit HTTP-Status NNN (401, 413, 429, 500 …)
  *   #ablehnung          Ablehnung aus Sicherheitsgründen
  *   #maxtokens          Antwort wegen Längenbegrenzung abgeschnitten
@@ -69,7 +69,8 @@ export async function runMock(req: ProviderRequest): Promise<ProviderResult> {
 
   thinking = `Ich überlege, wie ich auf „${lastText.slice(-80).trim()}“ am besten antworte.`;
   req.emit({ type: "thinking", text: thinking });
-  await sleep(flag("#warten") ? 3000 : 30);
+  const wait = /#warten:(\d{1,2})(?=\s|$)/.exec(lower)?.[1];
+  await sleep(wait ? Math.min(Number(wait), 20) * 1000 : flag("#warten") ? 3000 : 30);
 
   if (flag("#ersatzmodell")) {
     fallbackModel = "claude-haiku-5-5";

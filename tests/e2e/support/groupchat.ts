@@ -91,7 +91,8 @@ export class GroupChatPage {
     return this.page.getByRole("dialog", { name: "Neuer Gruppenchat" });
   }
   get membersDialog() {
-    return this.page.getByRole("dialog", { name: "Mitglieder" });
+    // Im Schritt „Personen einladen“ trägt der Dialog diesen Titel.
+    return this.page.getByRole("dialog", { name: /^(Mitglieder|Personen einladen)$/ });
   }
   get heading() {
     return this.page.getByRole("heading", { level: 1 });
