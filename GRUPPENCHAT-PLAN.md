@@ -583,7 +583,7 @@ bisherigen IDs bleiben gültig.
 | 1 · Grundlage | erledigt: Tabellen, `lib/groupchat/store.ts`, API, Schalter, `/api/status`, `coverage.mjs` mit zweistelligen Kürzeln |
 | 2 · Oberfläche | erledigt: `components/groupchat` (Ansicht, Dialoge, Abfrage), Seitenleiste, `useAppStatus` statt `useMailbox` |
 | 3 · Freebie im Gruppenchat | erledigt: Runden mit Autor und Uhrzeit (`prepareGroupTurns`), Prompt-Abschnitt, Sperre, Stoppen, Neu generieren, Posteingang gesperrt, Mock-Diagnose |
-| 4 · Abschluss | erledigt: E2E-Tests GC01–GC20, Q24, V08, W06, X10 und angepasste IDs, Doku, beide Handbücher; Stabilitätslauf siehe `TESTPLAN.md` Abschnitt 8. X10 läuft nach dem Merge mit dem echten Passwort |
+| 4 · Abschluss | erledigt: E2E-Tests GC01–GC20, Q24, V08, W06, X10 und angepasste IDs, Doku, beide Handbücher; Stabilitätslauf: 948 Läufe (3 × 316) ohne Wiederholungen grün. WebKit und Firefox laufen in der CI, X10 nach dem Merge mit dem echten Passwort |
 
 **Abweichungen vom Plan**
 
