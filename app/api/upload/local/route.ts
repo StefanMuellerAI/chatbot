@@ -1,7 +1,7 @@
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
 import { categoryOf, maxBytesFor, unsupportedMessage } from "@/lib/files/limits";
 import { requireFeature } from "@/lib/guards";
-import { assertSafeKey, putFile, storageMode } from "@/lib/storage";
+import { assertSafeKey, claimUploadKey, putFile, storageMode } from "@/lib/storage";
 
 /** Fallback ohne Vercel Blob (lokale Entwicklung): Datei geht über den Server. */
 export async function POST(request: Request) {
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     const settings = await requireFeature(category === "audio" ? "transcription" : "uploads");
     if (file.size === 0) throw new HttpError(400, "Die Datei ist leer.");
     if (file.size > maxBytesFor(category)) throw new HttpError(413, "Die Datei ist zu groß.");
+    await claimUploadKey(key, category, settings.fileRetentionDays);
     await putFile(key, Buffer.from(await file.arrayBuffer()), file.type || "application/octet-stream", category, settings.fileRetentionDays);
     return Response.json({ key });
   } catch (err) {

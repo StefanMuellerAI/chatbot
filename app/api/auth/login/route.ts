@@ -3,7 +3,18 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { safeEqual } from "@/lib/auth/password";
 import { consumeLoginAttempt, errorResponse, HttpError } from "@/lib/auth/session";
-import { adminCredentials, SESSION_COOKIE, SESSION_MAX_AGE_S, sessionCookie, signSession, type SessionClaims } from "@/lib/auth/tokens";
+import {
+  adminCredentials,
+  DEVICE_COOKIE,
+  deviceCookie,
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_S,
+  sessionCookie,
+  signDevice,
+  signSession,
+  verifyDevice,
+  type SessionClaims,
+} from "@/lib/auth/tokens";
 import { normalizeUsername } from "@/lib/events/credentials";
 import { checkGuestLogin, purgeExpiredGuests } from "@/lib/events/store";
 import { formatStart } from "@/lib/events/window";
@@ -22,7 +33,10 @@ export async function POST(request: Request) {
     const username = normalizeUsername(body.username.slice(0, MAX_INPUT));
     const password = body.password;
     const admin = adminCredentials();
-    const refundAttempt = await consumeLoginAttempt(request, username, username === admin.username);
+    const jar = await cookies();
+    // Bekanntes Gerät der Kursleitung: eigener Zähler, Fehlversuche anderer unter ihrem Namen sperren es nicht.
+    const device = username === admin.username ? await verifyDevice(jar.get(DEVICE_COOKIE)?.value, username) : null;
+    const refundAttempt = await consumeLoginAttempt(request, username, username === admin.username, device);
     const settings = await getSettings({ fresh: true });
 
     // Sitzungen gelten 12 Stunden; das Termin-Ende prüft der Server bei jeder Anfrage. So bleiben
@@ -53,8 +67,8 @@ export async function POST(request: Request) {
     }
 
     await refundAttempt();
-    const jar = await cookies();
     jar.set(SESSION_COOKIE, await signSession(claims, expiresAt), sessionCookie(request, expiresAt));
+    if (claims.role === "admin") jar.set(DEVICE_COOKIE, await signDevice(username, device ?? randomUUID()), deviceCookie(request));
     // „key“ benennt die lokale Chat-Datenbank des Kontos (Gäste: eigene, Admin: „freebie“).
     return Response.json({ ok: true, role: claims.role, key: claims.gid ?? "admin" });
   } catch (err) {

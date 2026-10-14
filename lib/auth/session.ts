@@ -118,6 +118,7 @@ export function errorResponse(err: unknown): Response {
 /** Fehlversuche je 10 Minuten: pro IP großzügig (Schulungsgruppe hinter einer IP), pro Name streng. */
 const MAX_PER_IP = 50;
 const MAX_PER_NAME = 10;
+const NAME_LOCKED = "Zu viele Fehlversuche für diesen Benutzernamen. Bitte warte ein paar Minuten.";
 
 async function countAttempt(key: string): Promise<{ count: number; refund: () => Promise<void> }> {
   const keyHash = hashId(key);
@@ -145,8 +146,22 @@ async function countAttempt(key: string): Promise<{ count: number; refund: () =>
  * höchstens 10 pro Benutzername (gezieltes Raten bei einem Konto). Gezählt wird atomar VOR der
  * Passwortprüfung; eine erfolgreiche Anmeldung erstattet ihre Versuche zurück. Die Sperre gilt
  * unabhängig davon, ob es den Namen gibt (verrät also nichts).
+ *
+ * Ein bekanntes Gerät der Kursleitung (`device`, aus dem Geräte-Cookie) zählt nur für sich: Andere – auch im selben
+ * Schulungsnetz – können sie mit Fehlversuchen unter ihrem Namen so nicht aussperren. Geraten werden kann auf diesem
+ * Weg nicht schneller, denn das Cookie gibt es nur nach einer erfolgreichen Anmeldung.
  */
-export async function consumeLoginAttempt(request: Request, username: string, adminName: boolean): Promise<() => Promise<void>> {
+export async function consumeLoginAttempt(
+  request: Request,
+  username: string,
+  adminName: boolean,
+  device: string | null = null,
+): Promise<() => Promise<void>> {
+  if (device) {
+    const own = await countAttempt(`device:${device}`);
+    if (own.count > MAX_PER_NAME) throw new HttpError(429, NAME_LOCKED);
+    return own.refund;
+  }
   // Versuche mit dem Admin-Namen zählen getrennt: Tippfehler der Gruppe sperren die Kursleitung nicht aus.
   const ip = await countAttempt(`${adminName ? "admin" : "login"}:${clientIp(request)}`);
   const name = await countAttempt(`name:${username}`);
@@ -155,7 +170,7 @@ export async function consumeLoginAttempt(request: Request, username: string, ad
     await name.refund();
   };
   if (ip.count > MAX_PER_IP) throw new HttpError(429, "Zu viele Anmeldeversuche. Bitte warte ein paar Minuten.");
-  if (name.count > MAX_PER_NAME) throw new HttpError(429, "Zu viele Fehlversuche für diesen Benutzernamen. Bitte warte ein paar Minuten.");
+  if (name.count > MAX_PER_NAME) throw new HttpError(429, NAME_LOCKED);
   return refund;
 }
 

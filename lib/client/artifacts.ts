@@ -129,8 +129,11 @@ const CSP =
 /** Bettet eine Content-Security-Policy in HTML-Artefakte ein (zusätzlich zur Sandbox). */
 export function hardenHtml(html: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${CSP}">`;
-  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => `${m}${meta}`);
-  if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (m) => `${m}<head>${meta}</head>`);
+  // Nur das echte <head>/<html>, nicht <header>: Außerhalb von <head> ignorieren Browser die CSP.
+  const head = /<head(?=[\s/>])[^>]*>/i;
+  const root = /<html(?=[\s/>])[^>]*>/i;
+  if (head.test(html)) return html.replace(head, (m) => `${m}${meta}`);
+  if (root.test(html)) return html.replace(root, (m) => `${m}<head>${meta}</head>`);
   return `<!doctype html><html><head><meta charset="utf-8">${meta}</head><body>${html}</body></html>`;
 }
 

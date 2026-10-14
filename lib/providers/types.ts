@@ -56,6 +56,8 @@ export interface ProviderRequest {
   /** Antwort in einem Gruppenchat (nur zur Anzeige im Mock). */
   groupChat?: boolean;
   emit: (event: StreamEvent) => void;
+  /** Laufender Verbrauch – zählt auch, wenn die Antwort abbricht. */
+  meter?: UsageMeter;
 }
 
 export interface ProviderResult {
@@ -115,6 +117,50 @@ export function addUsage(a: UsageInfo, b: Partial<UsageInfo>): UsageInfo {
     cacheWriteTokens: a.cacheWriteTokens + (b.cacheWriteTokens ?? 0),
     webSearches: (a.webSearches ?? 0) + (b.webSearches ?? 0),
   };
+}
+
+/** Websuche bei Claude und GPT: $10 pro 1.000 Suchen. */
+export const WEB_SEARCH_COST_USD = 0.01;
+
+/**
+ * Laufender Verbrauch einer Antwort: abgeschlossene Runden exakt, die laufende Runde so weit bekannt. So zählen
+ * auch abgebrochene Antworten (Stoppen, Verbindungsabbruch, Fehler mitten im Stream) in der Statistik.
+ */
+export class UsageMeter {
+  private done = emptyUsage();
+  private round = emptyUsage();
+  private roundChars = 0;
+
+  /** Beginn einer Runde – mit den Eingabe-Tokens, sobald die API sie meldet. */
+  start(usage: Partial<UsageInfo> = {}): void {
+    this.round = addUsage(emptyUsage(), usage);
+    this.roundChars = 0;
+  }
+
+  /** Gestreamter Text der laufenden Runde (für die Schätzung der Ausgabe-Tokens bei Abbruch). */
+  streamed(chars: number): void {
+    this.roundChars += chars;
+  }
+
+  webSearch(): void {
+    this.round.webSearches = (this.round.webSearches ?? 0) + 1;
+  }
+
+  /** Ende einer Runde mit den exakten Zahlen der API. */
+  finish(usage: Partial<UsageInfo>): void {
+    this.done = addUsage(this.done, usage);
+    this.start();
+  }
+
+  /** Abgeschlossene Runden (exakt). */
+  get total(): UsageInfo {
+    return this.done;
+  }
+
+  /** Bis jetzt angefallen; die Ausgabe der laufenden Runde ist aus dem Text geschätzt (die API meldet sie erst am Ende). */
+  get partial(): UsageInfo {
+    return addUsage(this.done, { ...this.round, outputTokens: this.round.outputTokens + Math.ceil(this.roundChars / 3.5) });
+  }
 }
 
 /** Max-Output-Tokens je Effort-Stufe (gedeckelt durch das Modell). */

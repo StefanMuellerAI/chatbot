@@ -108,7 +108,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | A04 | Falscher Name oder falsches Passwort; vor dem Laden Getipptes bzw. Autofill | „Benutzername oder Passwort stimmt nicht.“ (verrät nicht, was falsch war), Feld bleibt nutzbar; Vorausgefülltes wird übernommen |
 | A05 | Gast meldet sich per Enter an (Groß-/Kleinschreibung, Leerzeichen egal) | Chat öffnet; Cookie HttpOnly, SameSite=Lax, 12 Stunden; Secure hinter HTTPS (U01) |
 | A06 | Sehr lange Eingaben | gelten einfach als falsch |
-| A07 | 50 Fehlversuche von einer IP, dann der 51. | Sperre mit Meldung, auch richtige Zugangsdaten werden abgewiesen; andere IP und Kursleitung nicht betroffen; Erfolg zählt einen Versuch zurück |
+| A07 | 50 Fehlversuche von einer IP, dann der 51.; 10 Fehlversuche mit dem Namen der Kursleitung | Sperre mit Meldung, auch richtige Zugangsdaten werden abgewiesen; andere IP und Kursleitung nicht betroffen; Erfolg zählt einen Versuch zurück; ein Gerät, auf dem sich die Kursleitung schon angemeldet hat (Geräte-Cookie), zählt für sich und wird nicht ausgesperrt |
 | A08 | Abgelaufene, manipulierte, veraltete Tokens und Tokens unbekannter Gäste | abgewiesen, Weiterleitung auf Login |
 | A09 | Bereits angemeldet `/login` öffnen | Weiterleitung in den Chat |
 | A10 | „Abmelden“ (Gast: mit Rückfrage, Chats werden vom Gerät gelöscht, der Posteingang wird geleert) | zurück zum Login, Cookie weg |
@@ -381,7 +381,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | T14 | Login-Bremse pro Benutzername | 10 Fehlversuche sperren den Namen (auch in anderer Schreibweise), andere Konten nicht; unbekannte Namen verhalten sich gleich |
 | T15 | Admin meldet sich an | Chat und Admin-Bereich ohne zweite Anmeldung; Abmelden beendet beides |
 | T16 | Übersicht „Nach Termin“ | Gast-Anfragen und Sitzungen je Termin und (aufgeklappt) je Gruppe; Summen nach Rolle; gelöschte Gruppen und Termine bleiben in der Statistik |
-| T17 | Aufräumjob nach dem Termin-Ende | löscht die Gast-Zugänge, der Termin bleibt in der Statistik |
+| T17 | Aufräumjob nach dem Termin-Ende | löscht die Gast-Zugänge, der Termin bleibt 90 Tage in der Statistik (ab dem tatsächlichen Ende) und wird danach gelöscht |
 | T18 | API der Termine | 401 ohne Sitzung, 403 für Gäste, 400 mit deutscher Meldung, 404 für unbekannte IDs |
 | T19 | Frühstarter: 25 Gäste hinter einer IP melden sich vor der Freigabe mehrfach mit richtigen Daten an | „Dein Termin beginnt …“, keine Sperre; zum Beginn kommen alle hinein |
 | T20 | Gast nach 10 Fehlversuchen gesperrt, die Kursleitung erzeugt ein neues Passwort | Anmeldung mit dem neuen Passwort sofort möglich, das alte gilt nicht |
@@ -394,8 +394,8 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | U01 | Ohne, mit gefälschter und mit Gast-Sitzung an Admin-Routen (inkl. der Posteingangs-Routen); Cookie-Attribute; ändernde Aufrufe von fremden Seiten | 401 bzw. 403 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit; fremde Origin → 403 |
 | U02 | Falsche Methode | 405 |
 | U03 | Kaputtes JSON, falsche Felder, Grenzwerte (Nachricht, Anhänge, Bild-Prompt, Passwort) | 400 mit deutscher Meldung bzw. „Passwort stimmt nicht“ – nie 500 |
-| U04 | Pfad-Tricks (`../`, kodiert, fremde Präfixe, Nullbyte), hochgeladenes HTML | 400/404; Auslieferung als Download mit Sandbox-CSP |
-| U05 | Aufräumjob ohne, mit falschem und richtigem Secret | 401, 401, 200 mit Zählern |
+| U04 | Pfad-Tricks (`../`, kodiert, fremde Präfixe, Nullbyte), hochgeladenes HTML, Upload auf einen schon vorhandenen Pfad, Upload-Token für Blob | 400/404; Auslieferung als Download mit Sandbox-CSP; 409, die Datei bleibt unverändert; Tokens nur für `uploads/` und erlaubte Typen, mit Größengrenze je Typ |
+| U05 | Aufräumjob ohne, mit falschem und richtigem Secret; ohne gesetztes Secret | 401, 401, 200 mit Zählern; 401; abgelaufene Dateien, ausgelesene Texte, Transkripte und alte Aufträge sind wirklich weg, Neueres bleibt |
 | U06 | Sicherheits-Header auf Seiten, API-Antworten und Fehlern | nosniff, DENY, Referrer-Policy, HSTS, Permissions-Policy |
 
 ### V · Anbieter-Adapter (Fake-API, je Claude und GPT)
@@ -405,7 +405,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | V01 | Text, Gedankengang, Nutzungswerte inkl. Cache-Tokens | korrekte Anzeige und Kostenberechnung |
 | V02 | Websuche mit Quellen (inkl. Haiku mit Basis-Werkzeug) | Quellenkarten |
 | V03 | Bild-Werkzeug-Schleife, Fortsetzung nach Pause, Max-Tokens, Ablehnung, Ersatzmodell | richtige Fortsetzung, Hinweise und Kennzeichen „Ersatzmodell“ |
-| V04 | Fehler 401/429/413/400/500 und Abbruch mitten im Stream | deutsche Meldungen, keine hängenden Anfragen |
+| V04 | Fehler 401/429/413/400/500/529, Abbruch und Überlastung (Fehler-Ereignis) mitten im Stream | deutsche Meldungen, keine hängenden Anfragen |
 | V05 | **Caching-Vertrag über 3 Runden** | System-Prompt, Werkzeuge und frühere Nachrichten byte-gleich; Cache-Marker korrekt; Effort-Wechsel ohne Präfixbruch; gleicher Cache-Schlüssel bei GPT; Werkzeuge mit und ohne Verbindung „Posteingang“ byte-gleich, Umschalten ändert keinen früheren Teil der Anfrage |
 | V06 | Titel, Transkription, Bilder, Modell-Listen | Anfragen in der erwarteten Form |
 | V07 | Claude und GPT lesen den Posteingang und senden (Werkzeug-Schleife) | Liste → Lesen → Antwort mit Betreff; Senden → Mail beim Empfänger; Statuszeilen; Karten „Gelesene E-Mails“ und „Gesendete E-Mails“; ohne Verbindung Werkzeug-Fehler mit Hinweis |
@@ -659,6 +659,26 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 | 70 | Falsche Datei beim Import: immer dieselbe allgemeine Meldung | E13, Unit `import.test.ts` |
 | 71 | Seite während einer Antwort neu geladen, dann einfach weitergeschrieben: die erste Frage stand ohne Antwort und ohne Hinweis im Verlauf (gefunden vom Zufallstest, Seed 506) | C28, W07 |
 
+**Testlücken-Analyse** (14. Oktober 2026): Code und Tests bereichsweise abgeglichen – was prüft kein Test wirklich?
+
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 72 | „Neu generieren“ im Gruppenchat von zwei Personen gleichzeitig: beide Anfragen liefen, das Modell wurde zweimal bezahlt, eine Antwort verworfen | Unit `groupchat-store.test.ts` |
+| 73 | Zip-Bomben-Schutz nur nach Endung: eine ZIP-Datei als `.xls` oder `.csv` las SheetJS ungeprüft | Unit `extract.test.ts` |
+| 74 | HTML-Artefakte mit `<header>`, aber ohne `<head>`: die CSP landete im Seiteninhalt und wurde ignoriert (Netzwerk und Formulare offen) | Unit `artifacts.test.ts` |
+| 75 | Zehn Fehlversuche mit dem Namen der Kursleitung – von irgendwem, auch aus dem Schulungsnetz – sperrten sie 10 Minuten aus | A07, Unit `login-bremse.test.ts` |
+| 76 | Überlastung mitten in einer Claude-Antwort (Fehler-Ereignis nach HTTP 200): „Es ist ein interner Fehler aufgetreten“ statt „überlastet“ | V04, Unit `errors.test.ts` |
+| 77 | „Stoppen“, Verbindungsabbruch oder Fehler mitten in der Antwort: die bis dahin angefallenen Kosten fehlten in der Übersicht | Q10 |
+| 78 | Uploads ohne Besitz: wer einen Upload-Pfad kannte (z. B. aus dem Gruppenchat), konnte die Datei überschreiben | U04 |
+
+Dabei fielen vier Tests auf, die aus dem falschen Grund grün waren: U03/U04 an `/api/upload/token` (die 400 kam nur von
+„kein Blob-Speicher“), U05/Q13 und T17 (prüften nur, dass eine Zahl zurückkommt) und GC14 (die Kursleitung war gar
+nicht Mitglied). Jetzt prüfen sie die Wirkung: Unit `upload-token.test.ts`, `aufraeumen.test.ts`, `events-store.test.ts`
+und `groupchat-store.test.ts`.
+
+**Bekannte Grenze (77):** Bei GPT meldet die API die Eingabe-Tokens erst am Ende – bricht eine Antwort ab, zählt dort
+nur die aus dem Text geschätzte Ausgabe. Bei Claude kommen Eingabe und Cache gleich zu Beginn und zählen exakt.
+
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
@@ -701,8 +721,9 @@ liegt bei dir.
 | 11 · Grenzfälle, Phase 1 | A13/A14, C16/C17, C21/C22, F13–F15, H05, T19–T21; Fehler 45–53 (`GRENZFAELLE-PLAN.md`) | erledigt |
 | 12 · Grenzfälle, Phase 2 | C19/C20, C24–C26, C30, E11, E12, E15, E16, F17, H06; Fehler 54–61 (`GRENZFAELLE-PLAN.md`) | erledigt |
 | 13 · Grenzfälle, Phase 3 | A15/A16, C18, C23, C27–C29, E13, F11, F12, F16, F18, W07 (Zufallstest, nachts mit 50 Seeds), W08, Z18; Testhelfer `support/grenzfaelle.ts`; Fehler 62–71 (`GRENZFAELLE-PLAN.md`) | erledigt |
+| 14 · Testlücken | Code und Tests bereichsweise abgeglichen: Fehler 72–78 behoben, vier Scheinprüfungen (U03/U04, U05/Q13, T17, GC14) prüfen jetzt die Wirkung; A07, U04, U05, T17, V04 erweitert | erledigt |
 
-Ergebnis: 372 E2E-Tests in 32 Dateien (plus 10 Live-Smoke-Tests, dazu nachts der Zufallstest mit 50 Seeds) und 178
+Ergebnis: 376 E2E-Tests in 32 Dateien (plus 10 Live-Smoke-Tests, dazu nachts der Zufallstest mit 50 Seeds) und 190
 Unit-Tests; die komplette Suite läuft lokal in gut 12 Minuten (3 Worker). Nach Phase 3 der Grenzfälle (14. Oktober
 2026) war sie vollständig grün, die 45 Grenzfall-Tests (Chat, Handy, Tablet) auch dreimal hintereinander; der
 Zufallstest lief vorab mit rund 60 Seeds. Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den

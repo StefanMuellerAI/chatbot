@@ -128,6 +128,7 @@ for (const m of MODELS) {
       [413, "Die Anfrage ist zu groß. Bitte kürzere Dateien verwenden oder einen neuen Chat starten."],
       [400, "Die Anfrage wurde abgelehnt: Bad request from fake"],
       [500, "Der Anbieter hat gerade Probleme. Bitte gleich nochmal versuchen."],
+      [529, "Der Anbieter ist gerade überlastet. Bitte gleich nochmal versuchen."],
     ];
     test(`V04 ${m.name}: Fehler des Anbieters als deutsche Meldung`, async ({ chat }) => {
       for (const [status, message] of errors) {
@@ -173,6 +174,13 @@ for (const m of MODELS) {
 }
 
 test.describe("V · nur Claude", () => {
+  test("V04 Claude: Überlastung mitten im Stream (Fehler-Ereignis nach HTTP 200) als deutsche Meldung", async ({ chat, page }) => {
+    await chooseModel(page, "Claude Sonnet 5.5");
+    const answer = await chat.ask(`#fake:ueberlastet ${uniq()}`);
+    await expect(answer.getByRole("alert")).toHaveText("Der Anbieter ist gerade überlastet. Bitte gleich nochmal versuchen.");
+    await expect(answer.getByRole("button", { name: "Neu generieren" })).toBeVisible();
+  });
+
   test("V03 Fortsetzung nach pause_turn und Kennzeichen „Ersatzmodell“", async ({ chat, page }) => {
     await chooseModel(page, "Claude Sonnet 5.5");
     const id = uniq();

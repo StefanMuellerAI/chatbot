@@ -40,6 +40,20 @@ describe("Datei-Extraktion", () => {
     expect(() => assertZipSafe(zip)).toThrow(/zu groß/);
   });
 
+  it("prüft ZIP-Tabellen nach Inhalt, nicht nach Endung (auch .xls und .csv)", async () => {
+    const entries: Record<string, Uint8Array> = {};
+    for (let i = 0; i < 20_001; i++) entries[`x/${i}.txt`] = new Uint8Array(0);
+    const zip = Buffer.from(zipSync(entries));
+    for (const name of ["a.xlsx", "a.xls", "a.csv"]) {
+      await expect(extractText(zip, name, "")).rejects.toMatchObject({ status: 422, message: expect.stringContaining("entpackt über 200 MB") });
+    }
+    // Eine echte xlsx-Datei mit Endung .xls wird weiter gelesen.
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Stadt"], ["Kürbistal"]]), "Orte");
+    const xlsx = Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+    expect(await extractText(xlsx, "orte.xls", "application/vnd.ms-excel")).toContain("Kürbistal");
+  });
+
   it("liest Textdateien als UTF-8", async () => {
     expect(await extractText(Buffer.from("Grüße\r\nZeile 2"), "a.txt", "text/plain")).toBe("Grüße\nZeile 2");
   });

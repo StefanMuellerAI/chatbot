@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { getDb } from "@/lib/db/client";
-import { createEvent, createGroup, deleteGuest, endEventNow, listEvents, purgeExpiredGuests } from "@/lib/events/store";
+import { createEvent, createGroup, deleteEvent, deleteGroup, deleteGuest, endEventNow, listEvents, purgeExpiredGuests } from "@/lib/events/store";
 import {
   candidatesFor,
   createChat,
@@ -218,6 +218,33 @@ describe("Gruppenchat: verwalten, verlassen, löschen", () => {
     await purgeExpiredGuests();
   });
 
+  it("GC14 Gruppe löschen, Termin löschen, „Jetzt beenden“: Chats samt Mitgliedern und Beiträgen sind weg", async () => {
+    const db = await getDb();
+    const rowsFor = async (chatId: string) => {
+      const res = await db.execute(sql`
+        SELECT (SELECT count(*) FROM group_chats WHERE id = ${chatId})
+             + (SELECT count(*) FROM group_chat_members WHERE chat_id = ${chatId})
+             + (SELECT count(*) FROM group_chat_messages WHERE chat_id = ${chatId}) AS n
+      `);
+      return Number((Array.isArray(res) ? res : (res as { rows: { n: unknown }[] }).rows)[0].n);
+    };
+    const actions: [string, (s: Awaited<ReturnType<typeof setup>>) => Promise<void>][] = [
+      ["Gruppe löschen", (s) => deleteGroup(s.groupA)],
+      ["Termin löschen", (s) => deleteEvent(s.eventId)],
+      ["Jetzt beenden", (s) => endEventNow(s.eventId)],
+    ];
+    for (const [name, action] of actions) {
+      const s = await setup();
+      const byGuest = await createChat(s.a1, { title: "Von a1", members: [s.a2.name] });
+      const byTeacher = await createChat(ADMIN, { title: "Von der Kursleitung", members: [s.a2.name], groupId: s.groupA });
+      await postMessage(s.a1, byGuest.id, { text: "Hallo" });
+      expect(await rowsFor(byGuest.id), name).toBeGreaterThan(0);
+      await action(s);
+      expect(await rowsFor(byGuest.id), name).toBe(0);
+      expect(await rowsFor(byTeacher.id), name).toBe(0);
+    }
+  });
+
   it("Aufräumen löscht die Gruppenchats beendeter Termine", async () => {
     const { eventId, a1, a2 } = await setup();
     await createChat(a1, { title: "Bald vorbei", members: [a2.name] });
@@ -265,6 +292,21 @@ describe("Gruppenchat: Antworten von Freebie", () => {
     await finishAnswer(chat.id, again.answerId, { status: "done", text: "Hallo!", modelId: "mock", answer: {} });
     await postMessage(a2, chat.id, { text: "danke" });
     await expect(startAnswer(a1, chat.id, { ...ask, regenerate: true })).rejects.toThrow("nur bei der letzten Antwort");
+  });
+
+  it("Neu generieren zweimal gleichzeitig: nur ein Start, der andere bekommt 409", async () => {
+    const { a1, a2 } = await setup();
+    const chat = await createChat(a1, { title: "Gleichzeitig", members: [a2.name] });
+    await postMessage(a1, chat.id, { text: "@Freebie hallo" });
+    const job = await startAnswer(a1, chat.id, ask);
+    await finishAnswer(chat.id, job.answerId, { status: "error", text: "", modelId: "mock", answer: { error: "kaputt" } });
+    const results = await Promise.allSettled([
+      startAnswer(a1, chat.id, { ...ask, regenerate: true }),
+      startAnswer(a2, chat.id, { ...ask, regenerate: true }),
+    ]);
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(rejected.reason).toMatchObject({ status: 409, message: expect.stringContaining("Freebie antwortet gerade") });
   });
 
   it("gibt eine hängengebliebene Antwort nach der Frist frei", async () => {

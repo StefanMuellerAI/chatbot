@@ -115,11 +115,15 @@ test.describe("GC · Gruppenchats über die API", () => {
       const apiB = await guestApi(baseURL!, ip, b);
       const apiA = await guestApi(baseURL!, ip, a);
       const chat = await startGroupChat(apiA, action, [b.username]);
+      // Die Kursleitung ist Mitglied ihres eigenen Chats: 200 vorher, 404 nur, weil er wirklich weg ist
+      // (die Datenbank-Zeilen prüft groupchat-store.test.ts).
+      const byTeacher = await startGroupChat(admin.api, `${action} (Kursleitung)`, [b.username], groupA);
+      expect((await admin.api.get(`/api/groupchats/${byTeacher.id}`)).status(), action).toBe(200);
       if (action === "Gruppe") await admin.json("DELETE", `/api/admin/events/groups?id=${groupA}`);
       if (action === "Termin") await admin.json("DELETE", `/api/admin/events?id=${eventId}`);
       if (action === "Jetzt beenden") await admin.json("POST", "/api/admin/events/end", { id: eventId });
-      const res = await admin.api.get(`/api/groupchats/${chat.id}`);
-      expect(res.status(), action).toBe(404);
+      expect((await admin.api.get(`/api/groupchats/${byTeacher.id}`)).status(), action).toBe(404);
+      expect((await admin.api.get(`/api/groupchats/${chat.id}`)).status(), action).toBe(404);
       await Promise.all([apiA.dispose(), apiB.dispose()]);
     }
     // Termin-Ende und Aufräumjob: auf dem seriellen Server (admin-gruppenchat.spec.ts), sonst räumt eine
