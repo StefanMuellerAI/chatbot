@@ -2,8 +2,10 @@ import type { Page } from "@playwright/test";
 import { expect, ipFor, openAdmin, openChat, test, uniq } from "../support/fixtures";
 import { guestApi, inboxOf, mailGroup, MailPage, sendMail } from "../support/mail";
 import { GroupChatPage, groupChatOf, postMessage, startGroupChat } from "../support/groupchat";
+import { CRON_SECRET } from "../support/servers.mjs";
 
-// Q24 und der Not-Aus-Teil von GC18: ändern Einstellungen, laufen deshalb auf dem seriellen Server.
+// Q24, der Not-Aus-Teil von GC18 und der Aufräumjob (GC14): ändern Einstellungen bzw. brauchen Ruhe auf dem
+// Server (sonst räumt eine parallele Abfrage vorher ab), laufen deshalb auf dem seriellen Server.
 
 const settingSwitch = (page: Page, label: string) => page.getByRole("switch", { name: label, exact: true });
 
@@ -98,5 +100,24 @@ test.describe("Q · Admin: Schalter „Gruppenchats“", () => {
     await expect(g.composer).toBeDisabled();
     await expect(g.composer).toHaveAttribute("placeholder", "Freebie macht gerade Pause.");
     await apiA.dispose();
+  });
+
+  test("GC14 Termin-Ende: der Aufräumjob löscht die Gruppenchats beendeter Termine und meldet die Zahl", async ({ admin, playwright, baseURL, ip }) => {
+    const end = Date.now() + 5_000;
+    const {
+      guests: [a, b],
+    } = await mailGroup(admin, 2, 0, new Date(end).toISOString());
+    const apiA = await guestApi(baseURL!, ip, a);
+    await startGroupChat(apiA, "Kurz vor Schluss", [b.username]);
+    await startGroupChat(apiA, "Noch einer", [b.username]);
+    await new Promise((r) => setTimeout(r, end - Date.now() + 500));
+    const cron = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ip } });
+    const res = await cron.get("/api/cron/cleanup", { headers: { authorization: `Bearer ${CRON_SECRET}` } });
+    expect(res.status(), await res.text()).toBe(200);
+    expect(((await res.json()) as { deletedGroupChats: number }).deletedGroupChats).toBeGreaterThanOrEqual(2);
+    // Ein zweiter Lauf findet nichts mehr.
+    const again = await cron.get("/api/cron/cleanup", { headers: { authorization: `Bearer ${CRON_SECRET}` } });
+    expect(((await again.json()) as { deletedGroupChats: number }).deletedGroupChats).toBe(0);
+    await Promise.all([cron.dispose(), apiA.dispose()]);
   });
 });

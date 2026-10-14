@@ -2,7 +2,6 @@ import type { APIRequestContext } from "@playwright/test";
 import { expect, test, uniq } from "../support/fixtures";
 import { guestApi, mailGroup } from "../support/mail";
 import { askFreebie, groupChatOf, groupChatsOf, postMessage, startGroupChat } from "../support/groupchat";
-import { CRON_SECRET } from "../support/servers.mjs";
 
 // GC · Gruppenchats über die API: Rechte, Grenzen, Datenschutz und Löschen (ohne Browser).
 
@@ -89,7 +88,7 @@ test.describe("GC · Gruppenchats über die API", () => {
     await Promise.all([apiA, apiB, apiC].map((x) => x.dispose()));
   });
 
-  test("GC14 Termin-Ende, „Jetzt beenden“, Gast, Gruppe oder Termin löschen und der Aufräumjob räumen Gruppenchats ab", async ({ admin, baseURL, ip, playwright }) => {
+  test("GC14 „Jetzt beenden“, Gast, Gruppe oder Termin löschen räumen Gruppenchats ab", async ({ admin, baseURL, ip }) => {
     // Gast gelöscht: seine Beiträge bleiben mit Namen; hat er gestartet, ist der Chat weg.
     {
       const {
@@ -123,19 +122,8 @@ test.describe("GC · Gruppenchats über die API", () => {
       expect(res.status(), action).toBe(404);
       await Promise.all([apiA.dispose(), apiB.dispose()]);
     }
-    // Termin-Ende: der Aufräumjob löscht die Gruppenchats und meldet die Zahl.
-    const end = Date.now() + 5_000;
-    const {
-      guests: [a, b],
-    } = await mailGroup(admin, 2, 0, new Date(end).toISOString());
-    const apiA = await guestApi(baseURL!, ip, a);
-    await startGroupChat(apiA, "Kurz vor Schluss", [b.username]);
-    await new Promise((r) => setTimeout(r, end - Date.now() + 500));
-    const cron = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ip } });
-    const res = await cron.get("/api/cron/cleanup", { headers: { authorization: `Bearer ${CRON_SECRET}` } });
-    expect(res.status(), await res.text()).toBe(200);
-    expect(((await res.json()) as { deletedGroupChats: number }).deletedGroupChats).toBeGreaterThanOrEqual(1);
-    await Promise.all([cron.dispose(), apiA.dispose()]);
+    // Termin-Ende und Aufräumjob: auf dem seriellen Server (admin-gruppenchat.spec.ts), sonst räumt eine
+    // parallele Abfrage den Chat schon vorher ab und der Job meldet 0.
   });
 
   test("GC18 API: 401, 403, 400 mit deutscher Meldung, 404, 409 und 429", async ({ admin, baseURL, ip, playwright }) => {
