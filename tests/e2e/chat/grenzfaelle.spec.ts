@@ -381,7 +381,7 @@ async function editFirstQuestion(page: Page, chat: { questions: ReturnType<Page[
 }
 
 test.describe("C · Eingabe auf dem iPad, Entwurf und Reihenfolgen", () => {
-  test("C19 iPad: Enter macht eine neue Zeile, gesendet wird mit dem Knopf oder Strg/Cmd+Enter @tablet @mobil", async ({ chat }) => {
+  test("C19 Gerät ohne Maus (iPad, Handy): Enter macht eine neue Zeile, gesendet wird mit dem Knopf oder Strg/Cmd+Enter @tablet @mobil", async ({ chat }) => {
     const id = uniq();
     await chat.composer.fill(`Zeile eins ${id}`);
     await chat.composer.press("Enter");

@@ -146,7 +146,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | C15 | HTML/Script in Frage und Antwort, `javascript:`-Links | als Text dargestellt, nichts wird ausgeführt |
 | C16 | Einfügen aus Word, Excel und PowerPoint (Text, HTML und Bild in der Zwischenablage) | der Text steht im Eingabefeld, kein Bild-Anhang (auch mit der echten Zwischenablage in Chromium) |
 | C17 | Screenshot, Bild von einer Webseite, kopierte Datei einfügen | wird angehängt |
-| C19 | iPad (Touch ohne Maus): Enter, Senden-Knopf, Strg/Cmd+Enter | Enter macht eine neue Zeile, gesendet wird mit dem Knopf bzw. Strg/Cmd+Enter; am Rechner bleibt Enter = Senden (C02) |
+| C19 | Geräte ohne Maus (iPad, Handy, Android-Tablet): Enter, Senden-Knopf, Strg/Cmd+Enter | Enter macht eine neue Zeile, gesendet wird mit dem Knopf bzw. Strg/Cmd+Enter; am Rechner mit Maus oder Trackpad bleibt Enter = Senden (C02) |
 | C20 | Markierten Text ins Eingabefeld ziehen | wird eingefügt, nichts wird abgefangen oder angehängt |
 | C21 | Doppelklick und Doppel-Enter auf „Senden“ (neuer und laufender Chat); langsamer Doppelklick, dessen zweiter Klick schon „Stoppen“ trifft | genau eine Frage, ein Chat, eine Anfrage; die Antwort läuft weiter |
 | C22 | Doppelklick auf „Neu generieren“ | genau eine neue Antwort, eine Anfrage |
@@ -620,7 +620,7 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 
 | # | Fehler | Abgesichert durch |
 |---|---|---|
-| 54 | Auf dem iPad schickte Enter die Nachricht ab – Absätze waren ohne Hardware-Tastatur unmöglich | C19 |
+| 54 | Auf iPad, Handy und Android-Tablet schickte Enter die Nachricht ab – Absätze waren ohne Hardware-Tastatur unmöglich | C19 |
 | 55 | Während des Diktats Getipptes wurde durch den Stand vom Aufnahmebeginn ersetzt | H06 |
 | 56 | „Bearbeiten“ und „Abbrechen“ löschten Entwurf und laufende Uploads; ein Beispiel überschrieb den Entwurf; beim Chatwechsel im Bearbeiten-Modus stand der alte Nachrichtentext im anderen Chat | C24–C26 |
 | 57 | Datei neben die Ablagefläche fallen gelassen: der Browser öffnete sie anstelle von Freebie; Text ließ sich nicht ins Eingabefeld ziehen | F17, C20 |

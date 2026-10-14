@@ -275,9 +275,9 @@ Am 14. Oktober 2026 entschieden:
 
 1. **Gast-Passwörter tolerant vergleichen** (Leerzeichen, unsichtbare Zeichen und Groß-/Kleinschreibung egal; das
    Admin-Passwort bleibt exakt) – *ja, umgesetzt*
-2. **Enter macht auf dem iPad eine neue Zeile**, gesendet wird mit dem Knopf (mit angeschlossener Tastatur auch
-   Strg/Cmd+Enter); am Rechner bleibt Enter = Senden – *entschieden, umgesetzt. Erkannt werden Geräte, die nur per
-   Finger bedient werden – das schließt Handys und Android-Tablets mit ein*
+2. **Enter macht auf allen Geräten ohne Maus eine neue Zeile** (iPad, Handy, Android-Tablet), gesendet wird mit dem
+   Knopf (mit angeschlossener Tastatur auch Strg/Cmd+Enter); am Rechner mit Maus oder Trackpad bleibt Enter = Senden
+   – *entschieden und umgesetzt; bestätigt, dass es für alle Geräte ohne Maus gilt, nicht nur fürs iPad*
 3. **Entwurf schützen:** Beispiel, Vorlage und „Mit Freebie besprechen“ füllen nur ein leeres Feld; „Bearbeiten“
    merkt sich den Entwurf; beim Chatwechsel bleibt der eigene Entwurf samt laufender Uploads stehen – *ja,
    umgesetzt: steht schon ein eigener Entwurf da, bleibt er stehen und ein Hinweis bietet „Ersetzen“ an*
