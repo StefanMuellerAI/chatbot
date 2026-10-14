@@ -6,7 +6,7 @@ import { getModel, getPreset, providerConfigured } from "@/lib/models";
 import { runAnthropic } from "@/lib/providers/anthropic";
 import { runMock } from "@/lib/providers/mock";
 import { runOpenAI } from "@/lib/providers/openai";
-import { ProviderError, type ProviderRequest, type ProviderResult, type ToolSet } from "@/lib/providers/types";
+import { ProviderError, UsageMeter, WEB_SEARCH_COST_USD, type ProviderRequest, type ProviderResult, type ToolSet } from "@/lib/providers/types";
 import { getSettings, type AppSettings } from "@/lib/settings";
 import type { ChatRequestBody, FeatureFlags, StreamEvent, UsageInfo } from "@/lib/shared/types";
 import type { ModelRow } from "@/lib/models";
@@ -242,13 +242,32 @@ export async function runTurn(t: TurnInput): Promise<{ result: ProviderResult; u
     customTools,
     mailboxConnected: t.mailboxConnected,
     groupChat: t.groupChat,
+    meter: new UsageMeter(),
   };
 
   let result: ProviderResult;
-  if (mock) result = await runMock(request);
-  else if (model.provider === "anthropic") result = await runAnthropic(request);
-  else if (model.provider === "openai") result = await runOpenAI(request);
-  else throw new ProviderError(`Unbekannter Provider ${model.provider}`, "Unbekannter Anbieter.");
+  try {
+    if (mock) result = await runMock(request);
+    else if (model.provider === "anthropic") result = await runAnthropic(request);
+    else if (model.provider === "openai") result = await runOpenAI(request);
+    else throw new ProviderError(`Unbekannter Provider ${model.provider}`, "Unbekannter Anbieter.");
+  } catch (err) {
+    // Auch abgebrochene Antworten (Stoppen, Verbindungsabbruch, Fehler mitten im Stream) kosten: was bis dahin
+    // angefallen ist, zählt in der Statistik. Fehler vor der ersten Antwort kosten nichts und zählen nicht.
+    const spent = request.meter!.partial;
+    if (!mock && (spent.inputTokens || spent.outputTokens || spent.cacheReadTokens || spent.cacheWriteTokens || spent.webSearches)) {
+      await logUsage({
+        sessionHash: session.sessionHash,
+        ...usageTag(session),
+        modelId: model.id,
+        feature: "chat",
+        usage: spent,
+        costUsd: costOf(spent, prices) + (spent.webSearches ?? 0) * WEB_SEARCH_COST_USD,
+        savedUsd: promptCacheSavings(spent, prices),
+      }).catch((logErr) => console.error("usage log failed", logErr));
+    }
+    throw err;
+  }
 
   const costUsd = mock ? 0 : costOf(result.usage, prices) + result.extraCostUsd;
   const usage = { ...result.usage, costUsd };

@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { getDb } from "@/lib/db/client";
 import {
   addGuests,
   checkGuestLogin,
@@ -8,6 +10,7 @@ import {
   endEventNow,
   guestSessionValid,
   listEvents,
+  purgeOldEvents,
   resetGuestPassword,
   updateEvent,
 } from "@/lib/events/store";
@@ -87,5 +90,29 @@ describe("Termine, Gruppen und Gäste", () => {
     const b = await eventWithGuests(40);
     const names = [...a.guests, ...b.guests].map((g) => g.username);
     expect(new Set(names).size).toBe(80);
+  });
+
+  it("T17 Termine bleiben nach dem Ende 90 Tage in der Statistik, danach werden sie gelöscht", async () => {
+    const db = await getDb();
+    /** Termin, dessen geplantes (bzw. vorzeitiges) Ende so viele Tage zurückliegt. */
+    const ended = async (endsDaysAgo: number, endedEarlyDaysAgo?: number) => {
+      const id = await createEvent({ name: `Alt ${Math.random()}`, startsAt: inMinutes(-1), endsAt: inMinutes(120) });
+      await db.execute(sql`
+        UPDATE events SET starts_at = now() - make_interval(days => ${endsDaysAgo}, hours => 2), ends_at = now() - make_interval(days => ${endsDaysAgo}),
+          ended_early_at = ${endedEarlyDaysAgo === undefined ? null : sql`now() - make_interval(days => ${endedEarlyDaysAgo})`}
+        WHERE id = ${id}
+      `);
+      return id;
+    };
+    const keep = await ended(89);
+    const drop = await ended(91);
+    // Vorzeitig beendet: die Frist läuft ab dem tatsächlichen Ende.
+    const droppedEarly = await ended(89, 91);
+    const running = await createEvent({ name: `Läuft ${Math.random()}`, startsAt: inMinutes(-1), endsAt: inMinutes(120) });
+    expect(await purgeOldEvents()).toBe(2);
+    const ids = (await listEvents()).map((e) => e.id);
+    expect(ids).toEqual(expect.arrayContaining([keep, running]));
+    expect(ids).not.toContain(drop);
+    expect(ids).not.toContain(droppedEarly);
   });
 });

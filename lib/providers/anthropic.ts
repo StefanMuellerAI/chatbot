@@ -12,10 +12,10 @@ import type { PreparedMessage } from "@/lib/chat/prepare";
 import { isLegacyClaude } from "@/lib/shared/claude-models";
 import type { Citation, Effort } from "@/lib/shared/types";
 import {
-  addUsage,
-  emptyUsage,
   maxTokensFor,
   ProviderError,
+  UsageMeter,
+  WEB_SEARCH_COST_USD,
   type ProviderRequest,
   type ProviderResult,
 } from "./types";
@@ -23,7 +23,6 @@ import {
 const FALLBACK_BETA = "server-side-fallback-2026-07-01";
 const EFFORT_BETA = "mid-conversation-output-config-2026-07-01";
 const BINDING_BETA = "thinking-binding-controls-2026-08-01";
-const WEB_SEARCH_COST_USD = 0.01; // $10 pro 1.000 Suchen
 const MAX_ITERATIONS = 8;
 /** Thinking-Budget je Effort-Stufe für ältere Modelle ohne adaptives Thinking (z. B. Haiku 4.5). */
 const LEGACY_THINKING_BUDGET: Record<Effort, number> = { low: 2048, medium: 8192, high: 16384, max: 32768 };
@@ -213,7 +212,7 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
   const anthropic = getClient();
   const { params, betas } = buildAnthropicRequest(req);
   const appended: BetaMessageParam[] = [];
-  let usage = emptyUsage();
+  const meter = req.meter ?? new UsageMeter();
   let text = "";
   let thinking = "";
   const citations: Citation[] = [];
@@ -234,14 +233,20 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
       text += "\n\n";
       req.emit({ type: "text", text: "\n\n" });
     }
+    meter.start();
     const stream = anthropic.beta.messages.stream(
       { ...params, messages: [...params.messages, ...appended], ...(betas.length ? { betas } : {}) },
       { signal: req.signal },
     );
     for await (const event of stream) {
-      if (event.type === "content_block_start") {
+      if (event.type === "message_start") {
+        // Die Eingabe ist ab hier bezahlt – auch wenn die Antwort danach abbricht.
+        const u = event.message.usage;
+        meter.start({ inputTokens: u.input_tokens ?? 0, cacheReadTokens: u.cache_read_input_tokens ?? 0, cacheWriteTokens: u.cache_creation_input_tokens ?? 0 });
+      } else if (event.type === "content_block_start") {
         const block = event.content_block as { type: string; name?: string; content?: unknown; to?: { model?: string } };
         if (block.type === "server_tool_use") {
+          if (block.name === "web_search") meter.webSearch();
           req.emit({ type: "status", status: block.name === "web_fetch" ? "Lese Webseite …" : "Suche im Web …" });
         } else if (block.type === "web_search_tool_result" && Array.isArray(block.content)) {
           for (const r of block.content as { type: string; url?: string; title?: string }[]) {
@@ -261,9 +266,11 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
         const delta = event.delta as { type: string; text?: string; thinking?: string; citation?: { url?: string; title?: string } };
         if (delta.type === "text_delta" && delta.text) {
           text += delta.text;
+          meter.streamed(delta.text.length);
           req.emit({ type: "text", text: delta.text });
         } else if (delta.type === "thinking_delta" && delta.thinking) {
           thinking += delta.thinking;
+          meter.streamed(delta.thinking.length);
           req.emit({ type: "thinking", text: delta.thinking });
         } else if (delta.type === "citations_delta" && delta.citation?.url) {
           addCitation(delta.citation.url, delta.citation.title);
@@ -272,7 +279,7 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
     }
     const final = await stream.finalMessage();
     const u = final.usage;
-    usage = addUsage(usage, {
+    meter.finish({
       inputTokens: u.input_tokens ?? 0,
       outputTokens: u.output_tokens ?? 0,
       cacheReadTokens: u.cache_read_input_tokens ?? 0,
@@ -288,10 +295,10 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
         thinking,
         citations,
         native: undefined,
-        usage,
+        usage: meter.total,
         stopReason,
         fallbackModel,
-        extraCostUsd: (usage.webSearches ?? 0) * WEB_SEARCH_COST_USD,
+        extraCostUsd: (meter.total.webSearches ?? 0) * WEB_SEARCH_COST_USD,
       };
     }
 
@@ -347,10 +354,10 @@ export async function runAnthropic(req: ProviderRequest): Promise<ProviderResult
     thinking,
     citations,
     native: { provider: "anthropic", model: req.model.modelId, items: appended },
-    usage,
+    usage: meter.total,
     stopReason,
     fallbackModel,
-    extraCostUsd: (usage.webSearches ?? 0) * WEB_SEARCH_COST_USD,
+    extraCostUsd: (meter.total.webSearches ?? 0) * WEB_SEARCH_COST_USD,
   };
 }
 

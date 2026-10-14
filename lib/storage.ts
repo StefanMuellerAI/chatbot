@@ -100,6 +100,21 @@ export async function registerFile(
     .onConflictDoUpdate({ target: schema.storedFiles.key, set: { expiresAt, size, mime } });
 }
 
+/**
+ * Reserviert einen Upload-Pfad für genau einen Upload. Der Browser wählt für jede Datei einen neuen, zufälligen Pfad –
+ * gibt es ihn schon, will jemand eine vorhandene Datei überschreiben (Pfade sind z. B. im Gruppenchat sichtbar).
+ */
+export async function claimUploadKey(key: string, kind: string, retentionDays: number): Promise<void> {
+  const db = await getDb();
+  const expiresAt = new Date(Date.now() + retentionDays * 86_400_000);
+  const claimed = await db
+    .insert(schema.storedFiles)
+    .values({ key, kind, mime: "application/octet-stream", size: 0, expiresAt })
+    .onConflictDoNothing()
+    .returning({ key: schema.storedFiles.key });
+  if (!claimed.length) throw new HttpError(409, "Diese Datei gibt es schon. Bitte die Datei erneut anhängen.");
+}
+
 export async function getFile(key: string): Promise<{ data: Buffer; contentType: string } | null> {
   assertSafeKey(key);
   if (storageMode() === "blob") {

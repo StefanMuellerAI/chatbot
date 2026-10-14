@@ -104,6 +104,11 @@ Prüfregeln:
 - **Login-Bremse:**
   - Wie heute 50 Fehlversuche je 10 Minuten und IP (eine ganze Gruppe hinter einer IP bleibt möglich).
   - Neu: höchstens 10 Fehlversuche je 10 Minuten und Benutzername. Das bremst gezieltes Raten bei einem Konto.
+  - Geräte der Kursleitung (14. Oktober 2026): Nach einer erfolgreichen Admin-Anmeldung merkt sich ein zweites,
+    signiertes Cookie das Gerät (`freebie_geraet`, HttpOnly, nur an `/api/auth/login`, 180 Tage). Es öffnet nichts,
+    sondern gibt der Bremse einen eigenen Zähler für dieses Gerät. So können zehn Fehlversuche anderer unter dem
+    Admin-Namen – auch aus demselben Schulungsnetz – die Kursleitung nicht mehr aussperren; unbekannte Geräte bleiben
+    gebremst.
   - Die Meldung unterscheidet nicht zwischen unbekanntem Namen und falschem Passwort.
 - **Admin-Konto:** `ADMIN_USERNAME` (Standard `admin`) und `ADMIN_PASSWORD` aus der Umgebung. Admin-Sitzungen gelten
   12 Stunden.

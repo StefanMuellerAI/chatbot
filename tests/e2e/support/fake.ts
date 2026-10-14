@@ -12,6 +12,8 @@ export interface Recorded {
   // Der Rohinhalt der Anfrage – je nach Endpunkt unterschiedlich aufgebaut.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   body: any;
+  /** Nur bei #fake:haengt: Freebie hat die Verbindung geschlossen (Stoppen bricht die Anfrage wirklich ab). */
+  closed?: boolean;
 }
 
 /** Alle Anfragen an die Fake-API, deren Inhalt den Text enthält (optional nur ein Pfad). */

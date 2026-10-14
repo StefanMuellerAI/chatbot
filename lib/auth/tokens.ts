@@ -89,6 +89,40 @@ export async function verifySession(token: string | undefined, opts: { allowExpi
   return null;
 }
 
+/**
+ * Bekanntes Gerät der Kursleitung: nach einer erfolgreichen Admin-Anmeldung gesetzt. Es öffnet nichts, sondern gibt
+ * der Login-Bremse einen eigenen Zähler für dieses Gerät – so können Fehlversuche anderer mit dem Admin-Namen
+ * (auch aus demselben Schulungsnetz) die Kursleitung nicht aussperren.
+ */
+export const DEVICE_COOKIE = "freebie_geraet";
+export const DEVICE_MAX_AGE_S = 180 * 24 * 60 * 60;
+const DEVICE_AUDIENCE = "freebie-geraet";
+
+export async function signDevice(name: string, deviceId: string): Promise<string> {
+  return new SignJWT({ name, did: deviceId })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(Date.now() / 1000) + DEVICE_MAX_AGE_S)
+    .setAudience(DEVICE_AUDIENCE)
+    .sign(secretMaterial());
+}
+
+/** Geräte-ID aus einem gültigen Geräte-Cookie für genau diesen Namen, sonst null. */
+export async function verifyDevice(token: string | undefined, name: string): Promise<string | null> {
+  if (!token) return null;
+  try {
+    const { payload } = await jwtVerify(token, secretMaterial(), { audience: DEVICE_AUDIENCE });
+    return payload.name === name && typeof payload.did === "string" ? payload.did : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Nur an die Anmeldung geschickt, damit es sonst nirgends mitreist. */
+export function deviceCookie(request: Request) {
+  return { httpOnly: true, secure: secureCookie(request), sameSite: "lax" as const, path: "/api/auth/login", maxAge: DEVICE_MAX_AGE_S };
+}
+
 /** Cookie-Optionen passend zum Ablauf des Tokens. */
 export function sessionCookie(request: Request, expiresAt: Date) {
   return {
