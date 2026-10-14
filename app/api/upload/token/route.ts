@@ -1,7 +1,7 @@
 import { issueSignedToken } from "@vercel/blob";
 import { handleUpload, handleUploadPresigned, type HandleUploadBody, type HandleUploadPresignedBody } from "@vercel/blob/client";
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
-import { categoryOf, maxBytesFor } from "@/lib/files/limits";
+import { categoryOf, maxBytesFor, unsupportedMessage } from "@/lib/files/limits";
 import { requireFeature } from "@/lib/guards";
 import { assertSafeKey, blobAuth, registerFile } from "@/lib/storage";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       assertSafeKey(pathname);
       if (!pathname.startsWith("uploads/")) throw new HttpError(400, "Ungültiger Upload-Pfad.");
       const category = categoryOf(pathname);
-      if (!category) throw new HttpError(400, "Dieses Dateiformat wird nicht unterstützt.");
+      if (!category) throw new HttpError(400, unsupportedMessage(pathname));
       const settings = await requireFeature(category === "audio" ? "transcription" : "uploads");
       await registerFile(pathname, category, "application/octet-stream", 0, settings.fileRetentionDays);
       return maxBytesFor(category);

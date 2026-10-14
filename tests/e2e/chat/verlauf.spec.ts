@@ -203,9 +203,9 @@ test.describe("E · Verlauf und Seitenleiste", () => {
 
     const broken = testInfo.outputPath("kaputt.json");
     writeFileSync(broken, "{ das ist kein json");
-    expect(await importFile(page, broken)).toBe("Die Datei konnte nicht importiert werden. Bitte eine Export-Datei von Freebie wählen.");
+    expect(await importFile(page, broken)).toBe("Die Datei konnte nicht importiert werden. Importieren lassen sich nur Export-Dateien von Freebie: die .json-Datei, die „Export“ in der Seitenleiste erzeugt (freebie-chats-JJJJ-MM-TT.json).");
     writeFileSync(broken, JSON.stringify({ conversations: [{ foo: 1 }] }));
-    expect(await importFile(page, broken)).toBe("Die Datei konnte nicht importiert werden. Bitte eine Export-Datei von Freebie wählen.");
+    expect(await importFile(page, broken)).toBe("Die Datei konnte nicht importiert werden. Importieren lassen sich nur Export-Dateien von Freebie: die .json-Datei, die „Export“ in der Seitenleiste erzeugt (freebie-chats-JJJJ-MM-TT.json).");
 
     // Unvollständige Einträge werden ergänzt und bringen nichts zum Absturz.
     const partial = testInfo.outputPath("teilweise.json");

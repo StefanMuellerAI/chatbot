@@ -1,9 +1,14 @@
 "use client";
 import { ArrowRight, Loader2, Lock, User } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { forgetExpiredGuest, forgetOtherGuests } from "@/lib/client/db";
 import { credentialPair } from "@/lib/shared/login-input";
+
+const COOKIES_BLOCKED =
+  "Dein Browser speichert keine Cookies für Freebie – ohne sie klappt die Anmeldung nicht. Bitte Cookies für diese Seite erlauben (z. B. „Alle Cookies blockieren“ ausschalten) und es erneut versuchen.";
+
+const noSubscription = () => () => {};
 
 export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?: boolean; accessExpired?: boolean }) {
   const router = useRouter();
@@ -15,6 +20,15 @@ export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sperre gegen doppeltes Absenden (zweimal Enter, bevor der Knopf gesperrt ist).
+  const busyRef = useRef(false);
+  // Ohne Cookies bliebe die Anmeldung wirkungslos: man landete kommentarlos wieder hier.
+  const cookiesBlocked = useSyncExternalStore(
+    noSubscription,
+    () => !navigator.cookieEnabled,
+    () => false,
+  );
+  const shownError = error ?? (cookiesBlocked ? COOKIES_BLOCKED : null);
   // Vor dem Laden getippte oder vom Browser automatisch ausgefüllte Werte übernehmen –
   // sonst bliebe der Button gesperrt, obwohl in den Feldern etwas steht.
   const adoptUsername = useCallback((el: HTMLInputElement | null) => {
@@ -37,7 +51,8 @@ export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim() || !password) return;
+    if (!username.trim() || !password || busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -48,12 +63,15 @@ export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; role?: "admin" | "guest"; key?: string };
       if (!res.ok) throw new Error(data.error ?? "Anmeldung fehlgeschlagen.");
+      // Hat der Browser das Sitzungs-Cookie gespeichert? Sonst ginge es ohne Erklärung zurück zur Anmeldung.
+      if ((await fetch("/api/auth/session").catch(() => null))?.status === 401) throw new Error(COOKIES_BLOCKED);
       // Chats früherer Gäste auf diesem Gerät entfernen (Schulungsrechner).
       await forgetOtherGuests(data.key).catch(() => {});
       router.replace(toAdmin && data.role === "admin" ? "/admin" : "/");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Anmeldung fehlgeschlagen.");
+      busyRef.current = false;
       setBusy(false);
     }
   };
@@ -94,7 +112,7 @@ export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?
           aria-label="Passwort"
         />
       </label>
-      {error && <p className="rounded-xl bg-[#e41c68]/15 px-3 py-2 text-sm text-[#ff8fb5]" role="alert">{error}</p>}
+      {shownError && <p className="rounded-xl bg-[#e41c68]/15 px-3 py-2 text-sm text-[#ff8fb5]" role="alert">{shownError}</p>}
       <button
         type="submit"
         disabled={busy || !username.trim() || !password}

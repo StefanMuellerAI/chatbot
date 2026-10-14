@@ -2,6 +2,7 @@
 import { Clock, Download } from "lucide-react";
 import { useEffect, useState } from "react";
 import { downloadExport } from "@/lib/client/db";
+import { leavePage } from "@/lib/client/leave";
 import { formatTime } from "@/lib/events/window";
 
 /** So lange vor dem Ende warnt der Chat Gäste (mit Export-Knopf). */
@@ -45,7 +46,7 @@ export function AccessExpiry({ validUntil, onChange }: { validUntil: string | nu
         const end = await currentEnd();
         if (cancelled) return;
         // Vorbei (oder verschoben): neu laden – die Seite leitet mit dem passenden Hinweis zur Anmeldung.
-        if (end === null) return window.location.replace(`${window.location.origin}/`);
+        if (end === null) return leavePage(`${window.location.origin}/`);
         if (end !== undefined && end !== until) return onChange(new Date(end).toISOString());
       }
       setWarn(left <= WARN_BEFORE_MS);

@@ -1,5 +1,8 @@
 "use client";
+import { CHAT_TOO_LONG } from "@/lib/errors";
 import type { ChatRequestBody, StreamEvent } from "@/lib/shared/types";
+import { leavePage } from "./leave";
+import { MAX_REQUEST_BYTES } from "./long-chat";
 
 export class ApiError extends Error {
   constructor(
@@ -39,7 +42,7 @@ async function request(url: string, init: RequestInit): Promise<Response> {
 function handleUnauthorized(status: number, admin = false) {
   if (typeof window === "undefined") return;
   if (status === 401 || (admin && status === 403)) {
-    window.location.replace(`${window.location.origin}/login${admin ? "?weiter=admin" : ""}`);
+    leavePage(`${window.location.origin}/login${admin ? "?weiter=admin" : ""}`);
   }
 }
 
@@ -76,6 +79,8 @@ export async function streamChat(
   const payload = compress
     ? await new Response(new Blob([json]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer()
     : json;
+  // Größer nimmt die Plattform nicht an (sie antwortet mit einer Fehlerseite) – gleich verständlich melden.
+  if ((typeof payload === "string" ? payload.length : payload.byteLength) > MAX_REQUEST_BYTES) throw new ApiError(CHAT_TOO_LONG, 413);
   const res = await request("/api/chat", {
     method: "POST",
     headers: compress

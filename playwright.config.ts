@@ -28,6 +28,8 @@ const projects: Project[] = [
   { name: "api", testDir: "tests/e2e/api", use: { baseURL: baseUrl("mock") } },
   // Last und Ausfälle: einzeln, damit Zeitbudgets nicht von anderen Tests abhängen.
   { name: "belastung", testDir: "tests/e2e/belastung", workers: 1, timeout: 180_000, use: { ...chrome, baseURL: baseUrl("mock") } },
+  // Zufallstest W07: jeder Seed mit eigenem Gast, daher parallel (nachts 50 Seeds).
+  { name: "zufall", testDir: "tests/e2e/zufall", timeout: 600_000, use: { ...chrome, baseURL: baseUrl("mock") } },
   {
     name: "mobile",
     testDir: "tests/e2e/chat",

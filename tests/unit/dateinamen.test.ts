@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categoryOf, safeFileName } from "@/lib/files/limits";
+import { categoryOf, safeFileName, unsupportedMessage } from "@/lib/files/limits";
 import { assertSafeKey } from "@/lib/storage";
 
 // F13: Aus jedem Dateinamen mit erlaubter Endung wird ein gültiger Speicherpfad mit demselben Dateityp.
@@ -35,5 +35,20 @@ describe("Dateinamen für Speicherpfade", () => {
       expect(categoryOf(key(name)), name).toBe(categoryOf(name));
       expect(() => assertSafeKey(key(name)), name).not.toThrow();
     }
+  });
+});
+
+// F16: Falsche Formate bekommen einen Tipp, wie es doch geht.
+describe("Meldung bei nicht unterstützten Formaten", () => {
+  it("nennt für typische Verwechslungen den nächsten Schritt", () => {
+    expect(unsupportedMessage("Bericht.DOC")).toBe("Dieses Format wird nicht unterstützt. Bitte in Word als .docx speichern (Datei → Speichern unter).");
+    expect(unsupportedMessage("IMG_0042.heic")).toMatch(/^Dieses Format wird nicht unterstützt\. Fotos vom iPhone oder iPad \(HEIC\) bitte als JPG speichern/);
+    expect(unsupportedMessage("Unterlagen.7z")).toBe("Dieses Format wird nicht unterstützt. Bitte zuerst entpacken und die Dateien einzeln anhängen.");
+    expect(unsupportedMessage("Scan")).toMatch(/Die Datei hat keine Endung/);
+  });
+
+  it("ohne bekannten Tipp bleibt es bei der kurzen Meldung; unterstützte Formate sind nicht betroffen", () => {
+    expect(unsupportedMessage("programm.exe")).toBe("Dieses Format wird nicht unterstützt.");
+    for (const name of ["a.docx", "a.pptx", "a.jpg", "a.eml", "a.m4a"]) expect(categoryOf(name), name).not.toBeNull();
   });
 });

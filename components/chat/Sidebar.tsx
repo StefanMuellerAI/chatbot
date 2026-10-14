@@ -5,6 +5,8 @@ import { useMemo, useRef, useState } from "react";
 import { mailAddress, type MailFolder } from "@/lib/shared/mail";
 import type { GroupChatSummary } from "@/lib/shared/groupchat";
 import { downloadExport, forgetCurrentGuest, importAll, type Conversation } from "@/lib/client/db";
+import { importProblem } from "@/lib/client/export";
+import { leavePage } from "@/lib/client/leave";
 import { formatTime } from "@/lib/events/window";
 import type { AccountInfo } from "@/lib/shared/types";
 import { Logo } from "@/components/ui/Logo";
@@ -19,6 +21,7 @@ export function Sidebar({
   onNew,
   onDelete,
   busy,
+  onLeaving,
   theme,
   onTheme,
   onClose,
@@ -31,8 +34,10 @@ export function Sidebar({
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
-  /** Während einer Antwort sind Chatwechsel und neuer Chat gesperrt. */
+  /** Während einer Antwort sind Chatwechsel, neuer Chat und Import gesperrt. */
   busy?: boolean;
+  /** Abmelden beginnt (true) bzw. ist gescheitert (false) – eine laufende Antwort endet vorher. */
+  onLeaving?: (leaving: boolean) => void;
   theme: Theme;
   onTheme: (t: Theme) => void;
   onClose?: () => void;
@@ -44,6 +49,9 @@ export function Sidebar({
   const busyTitle = busy ? "Während einer Antwort nicht möglich" : undefined;
   const [query, setQuery] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
+  // Export und Abmelden je nur einmal, auch bei einem Doppelklick.
+  const exportingRef = useRef(false);
+  const leavingRef = useRef(false);
   const groups = useMemo(() => groupByDate(filterConversations(conversations, query)), [conversations, query]);
   const shared = useMemo(() => filterGroupChats(groupChats?.chats ?? [], query), [groupChats?.chats, query]);
 
@@ -204,12 +212,22 @@ export function Sidebar({
         )}
         <div className="grid grid-cols-2 gap-1">
           <SideAction
-            onClick={() => void downloadExport()}
+            onClick={async () => {
+              if (exportingRef.current) return;
+              exportingRef.current = true;
+              try {
+                await downloadExport();
+              } finally {
+                // Der zweite Klick eines Doppelklicks kommt erst nach dem Download an.
+                setTimeout(() => (exportingRef.current = false), 1000);
+              }
+            }}
             label="Alle Chats exportieren"
           >
             <Download className="h-4 w-4" /> Export
           </SideAction>
-          <SideAction onClick={() => importRef.current?.click()} label="Chats importieren">
+          {/* Während einer Antwort gesperrt: ein importierter Chat mit derselben ID würde sie überschreiben. */}
+          <SideAction onClick={() => importRef.current?.click()} label="Chats importieren" disabled={busy} title={busyTitle}>
             <Upload className="h-4 w-4" /> Import
           </SideAction>
           <input
@@ -222,11 +240,12 @@ export function Sidebar({
               const file = e.target.files?.[0];
               e.target.value = "";
               if (!file) return;
+              const text = await file.text().catch(() => "");
               try {
-                const n = await importAll(await file.text());
+                const n = await importAll(text);
                 alert(n === 1 ? "1 Chat importiert." : `${n} Chats importiert.`);
               } catch {
-                alert("Die Datei konnte nicht importiert werden. Bitte eine Export-Datei von Freebie wählen.");
+                alert(importProblem(file.name, text));
               }
             }}
           />
@@ -238,13 +257,18 @@ export function Sidebar({
           <SideAction
             onClick={async () => {
               // Gast-Chats bleiben nicht auf (oft gemeinsam genutzten) Schulungsrechnern liegen; das Postfach wird geleert.
+              if (leavingRef.current) return;
               const question = logoutQuestion(account.role, mail, Boolean(groupChats?.chats?.some((g) => !g.left)));
               if (question && !confirm(question)) return;
+              leavingRef.current = true;
+              onLeaving?.(true);
               try {
                 await fetch("/api/auth/logout", { method: "POST" });
                 await forgetCurrentGuest();
-                window.location.replace(`${window.location.origin}/login`);
+                leavePage(`${window.location.origin}/login`);
               } catch {
+                leavingRef.current = false;
+                onLeaving?.(false);
                 alert("Abmelden hat nicht geklappt – bitte die Internetverbindung prüfen und erneut versuchen.");
               }
             }}
@@ -383,9 +407,28 @@ function MailNav({ mail, account, onClose }: { mail: SidebarMail; account: Accou
   );
 }
 
-function SideAction({ children, onClick, label }: { children: React.ReactNode; onClick: () => void; label?: string }) {
+function SideAction({
+  children,
+  onClick,
+  label,
+  disabled,
+  title,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  label?: string;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
-    <button type="button" onClick={onClick} aria-label={label} className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-white/70 hover:bg-white/8 hover:text-white">
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      disabled={disabled}
+      title={title}
+      className="flex items-center gap-2 rounded-xl px-3 py-2 text-left text-white/70 hover:bg-white/8 hover:text-white disabled:opacity-40 disabled:hover:bg-transparent"
+    >
       {children}
     </button>
   );

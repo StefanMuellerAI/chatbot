@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { errorResponse, requireUser } from "@/lib/auth/session";
+import { CHAT_TOO_LONG } from "@/lib/errors";
 import { chatStream } from "@/lib/chat/run";
 import { MAX_ATTACHMENTS, MAX_MESSAGE_CHARS } from "@/lib/files/limits";
 import { ChatRequestSchema } from "@/lib/shared/schemas";
@@ -36,7 +37,7 @@ function limitMessage(err: z.ZodError): string {
     const field = issue.path.at(-1);
     if (field === "text") return `Die Nachricht ist zu lang (höchstens ${MAX_MESSAGE_CHARS.toLocaleString("de-DE")} Zeichen).`;
     if (field === "attachments") return `Zu viele Anhänge (höchstens ${MAX_ATTACHMENTS} pro Nachricht).`;
-    if (field === "messages") return "Der Chat ist zu lang. Bitte einen neuen Chat starten.";
+    if (field === "messages") return CHAT_TOO_LONG;
   }
   return "Ungültige Anfrage.";
 }

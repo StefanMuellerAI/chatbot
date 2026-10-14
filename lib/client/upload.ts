@@ -4,6 +4,9 @@ import { categoryOf, safeFileName, type UploadCategory } from "@/lib/files/limit
 import type { Attachment, PublicConfig } from "@/lib/shared/types";
 import { api, ApiError, statusMessage } from "./api";
 
+/** Netz weg während des Hochladens – erneut anhängen genügt. */
+export const UPLOAD_OFFLINE = "Upload fehlgeschlagen: keine Verbindung zu Freebie. Bitte die Internetverbindung prüfen und die Datei erneut anhängen.";
+
 export type Progress = (fraction: number, label: string) => void;
 
 const MAX_IMAGE_EDGE = 1568;
@@ -75,7 +78,7 @@ export async function uploadFile(
         reject(new ApiError(msg, xhr.status));
       }
     };
-    xhr.onerror = () => reject(new ApiError("Upload fehlgeschlagen (Netzwerk).", 0));
+    xhr.onerror = () => reject(new ApiError(UPLOAD_OFFLINE, 0));
     xhr.onabort = () => reject(new DOMException("Abgebrochen", "AbortError"));
     signal?.addEventListener("abort", () => xhr.abort(), { once: true });
     xhr.send(form);

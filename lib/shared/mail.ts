@@ -80,12 +80,18 @@ export function mailContact(local: string): MailContact {
 }
 
 /**
- * Lokaler Teil einer Eingabe wie „ Fuchs27 “, „fuchs27@freebie.example“ oder „<fuchs27@freebie.example>“.
- * Null bei fremder Domain oder unzulässigen Zeichen.
+ * Lokaler Teil einer Eingabe wie „ Fuchs27 “, „fuchs27@freebie.example“, „<fuchs27@freebie.example>“ oder – aus einem
+ * Mailprogramm kopiert – „Max Muster <fuchs27@freebie.example>“, „mailto:fuchs27@freebie.example“ und mit Satzzeichen
+ * am Ende. Null bei fremder Domain oder unzulässigen Zeichen.
  */
 export function parseAddress(raw: string): string | null {
   let value = raw.trim().toLowerCase();
-  if (value.startsWith("<") && value.endsWith(">")) value = value.slice(1, -1).trim();
+  const angle = /<([^<>]*)>$/.exec(value);
+  if (angle) value = angle[1].trim();
+  value = value
+    .replace(/^mailto:/, "")
+    .replace(/^["'„“‚(]+|["'“”‘’)]+$/g, "")
+    .replace(/[.,;:!?]+$/, "");
   const at = value.indexOf("@");
   if (at >= 0) {
     if (value.slice(at + 1) !== MAIL_DOMAIN) return null;
@@ -94,9 +100,13 @@ export function parseAddress(raw: string): string | null {
   return /^[a-z0-9._-]{1,64}$/.test(value) ? value : null;
 }
 
-/** Zerlegt „a, b; c“ in einzelne Einträge. */
+/**
+ * Zerlegt „a, b; c“ in einzelne Einträge. Anzeigenamen aus Mailprogrammen („"Muster, Max" <a@…>“, „Max Muster <a@…>“)
+ * fallen weg – sie dürfen Leerzeichen und (in Anführungszeichen) Kommas enthalten.
+ */
 export function splitAddresses(raw: string): string[] {
   return raw
+    .replace(/(?:"[^"]*"|[^,;<>"\n]*)\s*<([^<>]*)>/g, " $1 ")
     .split(/[,;\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);

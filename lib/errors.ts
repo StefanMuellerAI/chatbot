@@ -10,9 +10,15 @@ export class HttpError extends Error {
   }
 }
 
+/** Der Verlauf passt nicht mehr in eine Anfrage (Kontextfenster des Modells, 500 Nachrichten oder 4,5 MB). */
+export const CHAT_TOO_LONG = "Dieser Chat ist zu lang geworden. Bitte einen neuen Chat starten – dieser bleibt im Verlauf erhalten.";
+
+/** Anfang der Meldung für Fehler, die keiner bekannten Ursache zugeordnet sind. */
+export const UNKNOWN_ERROR = "Es ist ein Fehler aufgetreten:";
+
 /** Übersetzt Fehler der Anbieter (SDK-Fehler mit Status oder eigene ProviderError) in verständliche Meldungen. */
 export function providerErrorMessage(err: unknown): string {
-  const e = err as { status?: number; message?: string; userMessage?: string; error?: { message?: string; error?: { message?: string } } };
+  const e = err as { status?: number; message?: string; userMessage?: string; error?: { message?: string; code?: string; error?: { message?: string } } };
   if (typeof e?.userMessage === "string") return e.userMessage;
   if (e?.status === 401) return "Der API-Schlüssel wurde abgelehnt. Bitte im Admin-Bereich prüfen.";
   if (e?.status === 429) return "Der Anbieter ist gerade überlastet oder das Kontingent ist erschöpft. Bitte gleich nochmal versuchen.";
@@ -22,6 +28,8 @@ export function providerErrorMessage(err: unknown): string {
   if (e?.status === 400) {
     // Anthropic: { error: { error: { message } } }, OpenAI: { error: { message } }.
     const detail = e.error?.error?.message ?? e.error?.message ?? e.message ?? "";
+    // Verlauf länger als das Kontextfenster (Anthropic: „prompt is too long“, OpenAI: context_length_exceeded).
+    if (e.error?.code === "context_length_exceeded" || /prompt is too long|context window|context length/i.test(detail)) return CHAT_TOO_LONG;
     return `Die Anfrage wurde abgelehnt: ${detail.slice(0, 300)}`;
   }
   if (e?.status && e.status >= 500) return "Der Anbieter hat gerade Probleme. Bitte gleich nochmal versuchen.";
@@ -32,7 +40,7 @@ export function providerErrorMessage(err: unknown): string {
   if (name === "APIConnectionError" || /^(terminated|fetch failed|socket hang up|other side closed)$|ECONNRESET|ECONNREFUSED/i.test(e?.message ?? "")) {
     return "Die Verbindung zum Anbieter ist abgebrochen. Bitte „Neu generieren“ verwenden.";
   }
-  return `Es ist ein Fehler aufgetreten: ${(e?.message ?? "unbekannt").slice(0, 300)}`;
+  return `${UNKNOWN_ERROR} ${(e?.message ?? "unbekannt").slice(0, 300)}`;
 }
 
 /** Fehler eines Anbieters oder SDKs (hat einen HTTP-Status oder eine eigene Nutzermeldung). */

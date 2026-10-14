@@ -23,6 +23,19 @@ describe("Adressen im Posteingang", () => {
     expect(splitAddresses(" , ")).toEqual([]);
   });
 
+  it("Z18 versteht Adressen, wie sie aus Mailprogrammen kopiert werden", () => {
+    const list = (raw: string) => splitAddresses(raw).map(parseAddress);
+    expect(list('"Kursleitung" <kursleitung@freebie.example>')).toEqual(["kursleitung"]);
+    expect(list('"Muster, Max" <fuchs27@freebie.example>; Erika Mustermann <wolke83@freebie.example>')).toEqual(["fuchs27", "wolke83"]);
+    expect(list("fuchs27@freebie.example.\nwolke83@freebie.example,")).toEqual(["fuchs27", "wolke83"]);
+    expect(list("mailto:fuchs27@freebie.example")).toEqual(["fuchs27"]);
+    expect(list("„fuchs27@freebie.example“")).toEqual(["fuchs27"]);
+    expect(parseAddress("Max Muster <fuchs27@freebie.example>")).toBe("fuchs27");
+    // Fremde Adressen bleiben abgelehnt – mit dem Teil, der nicht passt.
+    expect(list('"Max" <max@gmail.com>')).toEqual([null]);
+    expect(splitAddresses('"Max" <max@gmail.com>')).toEqual(["max@gmail.com"]);
+  });
+
   it("Anzeige, Vorschau und Betreff-Präfixe", () => {
     expect(mailAddress("fuchs27")).toBe("fuchs27@freebie.example");
     expect(mailName("kursleitung")).toBe("Kursleitung");

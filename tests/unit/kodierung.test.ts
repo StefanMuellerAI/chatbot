@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { decodeText, extractText } from "@/lib/files/extract";
+import { stripControlChars, withoutNullBytes } from "@/lib/shared/text";
 
 // F14/F15: Textdateien in den Kodierungen, die Teilnehmende tatsächlich mitbringen.
 
@@ -40,5 +41,16 @@ describe("Kodierung von Textdateien", () => {
   it("CSV aus deutschem Excel: Umlaute, Dezimalkomma und Datum bleiben, wie sie in der Datei stehen", async () => {
     const text = await extractText(windows1252("Name;Ort;Betrag;Datum\nMüller;Köln;1.234,56;14.10.2026\n"), "excel-export.csv", "text/csv");
     expect(text).toContain("Müller,Köln,\"1.234,56\",14.10.2026");
+  });
+});
+
+// C18: Steuerzeichen in getipptem oder kopiertem Text – das Modell bekommt sie nicht, jsonb keine Nullbytes.
+describe("Steuerzeichen in Texten", () => {
+  it("entfernt Steuerzeichen, lässt Tab, Zeilenumbruch, Emoji und andere Schriften stehen", () => {
+    expect(stripControlChars("a\u0000b\u0001c\u007f\td\ne 😀 مرحبا\u00a0!")).toBe("abc\td\ne 😀 مرحبا\u00a0!");
+  });
+
+  it("entfernt Nullbytes in allen Texten eines JSON-Werts, auch in Schlüsseln", () => {
+    expect(withoutNullBytes({ text: "a\u0000b", list: ["\u0000x", 1, null], nested: { "k\u0000": true } })).toEqual({ text: "ab", list: ["x", 1, null], nested: { k: true } });
   });
 });

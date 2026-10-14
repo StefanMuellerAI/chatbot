@@ -137,6 +137,33 @@ for (const m of MODELS) {
       }
     });
 
+    test(`C28 ${m.name}: nach einem Fehler weiterschreiben und nach „Stoppen“ sofort neu senden – die Anfrage bleibt gültig`, async ({ chat }) => {
+      const id = uniq();
+      const failed = await chat.ask(`#fake:fehler:500 Erste ${id}`);
+      await expect(failed.getByRole("alert")).toBeVisible();
+      const second = await chat.ask(`Zweite ${id}`);
+      await expect(second).toContainText(`Fake-Antwort von ${m.modelId}.`);
+      await chat.send(`#fake:langsam Dritte ${id}`);
+      await expect(chat.stopButton).toBeVisible();
+      await chat.stopButton.click();
+      await chat.waitForAnswer(3);
+      const fourth = await chat.ask(`Vierte ${id}`);
+      // Die Fake-API prüft die Regeln der echten API (erste Nachricht vom Nutzer, keine leeren Textblöcke) – sonst 400.
+      await expect(fourth.getByRole("alert")).toHaveCount(0);
+      await expect(fourth).toContainText(`Fake-Antwort von ${m.modelId}.`);
+      const last = (await chatRequests(id, m.provider)).at(-1)!.body;
+      const items: { role?: string; content?: string | { text?: string }[] }[] = m.provider === "anthropic" ? last.messages : last.input;
+      const userTexts = items
+        .filter((i) => i.role === "user")
+        .map((i) => (typeof i.content === "string" ? i.content : (i.content ?? []).map((b) => b.text ?? "").join(" ")));
+      expect(userTexts.map((t) => /(Erste|Zweite|Dritte|Vierte)/.exec(t)?.[1])).toEqual(["Erste", "Zweite", "Dritte", "Vierte"]);
+    });
+
+    test(`W08 ${m.name}: Verlauf länger als das Kontextfenster – deutsche Meldung mit nächstem Schritt`, async ({ chat }) => {
+      const answer = await chat.ask(`#fake:zu-lang ${uniq()}`);
+      await expect(answer.getByRole("alert")).toHaveText("Dieser Chat ist zu lang geworden. Bitte einen neuen Chat starten – dieser bleibt im Verlauf erhalten.");
+    });
+
     test(`V04 ${m.name}: Abbruch mitten im Stream hängt nicht`, async ({ chat }) => {
       const answer = await chat.ask(`#fake:abbruch ${uniq()}`);
       await expect(answer.getByRole("alert")).toHaveText("Die Verbindung zum Anbieter ist abgebrochen. Bitte „Neu generieren“ verwenden.");

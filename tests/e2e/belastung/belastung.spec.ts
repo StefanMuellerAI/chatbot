@@ -1,8 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
 import path from "node:path";
-import { request as playwrightRequest, type APIRequestContext, type Browser } from "@playwright/test";
+import { request as playwrightRequest, type APIRequestContext, type Browser, type Page } from "@playwright/test";
 import { AdminApi, ChatPage, expect, loginUser, openChat, test, trackErrors, uniq } from "../support/fixtures";
 
 // W: Ausfälle und Last. Zeitbudgets sind großzügig gewählt (CI-Rechner sind langsamer),
@@ -370,4 +370,67 @@ test("W06 25 Personen einer Gruppe in drei Gruppenchats posten gleichzeitig, all
   } finally {
     await Promise.all(group.map((api) => api.dispose()));
   }
+});
+
+// ---------------------------------------------------------------- W08 lange Chats
+
+const CHAT_TOO_LONG = "Dieser Chat ist zu lang geworden. Bitte einen neuen Chat starten – dieser bleibt im Verlauf erhalten.";
+
+/** Chat mit `count` Nachrichten; optional mit großem, kaum komprimierbarem Anhang an der ersten Antwort (wie verschlüsselte Suchergebnisse). */
+function longChat(id: string, count: number, nativeBytes = 0) {
+  const now = Date.now();
+  const native = nativeBytes
+    ? { provider: "anthropic", model: "claude-sonnet-5-5", items: [{ type: "web_search_tool_result", content: [{ encrypted_content: randomBytes(nativeBytes).toString("base64") }] }] }
+    : undefined;
+  return {
+    id: `lang-${id}`,
+    title: `Lang ${id}`,
+    modelId: "claude-sonnet-5-5",
+    presetId: null,
+    createdAt: now,
+    updatedAt: now + count,
+    messages: Array.from({ length: count }, (_, i) => ({
+      id: `${id}-${i}`,
+      role: i % 2 ? "assistant" : "user",
+      text: `Nachricht ${i}`,
+      createdAt: now + i,
+      ...(i === 1 && native ? { native } : {}),
+    })),
+  };
+}
+
+async function openImported(page: Page, conv: ReturnType<typeof longChat>) {
+  page.once("dialog", (d) => void d.accept());
+  await page.getByLabel("Export-Datei für den Import").setInputFiles({ name: "lang.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ app: "freebie", conversations: [conv] })) });
+  await page.getByRole("navigation", { name: "Chatverlauf" }).getByRole("button", { name: conv.title, exact: true }).click();
+}
+
+test("W08 lange Chats: rechtzeitig ein Hinweis, an den Grenzen eine klare Meldung statt eines Fehlercodes", async ({ chat, page }) => {
+  const id = uniq();
+  const hint = page.getByRole("status").filter({ hasText: /^Dieser Chat (ist schon sehr lang|hat die Höchstzahl)/ });
+
+  // 420 Nachrichten: Hinweis mit Zahl; Senden geht noch, „Neuer Chat“ führt weiter.
+  await openImported(page, longChat(`${id}a`, 420));
+  await expect(hint).toContainText("Dieser Chat ist schon sehr lang (420 von höchstens 500 Nachrichten).");
+  await chat.ask(`Noch eine ${id}`);
+  await expect(chat.lastAnswer.getByRole("alert")).toHaveCount(0);
+  await expect(hint).toContainText("(422 von höchstens 500 Nachrichten)");
+  await hint.getByRole("button", { name: "Neuer Chat" }).click();
+  await expect(page.getByRole("heading", { name: "Hallo, ich bin Freebie." })).toBeVisible();
+  await expect(hint).toHaveCount(0);
+
+  // 500 Nachrichten: Höchstzahl erreicht; wer trotzdem sendet, bekommt dieselbe klare Meldung.
+  await openImported(page, longChat(`${id}b`, 500));
+  await expect(hint).toHaveText(/^Dieser Chat hat die Höchstzahl von 500 Nachrichten erreicht\./);
+  await chat.ask(`Zu viel ${id}`);
+  await expect(chat.lastAnswer.getByRole("alert")).toHaveText(CHAT_TOO_LONG);
+
+  // Wenige Nachrichten, aber über 4,5 MB (viele Websuchen): Hinweis; die Anfrage geht gar nicht erst los.
+  await openImported(page, longChat(`${id}c`, 2, 5 * 1024 * 1024));
+  await expect(hint).toHaveText(/^Dieser Chat ist schon sehr lang\. Für neue Fragen/);
+  let requests = 0;
+  page.on("request", (r) => r.url().endsWith("/api/chat") && requests++);
+  await chat.ask(`Zu groß ${id}`);
+  await expect(chat.lastAnswer.getByRole("alert")).toHaveText(CHAT_TOO_LONG);
+  expect(requests).toBe(0);
 });

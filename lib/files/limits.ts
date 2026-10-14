@@ -29,6 +29,45 @@ export function categoryOf(name: string): UploadCategory | null {
   return null;
 }
 
+// Typische Verwechslungen aus dem Schulungsalltag: alte Office-Formate, Apple-Formate, Fotos vom iPad, Archive.
+const TO_DOCX = "Bitte in Word als .docx speichern (Datei → Speichern unter).";
+const TO_PPTX = "Bitte in PowerPoint als .pptx speichern (Datei → Speichern unter).";
+const TO_IMAGE = "Bitte als PNG oder JPG speichern.";
+const UNZIP = "Bitte zuerst entpacken und die Dateien einzeln anhängen.";
+const FORMAT_TIPS: Record<string, string> = {
+  doc: TO_DOCX,
+  dot: TO_DOCX,
+  ppt: TO_PPTX,
+  pps: TO_PPTX,
+  odt: "Bitte als .docx oder PDF speichern.",
+  odp: "Bitte als .pptx oder PDF speichern.",
+  pages: "Bitte in Pages als Word-Datei oder PDF exportieren (Ablage → Exportieren).",
+  numbers: "Bitte in Numbers als Excel-Datei oder CSV exportieren (Ablage → Exportieren).",
+  key: "Bitte in Keynote als PowerPoint oder PDF exportieren (Ablage → Exportieren).",
+  heic: "Fotos vom iPhone oder iPad (HEIC) bitte als JPG speichern – oder über die Fotomediathek auswählen, dann wandelt das Gerät sie meist selbst um.",
+  heif: "Fotos vom iPhone oder iPad (HEIF) bitte als JPG speichern – oder über die Fotomediathek auswählen, dann wandelt das Gerät sie meist selbst um.",
+  tif: TO_IMAGE,
+  tiff: TO_IMAGE,
+  bmp: TO_IMAGE,
+  svg: TO_IMAGE,
+  msg: "Outlook-Nachrichten bitte in Outlook als .eml speichern – oder den Text kopieren und einfügen.",
+  zip: UNZIP,
+  rar: UNZIP,
+  "7z": UNZIP,
+  mov: "Videos bitte als .mp4 speichern – oder nur den Ton (z. B. .m4a) anhängen.",
+  avi: "Videos bitte als .mp4 speichern – oder nur den Ton (z. B. .m4a) anhängen.",
+  mkv: "Videos bitte als .mp4 speichern – oder nur den Ton (z. B. .m4a) anhängen.",
+};
+
+/** Meldung für Dateien, die Freebie nicht liest – mit Tipp, wie es doch geht (Browser und Server). */
+export function unsupportedMessage(name: string): string {
+  const ext = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase();
+  const tip = ext
+    ? FORMAT_TIPS[ext]
+    : "Die Datei hat keine Endung – bitte mit passender Endung speichern (z. B. .pdf, .docx, .txt). Ordner lassen sich nicht anhängen, nur die Dateien darin.";
+  return tip ? `Dieses Format wird nicht unterstützt. ${tip}` : "Dieses Format wird nicht unterstützt.";
+}
+
 export function maxBytesFor(category: UploadCategory): number {
   return category === "audio" ? MAX_AUDIO_BYTES : category === "image" ? MAX_IMAGE_BYTES : MAX_DOCUMENT_BYTES;
 }

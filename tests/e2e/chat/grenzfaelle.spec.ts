@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import type { APIRequestContext, Page } from "@playwright/test";
 import { createGuest, expect, inMinutes, test, uniq } from "../support/fixtures";
-import { attachments, chip, expectReady } from "../support/files";
+import { attachments, chip, expectReady, freshPayload } from "../support/files";
+import { clickTwice, CLIPBOARD, dropOn, failStorage, holdUploads, messageOrder, pasteInto, pasteText, platformError, trackMicrophone } from "../support/grenzfaelle";
 import { MailPage } from "../support/mail";
 import { ADMIN } from "../support/servers.mjs";
 
@@ -9,17 +10,6 @@ import { ADMIN } from "../support/servers.mjs";
 // Dateien aus dem echten Leben und der Schulungsraum hinter einer IP.
 
 const login = (api: APIRequestContext, username: string, password: string) => api.post("/api/auth/login", { data: { username, password } });
-
-/** Fügt Text so ein, wie ihn der Browser aus der Zwischenablage liefert (Firefox übernimmt clipboardData nicht aus dem Konstruktor). */
-async function pasteText(page: Page, label: string, text: string) {
-  await page.getByLabel(label).evaluate((el, value) => {
-    const dt = new DataTransfer();
-    dt.setData("text/plain", value);
-    const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
-    Object.defineProperty(event, "clipboardData", { value: dt });
-    el.dispatchEvent(event);
-  }, text);
-}
 
 test.describe("A · Zugangsdaten aus der Zwischenablage", () => {
   test("A13 Gast-Passwort mit kopierten Leerzeichen, Großbuchstaben oder unsichtbaren Zeichen öffnet den Chat; das Admin-Passwort bleibt exakt", async ({ page, baseURL }) => {
@@ -64,28 +54,28 @@ test.describe("A · Zugangsdaten aus der Zwischenablage", () => {
     for (const text of [`${guest.username} ${guest.password}`, `${guest.username};${guest.password};E2E;bis 17:00`, `Benutzername: ${guest.username}\nPasswort: ${guest.password}`]) {
       await username.fill("");
       await password.fill("");
-      await pasteText(page, "Benutzername", text);
+      await pasteText(page.getByLabel("Benutzername"), text);
       await expect(username).toHaveValue(guest.username);
       await expect(password).toHaveValue(guest.password);
     }
     // Ins leere Passwortfeld eingefügt: ebenso.
     await username.fill("");
     await password.fill("");
-    await pasteText(page, "Passwort", `${guest.username}\t${guest.password}`);
+    await pasteText(page.getByLabel("Passwort"), `${guest.username}\t${guest.password}`);
     await expect(username).toHaveValue(guest.username);
     await expect(password).toHaveValue(guest.password);
     // Steht der Name schon da, wird ein eingefügtes Passwort nie zerlegt.
     await password.fill("");
-    await pasteText(page, "Passwort", "ganz eigenes22 passwort33");
+    await pasteText(page.getByLabel("Passwort"), "ganz eigenes22 passwort33");
     await expect(username).toHaveValue(guest.username);
     await expect(password).toHaveValue("");
     // Ein einzelner Name bleibt ein normales Einfügen.
     await username.fill("");
-    await pasteText(page, "Benutzername", guest.username);
+    await pasteText(page.getByLabel("Benutzername"), guest.username);
     await expect(password).toHaveValue("");
 
     await username.fill("");
-    await pasteText(page, "Benutzername", `${guest.username} ${guest.password}`);
+    await pasteText(page.getByLabel("Benutzername"), `${guest.username} ${guest.password}`);
     await password.press("Enter");
     await expect(page).toHaveURL(/\/$/);
   });
@@ -144,28 +134,7 @@ test.describe("T · Schulungsraum und Login-Bremse", () => {
 
 // ---------------------------------------------------------------- Einfügen
 
-/** Zwischenablage, wie sie Programme füllen: Office legt zum Text ein Bild der Auswahl dazu. */
-const CLIPBOARD = {
-  word: { "text/plain": "Sehr geehrte Damen und Herren,\nanbei der Bericht.", "text/html": "<p class=MsoNormal>Sehr geehrte Damen und Herren,</p>", "text/rtf": "{\\rtf1 Sehr geehrte}", image: true },
-  excel: { "text/plain": "Monat\tUmsatz\nJanuar\t1.234,56", "text/html": "<table><tr><td>Monat</td><td>Umsatz</td></tr></table>", image: true },
-  powerpoint: { "text/plain": "Folie 1: Ziele 2026", "text/html": "<div>Folie 1: Ziele 2026</div>", image: true },
-  screenshot: { image: true },
-  webImage: { "text/html": '<img src="https://example.com/bild.png">', image: true },
-  finderFile: { "text/plain": "bericht.png", image: true },
-} as const;
-
-/** Löst ein Einfügen mit dieser Zwischenablage aus; liefert, ob Freebie das Einfügen des Browsers verhindert hat. */
-async function paste(page: Page, kind: keyof typeof CLIPBOARD) {
-  return page.getByRole("textbox", { name: "Nachricht" }).evaluate((el, content) => {
-    const dt = new DataTransfer();
-    for (const [type, value] of Object.entries(content)) if (type !== "image") dt.setData(type, value as string);
-    if (content.image) dt.items.add(new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], "image.png", { type: "image/png" }));
-    const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
-    Object.defineProperty(event, "clipboardData", { value: dt });
-    el.dispatchEvent(event);
-    return event.defaultPrevented;
-  }, CLIPBOARD[kind] as Record<string, string | boolean>);
-}
+const paste = (page: Page, kind: keyof typeof CLIPBOARD) => pasteInto(page.getByRole("textbox", { name: "Nachricht" }), kind);
 
 test.describe("C · Einfügen, Doppelklicks", () => {
   test("C16 Einfügen aus Word, Excel und PowerPoint: der Text gilt, das mitkopierte Bild nicht", async ({ chat, page }) => {
@@ -229,10 +198,7 @@ test.describe("C · Einfügen, Doppelklicks", () => {
 
     // Laufender Chat, zwei Klicks im selben Augenblick
     await chat.composer.fill(`Noch einmal ${id}`);
-    await chat.sendButton.evaluate((b: HTMLButtonElement) => {
-      b.click();
-      b.click();
-    });
+    await clickTwice(chat.sendButton);
     await chat.waitForAnswer(2);
     await page.waitForTimeout(500);
     await expect(chat.questions).toHaveCount(2);
@@ -272,10 +238,7 @@ test.describe("C · Einfügen, Doppelklicks", () => {
     await chat.lastAnswer.getByRole("button", { name: "Neu generieren" }).dblclick();
     await chat.waitForAnswer(1);
     await page.waitForTimeout(500);
-    await chat.lastAnswer.getByRole("button", { name: "Neu generieren" }).evaluate((b: HTMLButtonElement) => {
-      b.click();
-      b.click();
-    });
+    await clickTwice(chat.lastAnswer.getByRole("button", { name: "Neu generieren" }));
     await chat.waitForAnswer(1);
     await page.waitForTimeout(500);
     await expect(chat.answers).toHaveCount(1);
@@ -332,16 +295,7 @@ test.describe("F · Dateien aus dem echten Leben", () => {
 
 test.describe("H · Spracheingabe @nur-chromium", () => {
   test("H05 Doppelklick aufs Mikrofon: eine Aufnahme, nach „Stopp“ ist das Mikrofon aus", async ({ chat, page }) => {
-    await page.addInitScript(() => {
-      const w = window as unknown as { __streams: MediaStream[] };
-      w.__streams = [];
-      const original = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-      navigator.mediaDevices.getUserMedia = async (constraints) => {
-        const stream = await original(constraints);
-        w.__streams.push(stream);
-        return stream;
-      };
-    });
+    await trackMicrophone(page);
     await page.reload();
     await page.getByRole("button", { name: "Spracheingabe" }).dblclick();
     const stop = page.getByRole("button", { name: "Aufnahme beenden" });
@@ -362,17 +316,6 @@ test.describe("H · Spracheingabe @nur-chromium", () => {
 
 const nav = (page: Page) => page.getByRole("navigation", { name: "Chatverlauf" });
 const editBanner = (page: Page) => page.getByText("Du bearbeitest eine frühere Nachricht.");
-
-/** Hält Uploads an, bis der Test sie freigibt (zeigt laufende Uploads in Bedienfolgen). */
-async function holdUploads(page: Page) {
-  let release: () => void = () => {};
-  const released = new Promise<void>((r) => (release = r));
-  await page.route("/api/upload/local", async (route) => {
-    await released;
-    await route.continue().catch(() => {});
-  });
-  return release;
-}
 
 async function editFirstQuestion(page: Page, chat: { questions: ReturnType<Page["getByRole"]> }) {
   await chat.questions.first().hover();
@@ -400,15 +343,7 @@ test.describe("C · Eingabe auf dem iPad, Entwurf und Reihenfolgen", () => {
   });
 
   test("C20 markierter Text lässt sich ins Eingabefeld ziehen", async ({ chat, page }) => {
-    const prevented = await chat.composer.evaluate((el) => {
-      const dt = new DataTransfer();
-      dt.setData("text/plain", "Gezogener Text");
-      const over = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt });
-      el.dispatchEvent(over);
-      const drop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt });
-      el.dispatchEvent(drop);
-      return { dragover: over.defaultPrevented, drop: drop.defaultPrevented };
-    });
+    const prevented = await dropOn(chat.composer, { text: "Gezogener Text" });
     // Freebie lässt das Einfügen dem Browser – nichts wird abgefangen oder angehängt.
     expect(prevented).toEqual({ dragover: false, drop: false });
     await expect(attachments(page)).toHaveCount(0);
@@ -493,13 +428,12 @@ test.describe("C · Eingabe auf dem iPad, Entwurf und Reihenfolgen", () => {
   });
 
   test("C30 Fehlerseiten der Plattform ohne JSON: deutsche Meldung statt „Fehler 413“", async ({ chat, page }) => {
-    const html = "<html><body>An error occurred</body></html>";
     for (const [status, message] of [
       [413, "Die Anfrage ist zu groß. Bitte einen neuen Chat starten oder kleinere Dateien verwenden."],
       [504, "Freebie hat zu lange gebraucht (Zeitüberschreitung). Bitte gleich nochmal versuchen."],
       [502, "Freebie antwortet gerade nicht. Bitte gleich nochmal versuchen."],
     ] as const) {
-      await page.route("/api/chat", (r) => r.fulfill({ status, contentType: "text/html", body: html }));
+      await platformError(page, "/api/chat", status);
       await chat.ask(`Fehlerseite ${status} ${uniq()}`);
       await expect(chat.lastAnswer.getByRole("alert")).toHaveText(message);
       await page.unroute("/api/chat");
@@ -507,7 +441,7 @@ test.describe("C · Eingabe auf dem iPad, Entwurf und Reihenfolgen", () => {
     await page.route("/api/upload/local", (r) => r.fulfill({ status: 413, contentType: "text/plain", body: "Request Entity Too Large" }));
     await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "gross.txt", mimeType: "text/plain", buffer: Buffer.from("x") }]);
     await expect(chip(page, "gross.txt")).toContainText("Upload fehlgeschlagen: Die Anfrage ist zu groß.");
-    await page.route("/api/images", (r) => r.fulfill({ status: 504, contentType: "text/html", body: html }));
+    await platformError(page, "/api/images", 504);
     await page.getByRole("button", { name: "Bild-Modus" }).click();
     const dialog = page.getByRole("dialog", { name: "Bild-Modus" });
     await dialog.getByLabel("Bildbeschreibung").fill("Ein Leuchtturm");
@@ -530,19 +464,7 @@ test.describe("H · Spracheingabe beim Tippen @nur-chromium", () => {
 
 test.describe("F · Dateien neben die Ablagefläche", () => {
   test("F17 Datei auf die Seitenleiste fallen gelassen: Freebie bleibt offen und hängt sie an", async ({ chat, page }) => {
-    const prevented = await page.evaluate(() => {
-      const transfer = () => {
-        const dt = new DataTransfer();
-        dt.items.add(new File(["Daneben abgelegt"], "daneben.txt", { type: "text/plain" }));
-        return dt;
-      };
-      const aside = document.querySelector("aside")!;
-      const over = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer() });
-      aside.dispatchEvent(over);
-      const drop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer() });
-      aside.dispatchEvent(drop);
-      return { dragover: over.defaultPrevented, drop: drop.defaultPrevented };
-    });
+    const prevented = await dropOn(page.locator("aside"), { files: [{ name: "daneben.txt", text: "Daneben abgelegt" }] });
     // Ohne preventDefault würde der Browser die Datei anstelle von Freebie öffnen.
     expect(prevented).toEqual({ dragover: true, drop: true });
     await expectReady(page, "daneben.txt", /ca\. \d+ Tokens/);
@@ -664,11 +586,7 @@ test.describe("E · Import, Speicher und Tabs", () => {
   test("E16 Browser-Speicher voll: klare Meldung, Text und Anhang bleiben im Eingabefeld", async ({ chat, page }) => {
     await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "bleibt.txt", mimeType: "text/plain", buffer: Buffer.from(`Bleibt ${uniq()}`) }]);
     await expectReady(page, "bleibt.txt", /ca\. \d+ Tokens/);
-    await page.evaluate(() => {
-      IDBObjectStore.prototype.put = function () {
-        throw new DOMException("Speicher voll", "QuotaExceededError");
-      };
-    });
+    await failStorage(page);
     const text = `Speicher voll ${uniq()}`;
     await chat.composer.fill(text);
     await chat.sendButton.click();
@@ -676,5 +594,376 @@ test.describe("E · Import, Speicher und Tabs", () => {
     await expect(chat.composer).toHaveValue(text);
     await expect(chip(page, "bleibt.txt")).toBeVisible();
     await expect(chat.questions).toHaveCount(0);
+  });
+});
+
+// ---------------------------------------------------------------- Phase 3: übrige Grenzfälle
+
+/** Wählt eine Datei für den Import und liefert die Meldung (alert). */
+async function importDialog(page: Page, file: { name: string; mimeType: string; buffer: Buffer }) {
+  const dialog = page.waitForEvent("dialog");
+  await page.getByLabel("Export-Datei für den Import").setInputFiles(file);
+  const d = await dialog;
+  const message = d.message();
+  await d.accept();
+  return message;
+}
+
+/** Abfangen der Anmeldung: der Server antwortet, das Sitzungs-Cookie kommt aber nie im Browser an. */
+async function dropSessionCookie(page: Page) {
+  await page.route("/api/auth/login", async (route) => {
+    const req = route.request();
+    const res = await fetch(req.url(), {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-forwarded-for": (await req.allHeaders())["x-forwarded-for"] ?? "" },
+      body: req.postData(),
+    });
+    await route.fulfill({ status: res.status, contentType: "application/json", body: await res.text() });
+  });
+}
+
+test.describe("A · Anmeldung: Doppel-Enter und Cookies", () => {
+  test("A15 Doppel-Enter bei der Anmeldung: eine Anfrage, und es geht weiter", async ({ page, baseURL }) => {
+    const guest = await createGuest(baseURL!);
+    let requests = 0;
+    page.on("request", (r) => r.url().endsWith("/api/auth/login") && requests++);
+    await page.goto("/login");
+    await page.getByLabel("Benutzername").fill(guest.username);
+    await page.getByLabel("Passwort").fill(guest.password);
+    // Zweimal abgeschickt, bevor der Knopf gesperrt ist (ausgelastetes Gerät).
+    await page.locator("form").evaluate((form: HTMLFormElement) => {
+      form.requestSubmit();
+      form.requestSubmit();
+    });
+    await expect(page).toHaveURL(/\/$/);
+    expect(requests).toBe(1);
+  });
+
+  test("A16 Cookies blockiert: Hinweis auf der Anmeldeseite statt stillem Zurückspringen", async ({ page, baseURL }) => {
+    const guest = await createGuest(baseURL!);
+    await dropSessionCookie(page);
+    await page.goto("/login");
+    await page.getByLabel("Benutzername").fill(guest.username);
+    await page.getByLabel("Passwort").fill(guest.password);
+    await page.getByLabel("Passwort").press("Enter");
+    // Nur die Meldung im Formular (Next.js hat einen eigenen, unsichtbaren Ansage-Bereich).
+    const alert = page.locator("form").getByRole("alert");
+    await expect(alert).toHaveText(/^Dein Browser speichert keine Cookies für Freebie – ohne sie klappt die Anmeldung nicht\./);
+    await expect(page).toHaveURL(/\/login$/);
+    // Zweiter Versuch geht (der Knopf ist wieder frei).
+    await expect(page.getByRole("button", { name: /Los geht/ })).toBeEnabled();
+
+    // Meldet der Browser schon beim Laden, dass Cookies aus sind, steht der Hinweis gleich da.
+    await page.addInitScript(() => Object.defineProperty(Navigator.prototype, "cookieEnabled", { get: () => false }));
+    await page.reload();
+    await expect(alert).toHaveText(/^Dein Browser speichert keine Cookies/);
+  });
+});
+
+test.describe("C · Eingaben, Doppelklicks und Reihenfolgen (Phase 3)", () => {
+  const ODD = (id: string) => `Steuer\u0001zeichen Null\u0000byte geschützt leer 😀👩‍👩‍👧 مرحبا بالعالم ${id}`;
+
+  test("C18 Steuerzeichen, Nullbyte, geschützte Leerzeichen, Emoji und arabische Schrift: keine Fehlermeldung, auch aus dem Cache", async ({ chat }) => {
+    const id = uniq();
+    const answer = await chat.ask(ODD(id));
+    await expect(answer.getByRole("alert")).toHaveCount(0);
+    // Das Modell bekommt den Text ohne Steuerzeichen.
+    await expect(answer.locator("blockquote")).toContainText(`Steuerzeichen Nullbyte geschützt leer 😀👩‍👩‍👧 مرحبا بالعالم ${id}`);
+    await chat.newChat();
+    const again = await chat.ask(ODD(id));
+    await expect(again.getByText("aus dem Cache")).toBeVisible();
+    await expect(again.getByRole("alert")).toHaveCount(0);
+  });
+
+  test("C18 „Kopieren“ liefert den Text mit allen Zeichen exakt zurück @nur-chromium", async ({ chat, page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const text = ODD(uniq());
+    await chat.ask(text);
+    await chat.questions.first().hover();
+    await chat.questions.first().getByRole("button", { name: /kopieren/i }).click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(text);
+  });
+
+  test("C23 Doppelklick auf „Bild erzeugen“, „Stoppen“, „Export“, Senden im Posteingang und „Abmelden“: jeweils genau eine Wirkung", async ({ chat, page }) => {
+    const posts: Record<string, number> = {};
+    page.on("request", (r) => {
+      if (r.method() === "POST") posts[new URL(r.url()).pathname] = (posts[new URL(r.url()).pathname] ?? 0) + 1;
+    });
+    await page.getByRole("button", { name: "Bild-Modus" }).click();
+    const dialog = page.getByRole("dialog", { name: "Bild-Modus" });
+    await dialog.getByLabel("Bildbeschreibung").fill(`Leuchtturm ${uniq()}`);
+    await dialog.getByRole("button", { name: "Bild erzeugen" }).dblclick();
+    await expect(dialog).toBeHidden({ timeout: 30_000 });
+    await expect(chat.answers).toHaveCount(1);
+    expect(posts["/api/images"]).toBe(1);
+
+    await chat.send(`#langsam Stoppen doppelt ${uniq()}`);
+    await expect(chat.stopButton).toBeVisible();
+    await chat.stopButton.dblclick();
+    await chat.waitForAnswer(2);
+    await expect(chat.composer).toBeEnabled();
+
+    let downloads = 0;
+    page.on("download", () => downloads++);
+    await page.getByRole("button", { name: "Alle Chats exportieren" }).dblclick();
+    await expect.poll(() => downloads).toBe(1);
+    await page.waitForTimeout(1500);
+    expect(downloads).toBe(1);
+
+    const mail = MailPage.of(chat);
+    await mail.open();
+    await mail.newMail.click();
+    await mail.addRecipient("kursleitung");
+    await mail.dialog().getByRole("textbox", { name: "Betreff" }).fill(`Doppelt ${uniq()}`);
+    await mail.dialog().getByRole("button", { name: "Senden" }).dblclick();
+    await expect(mail.dialog()).toBeHidden();
+    expect(posts["/api/mail"]).toBe(1);
+    await mail.chatTab.click();
+
+    page.on("dialog", (d) => void d.accept());
+    await page.getByRole("button", { name: "Abmelden", exact: true }).dblclick();
+    await expect(page).toHaveURL(/\/login/);
+    expect(posts["/api/auth/logout"]).toBe(1);
+  });
+
+  test("C27 Antwort läuft: andere Chats, Bearbeiten, Bild-Modus und Import gesperrt; Abmelden beendet sie sauber", async ({ chat, page }) => {
+    const id = uniq();
+    await chat.ask(`Erster ${id}`);
+    await chat.newChat();
+    await chat.ask(`Zweiter ${id}`);
+    await chat.send(`#langsam Läuft ${id}`);
+    await expect(chat.stopButton).toBeVisible();
+    await expect(nav(page).getByRole("button", { name: new RegExp(`^Erster ${id}`) })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Bild-Modus" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Chats importieren" })).toBeDisabled();
+    await chat.questions.first().hover();
+    await expect(chat.questions.first().getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
+
+    // Abmelden mitten in der Antwort: keine Fehler, nichts wird danach noch gespeichert oder nachgeladen.
+    const errors: string[] = [];
+    page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+    const late: string[] = [];
+    let loggingOut = false;
+    page.on("request", (r) => loggingOut && r.method() === "POST" && late.push(new URL(r.url()).pathname));
+    page.on("dialog", (d) => void d.accept());
+    loggingOut = true;
+    await page.getByRole("button", { name: "Abmelden", exact: true }).click();
+    await expect(page).toHaveURL(/\/login/);
+    await page.waitForTimeout(500);
+    expect(late).toEqual(["/api/auth/logout"]);
+    expect(errors.filter((e) => !/Failed to load resource/.test(e))).toEqual([]);
+  });
+
+  test("C27 Neuladen während einer Antwort: der Browser fragt nach, „Bleiben“ lässt sie weiterlaufen @nur-chromium", async ({ chat, page }) => {
+    const dialogs: string[] = [];
+    page.on("dialog", (d) => {
+      dialogs.push(d.type());
+      void d.dismiss();
+    });
+    await chat.send(`#langsam Verlassen ${uniq()}`);
+    await expect(chat.stopButton).toBeVisible();
+    await page.evaluate(() => location.reload());
+    await expect.poll(() => dialogs).toEqual(["beforeunload"]);
+    await chat.waitForAnswer(1);
+    await expect(chat.lastAnswer.getByRole("alert")).toHaveCount(0);
+    // Ohne laufende Antwort fragt niemand nach.
+    await page.reload();
+    await expect(chat.composer).toBeVisible();
+    expect(dialogs).toEqual(["beforeunload"]);
+  });
+
+  test("C28 nach einer Fehlermeldung weiterschreiben und nach „Stoppen“ sofort neu senden: geordneter Verlauf, das Modell kennt beide Fragen", async ({ chat, page }) => {
+    const bodies: { role: string; text: string }[][] = [];
+    page.on("request", (r) => {
+      if (r.url().endsWith("/api/chat") && r.postData()) bodies.push(JSON.parse(r.postData()!).messages);
+    });
+    const id = uniq();
+    await chat.ask(`Erste ${id} #fehler:500`);
+    await expect(chat.lastAnswer.getByRole("alert")).toBeVisible();
+    const second = await chat.ask(`Zweite ${id}`);
+    await expect(second.getByRole("alert")).toHaveCount(0);
+    expect(await chat.diagnosis(second, "Nachrichten im Verlauf")).toBe("2");
+    expect(bodies.at(-1)!.map((m) => m.role)).toEqual(["user", "user"]);
+
+    await chat.send(`#langsam Dritte ${id}`);
+    await expect(chat.lastAnswer).toContainText("Testmodus");
+    await chat.stopButton.click();
+    await chat.composer.fill(`Vierte ${id}`);
+    await chat.sendButton.click();
+    await chat.waitForAnswer(4);
+    await expect(chat.lastAnswer.getByRole("alert")).toHaveCount(0);
+    expect(bodies.at(-1)!.map((m) => m.role)).toEqual(["user", "user", "assistant", "user", "assistant", "user"]);
+    expect(bodies.at(-1)![4].text).toMatch(/_\(Abgebrochen\)_$/);
+    expect(await messageOrder(page)).toBe("FAFAFAFA");
+  });
+
+  test("C28 Seite während der Antwort neu geladen, dann einfach weitergeschrieben: der Hinweis „Antwort fehlt“ bleibt im Verlauf", async ({ chat, page }) => {
+    // Gefunden vom Zufallstest W07 (Seed 506): danach stand die erste Frage ohne Antwort und ohne Erklärung da.
+    const id = uniq();
+    await chat.send(`#langsam Abgerissen ${id}`);
+    await expect(chat.lastAnswer).toContainText("Testmodus");
+    page.once("dialog", (d) => void d.accept());
+    await page.reload();
+    await nav(page).getByRole("button", { name: new RegExp(`^#langsam Abgerissen ${id}`) }).click();
+    await expect(chat.lastAnswer.getByRole("alert")).toHaveText(/^Die Antwort fehlt/);
+    const answer = await chat.ask(`Weiter ${id}`);
+    await expect(answer.getByRole("alert")).toHaveCount(0);
+    expect(await chat.diagnosis(answer, "Nachrichten im Verlauf")).toBe("2");
+    expect(await messageOrder(page)).toBe("FAFA");
+    await expect(chat.answers.first().getByRole("alert")).toHaveText("Die Antwort fehlt – die Seite wurde während der Antwort neu geladen oder die Verbindung ist abgebrochen.");
+    // Bleibt auch nach dem Neuladen so.
+    await page.reload();
+    await nav(page).getByRole("button", { name: new RegExp(`^#langsam Abgerissen ${id}`) }).click();
+    await expect(chat.answers).toHaveCount(2);
+    expect(await messageOrder(page)).toBe("FAFA");
+  });
+
+  test("C29 nur ein Anhang ohne Text bzw. nur mit Leerzeichen: die Antwort kommt", async ({ chat, page }) => {
+    for (const [i, text] of ["", "   "].entries()) {
+      const name = `nur-anhang-${i}.txt`;
+      await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name, mimeType: "text/plain", buffer: Buffer.from(`Inhalt ${uniq()}`) }]);
+      await expectReady(page, name, /ca\. \d+ Tokens/);
+      await chat.composer.fill(text);
+      await expect(chat.sendButton).toBeEnabled();
+      await chat.sendButton.click();
+      await chat.waitForAnswer(i + 1);
+      await expect(chat.lastAnswer.getByRole("alert")).toHaveCount(0);
+      expect(await chat.diagnosis(chat.lastAnswer, "Dateien")).toBe(name);
+    }
+  });
+});
+
+test.describe("E · Falsche Datei beim Import", () => {
+  test("E13 PDF, Bild, leere Datei, Markdown-Export oder fremdes JSON: Meldung sagt, was es ist und was stattdessen", async ({ chat, page }) => {
+    const howTo = "Importieren lassen sich nur Export-Dateien von Freebie: die .json-Datei, die „Export“ in der Seitenleiste erzeugt (freebie-chats-JJJJ-MM-TT.json).";
+    const cases: [{ name: string; mimeType: string; buffer: Buffer }, string][] = [
+      [{ name: "rechnung.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\n1 0 obj") }, `Das ist eine PDF-Datei. ${howTo} PDFs lassen sich stattdessen im Chat anhängen.`],
+      [{ name: "foto.png", mimeType: "image/png", buffer: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]) }, `Das ist ein Bild. ${howTo} Bilder lassen sich stattdessen im Chat anhängen.`],
+      [{ name: "leer.json", mimeType: "application/json", buffer: Buffer.from("") }, `Die Datei ist leer. ${howTo}`],
+      [{ name: "Mein Chat.md", mimeType: "text/markdown", buffer: Buffer.from("# Mein Chat\n\n## Du\n\nHallo") }, `Das ist ein einzelner Chat als Markdown (zum Lesen und Weitergeben). ${howTo}`],
+      [{ name: "fremd.json", mimeType: "application/json", buffer: Buffer.from('{"name":"anderes Programm"}') }, `Die Datei konnte nicht importiert werden. ${howTo}`],
+    ];
+    for (const [file, message] of cases) expect(await importDialog(page, file), file.name).toBe(message);
+    await expect(nav(page).getByRole("button", { name: /Importierter Chat/ })).toHaveCount(0);
+    void chat;
+  });
+});
+
+test.describe("F · Uploads in Bedienfolgen, doppelte und falsche Dateien, Netz weg", () => {
+  test("F11 Upload läuft → „Neuer Chat“ und Chatwechsel: der Anhang bleibt und wird fertig; Senden erst danach", async ({ chat, page }) => {
+    const id = uniq();
+    await chat.ask(`Chat A ${id}`);
+    const release = await holdUploads(page);
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "laeuft.txt", mimeType: "text/plain", buffer: Buffer.from(`Inhalt ${id}`) }]);
+    await expect(chip(page, "laeuft.txt")).toBeVisible();
+    await chat.composer.fill(`Mit Anhang ${id}`);
+    await chat.newChat();
+    await expect(chip(page, "laeuft.txt")).toBeVisible();
+    await nav(page).getByRole("button", { name: new RegExp(`^Chat A ${id}`) }).click();
+    await expect(chip(page, "laeuft.txt")).toBeVisible();
+    await expect(chat.sendButton).toBeDisabled();
+    release();
+    await expectReady(page, "laeuft.txt", /ca\. \d+ Tokens/);
+    await chat.sendButton.click();
+    await chat.waitForAnswer(2);
+    await expect(chat.questions.last().getByRole("group", { name: "laeuft.txt", exact: true })).toBeVisible();
+    await expect(attachments(page)).toHaveCount(0);
+  });
+
+  test("F11 Neuladen während eines Uploads: der Browser fragt nach, danach hängt nichts", async ({ chat, page, browserName }) => {
+    const dialogs: string[] = [];
+    page.on("dialog", (d) => {
+      dialogs.push(d.type());
+      void d.accept();
+    });
+    await holdUploads(page);
+    // Ein Klick vorher: Browser fragen nur nach, wenn auf der Seite schon etwas bedient wurde.
+    await chat.composer.click();
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "abbruch.txt", mimeType: "text/plain", buffer: Buffer.from(`Inhalt ${uniq()}`) }]);
+    await expect(chip(page, "abbruch.txt")).toBeVisible();
+    await page.reload();
+    if (browserName === "chromium") expect(dialogs).toEqual(["beforeunload"]);
+    await expect(chat.composer).toBeVisible();
+    await expect(attachments(page)).toHaveCount(0);
+    await expect(chat.sendButton).toBeDisabled();
+  });
+
+  test("F12 dieselbe Datei zweimal angehängt: Hinweis am zweiten Anhang, sie geht nur einmal mit", async ({ chat, page }) => {
+    const file = { name: "doppelt.txt", mimeType: "text/plain", buffer: Buffer.from(`Gleicher Inhalt ${uniq()}`) };
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([file]);
+    await expectReady(page, "doppelt.txt", /ca\. \d+ Tokens/);
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([file]);
+    await expect(attachments(page).getByText("Ist schon angehängt – geht nur einmal mit.")).toBeVisible();
+    // Auch zwei gleiche Dateien auf einmal (gleichzeitig fertig).
+    const twin = { name: "zwilling.txt", mimeType: "text/plain", buffer: Buffer.from(`Zwilling ${uniq()}`) };
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([twin, twin]);
+    await expect(attachments(page).getByRole("group", { name: "zwilling.txt", exact: true })).toHaveCount(2);
+    await expect(attachments(page).getByText(/Wird|Upload|ausgelesen/)).toHaveCount(0, { timeout: 30_000 });
+    const answer = await chat.ask(`#zeige-dateien doppelt ${uniq()}`);
+    expect(await chat.diagnosis(answer, "Dateien")).toBe("doppelt.txt, zwilling.txt");
+  });
+
+  test("F16 typische falsche Formate: Meldung mit Tipp, wie es doch geht", async ({ chat, page }) => {
+    const tips: Record<string, string> = {
+      "Bericht.doc": "Bitte in Word als .docx speichern (Datei → Speichern unter).",
+      "Folien.ppt": "Bitte in PowerPoint als .pptx speichern (Datei → Speichern unter).",
+      "Brief.odt": "Bitte als .docx oder PDF speichern.",
+      "Notiz.pages": "Bitte in Pages als Word-Datei oder PDF exportieren (Ablage → Exportieren).",
+      "IMG_0042.HEIC": "Fotos vom iPhone oder iPad (HEIC) bitte als JPG speichern",
+      "Anfrage.msg": "Outlook-Nachrichten bitte in Outlook als .eml speichern",
+      "Unterlagen.zip": "Bitte zuerst entpacken und die Dateien einzeln anhängen.",
+      Scan: "Die Datei hat keine Endung",
+    };
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles(Object.keys(tips).map((name) => ({ name, mimeType: "application/octet-stream", buffer: Buffer.from("PK\u0003\u0004") })));
+    for (const [name, tip] of Object.entries(tips)) {
+      await expect(chip(page, name)).toContainText("Dieses Format wird nicht unterstützt.");
+      await expect(chip(page, name)).toContainText(tip);
+    }
+    void chat;
+  });
+
+  test("F18 Netz bricht beim Hochladen, Auslesen oder Transkribieren ab: klare Meldung, erneut anhängen geht, nichts hängt", async ({ chat, page }) => {
+    await page.route("/api/upload/local", (r) => r.abort("connectionreset"));
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "netz.txt", mimeType: "text/plain", buffer: Buffer.from(`Netz ${uniq()}`) }]);
+    await expect(chip(page, "netz.txt")).toContainText("Upload fehlgeschlagen: keine Verbindung zu Freebie. Bitte die Internetverbindung prüfen und die Datei erneut anhängen.");
+    await page.unroute("/api/upload/local");
+
+    await page.route("/api/files/process", (r) => r.abort("internetdisconnected"));
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "auslesen.txt", mimeType: "text/plain", buffer: Buffer.from(`Auslesen ${uniq()}`) }]);
+    await expect(chip(page, "auslesen.txt")).toContainText("Keine Verbindung zu Freebie. Bitte prüfe die Internetverbindung und versuche es erneut.");
+    await page.unroute("/api/files/process");
+
+    await page.route("/api/transcribe**", (r) => r.abort("connectionreset"));
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([freshPayload("ton.mp3")]);
+    await expect(chip(page, "ton.mp3")).toContainText("Keine Verbindung zu Freebie.", { timeout: 30_000 });
+    await page.unroute("/api/transcribe**");
+
+    // Fehlerhafte Anhänge sperren nichts: dieselbe Datei erneut anhängen und senden.
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "netz.txt", mimeType: "text/plain", buffer: Buffer.from(`Netz wieder da ${uniq()}`) }]);
+    await expect(attachments(page).getByText("ca.", { exact: false })).toHaveCount(1, { timeout: 30_000 });
+    await expect(chat.sendButton).toBeEnabled();
+    const answer = await chat.ask(`#zeige-dateien wieder online ${uniq()}`);
+    expect(await chat.diagnosis(answer, "Dateien")).toBe("netz.txt");
+  });
+});
+
+test.describe("Z · Adressen aus dem Mailprogramm", () => {
+  test("Z18 Anzeigename in Anführungszeichen, mailto:, Punkt oder Komma am Ende: werden erkannt; fremde Adressen mit konkreter Meldung", async ({ chat }) => {
+    const mail = MailPage.of(chat);
+    await mail.open();
+    await mail.newMail.click();
+    const input = mail.dialog().getByRole("textbox", { name: "An", exact: true });
+    const chips = mail.dialog().getByRole("button", { name: "Kursleitung entfernen" });
+    for (const raw of ['"Kursleitung" <kursleitung@freebie.example>', "Kursleitung <kursleitung@freebie.example>", "kursleitung@freebie.example.", "mailto:kursleitung@freebie.example", "<kursleitung@freebie.example>,"]) {
+      await input.fill(raw);
+      await input.press("Enter");
+      await expect(chips, raw).toHaveCount(1);
+      await expect(mail.dialog().getByRole("alert")).toHaveCount(0);
+      await chips.click();
+      await expect(chips).toHaveCount(0);
+    }
+    await input.fill('"Max Muster" <max.muster@gmail.com>');
+    await input.press("Enter");
+    await expect(mail.dialog().getByRole("alert")).toHaveText("„max.muster@gmail.com“ ist keine Adresse in Freebie (…@freebie.example).");
   });
 });

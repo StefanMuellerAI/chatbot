@@ -42,3 +42,17 @@ export function downloadText(content: string, name: string, type = "text/markdow
 export function safeName(title: string): string {
   return (title || "freebie-chat").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "").slice(0, 60).toLowerCase() || "freebie-chat";
 }
+
+const IMPORT_HOWTO = "Importieren lassen sich nur Export-Dateien von Freebie: die .json-Datei, die „Export“ in der Seitenleiste erzeugt (freebie-chats-JJJJ-MM-TT.json).";
+
+/** Verständliche Meldung, wenn beim Import die falsche Datei gewählt wurde (PDF, Bild, Markdown-Export, leer …). */
+export function importProblem(name: string, text: string): string {
+  const ext = /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase() ?? "";
+  if (!text.trim()) return `Die Datei ist leer. ${IMPORT_HOWTO}`;
+  if (text.startsWith("%PDF") || ext === "pdf") return `Das ist eine PDF-Datei. ${IMPORT_HOWTO} PDFs lassen sich stattdessen im Chat anhängen.`;
+  if (/^(png|jpe?g|gif|webp|heic)$/.test(ext) || text.startsWith("�PNG") || text.startsWith("GIF8")) {
+    return `Das ist ein Bild. ${IMPORT_HOWTO} Bilder lassen sich stattdessen im Chat anhängen.`;
+  }
+  if (ext === "md" || text.startsWith("# ")) return `Das ist ein einzelner Chat als Markdown (zum Lesen und Weitergeben). ${IMPORT_HOWTO}`;
+  return `Die Datei konnte nicht importiert werden. ${IMPORT_HOWTO}`;
+}

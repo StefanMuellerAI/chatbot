@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { providerErrorMessage } from "@/lib/errors";
+import { CHAT_TOO_LONG, providerErrorMessage } from "@/lib/errors";
 
 describe("providerErrorMessage", () => {
   it("nimmt die Detailmeldung bei 400 aus beiden SDK-Formaten", () => {
     expect(providerErrorMessage({ status: 400, message: "400 {…}", error: { error: { message: "zu lang" } } })).toBe("Die Anfrage wurde abgelehnt: zu lang");
     expect(providerErrorMessage({ status: 400, message: "400 zu lang", error: { message: "zu lang" } })).toBe("Die Anfrage wurde abgelehnt: zu lang");
+  });
+
+  it("W08 erkennt einen Verlauf, der nicht mehr ins Kontextfenster passt", () => {
+    const anthropic = { status: 400, message: "400 {…}", error: { type: "error", error: { message: "prompt is too long: 213456 tokens > 200000 maximum" } } };
+    const openai = { status: 400, message: "400 …", error: { message: "Your input exceeds the context window of this model.", code: "context_length_exceeded" } };
+    for (const err of [anthropic, openai]) expect(providerErrorMessage(err)).toBe(CHAT_TOO_LONG);
   });
 
   it("übersetzt abgebrochene Verbindungen und Zeitüberschreitungen", () => {

@@ -1,5 +1,5 @@
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
-import { categoryOf, maxBytesFor } from "@/lib/files/limits";
+import { categoryOf, maxBytesFor, unsupportedMessage } from "@/lib/files/limits";
 import { requireFeature } from "@/lib/guards";
 import { assertSafeKey, putFile, storageMode } from "@/lib/storage";
 
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     assertSafeKey(key);
     if (!key.startsWith("uploads/")) throw new HttpError(400, "Ungültiger Upload-Pfad.");
     const category = categoryOf(key);
-    if (!category) throw new HttpError(400, "Dieses Dateiformat wird nicht unterstützt.");
+    if (!category) throw new HttpError(400, unsupportedMessage(key));
     const settings = await requireFeature(category === "audio" ? "transcription" : "uploads");
     if (file.size === 0) throw new HttpError(400, "Die Datei ist leer.");
     if (file.size > maxBytesFor(category)) throw new HttpError(413, "Die Datei ist zu groß.");

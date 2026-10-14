@@ -116,6 +116,8 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | A12 | „Alle abmelden“ bei mehreren Admin-Sitzungen | andere Admin-Sitzungen enden, die eigene bleibt |
 | A13 | Gast-Passwort mit kopierten Leerzeichen, Tab, geschütztem Leerzeichen, Großbuchstaben (iPad) oder unsichtbaren Zeichen, ebenso im Namen | Anmeldung klappt, kein Fehlversuch gezählt; das Admin-Passwort bleibt exakt |
 | A14 | Benutzername und Passwort zusammen eingefügt (Kärtchen, CSV-Zeile, „Benutzername: … Passwort: …“) | beide Felder gefüllt, Anmeldung klappt; steht der Name schon da, wird ein eingefügtes Passwort nie zerlegt |
+| A15 | Doppel-Enter bei der Anmeldung (zweimal abgeschickt, bevor der Knopf gesperrt ist) | genau eine Anfrage, die Anmeldung klappt |
+| A16 | Cookies blockiert (Sitzungs-Cookie kommt nicht an bzw. der Browser meldet Cookies aus) | Hinweis auf der Anmeldeseite, wie es geht – statt stillem Zurückspringen zur Anmeldung |
 
 ### B · Hinweis „Spielumgebung“
 
@@ -146,13 +148,18 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | C15 | HTML/Script in Frage und Antwort, `javascript:`-Links | als Text dargestellt, nichts wird ausgeführt |
 | C16 | Einfügen aus Word, Excel und PowerPoint (Text, HTML und Bild in der Zwischenablage) | der Text steht im Eingabefeld, kein Bild-Anhang (auch mit der echten Zwischenablage in Chromium) |
 | C17 | Screenshot, Bild von einer Webseite, kopierte Datei einfügen | wird angehängt |
+| C18 | Text mit Steuerzeichen, Nullbyte, geschützten Leerzeichen, Emoji und arabischer Schrift senden (auch ein zweites Mal aus dem Cache); danach „Kopieren“ | keine Fehlermeldung, das Modell bekommt den Text ohne Steuerzeichen, „Kopieren“ liefert ihn exakt zurück |
 | C19 | Geräte ohne Maus (iPad, Handy, Android-Tablet): Enter, Senden-Knopf, Strg/Cmd+Enter | Enter macht eine neue Zeile, gesendet wird mit dem Knopf bzw. Strg/Cmd+Enter; am Rechner mit Maus oder Trackpad bleibt Enter = Senden (C02) |
 | C20 | Markierten Text ins Eingabefeld ziehen | wird eingefügt, nichts wird abgefangen oder angehängt |
 | C21 | Doppelklick und Doppel-Enter auf „Senden“ (neuer und laufender Chat); langsamer Doppelklick, dessen zweiter Klick schon „Stoppen“ trifft | genau eine Frage, ein Chat, eine Anfrage; die Antwort läuft weiter |
 | C22 | Doppelklick auf „Neu generieren“ | genau eine neue Antwort, eine Anfrage |
+| C23 | Doppelklick auf „Bild erzeugen“, „Stoppen“, „Export“, Senden im Posteingang und „Abmelden“ | jeweils genau eine Wirkung (eine Anfrage, ein Download) |
 | C24 | Entwurf mit laufendem Upload → „Bearbeiten“ einer früheren Nachricht → „Abbrechen“ bzw. Senden | Entwurf und Anhang sind wieder da, der Upload läuft zu Ende |
 | C25 | Entwurf → Beispiel bzw. „Mit Freebie besprechen“ | der Entwurf bleibt stehen, Hinweis mit „Ersetzen“ |
 | C26 | Bearbeiten → anderer Chat, „Neuer Chat“, Chat löschen | der eigene Entwurf kommt zurück, nie der Text der bearbeiteten Nachricht; Hinweisleiste weg |
+| C27 | Antwort läuft → anderer Chat, Bild-Modus, Bearbeiten, Import, Abmelden, Neuladen | gesperrt; Abmelden beendet die Antwort ohne Fehler und ohne Nachspeichern; beim Neuladen fragt der Browser nach (Safari auf iPad/iPhone zeigt das nicht) |
+| C28 | Nach einer Fehlermeldung einfach weiterschreiben; nach „Stoppen“ sofort neu senden; nach „Antwort fehlt“ (Seite während der Antwort neu geladen) weiterschreiben | Verlauf bleibt Frage/Antwort (der Hinweis „Antwort fehlt“ bleibt stehen), das Modell kennt beide Fragen; die Anfrage an Claude und GPT ist gültig (die Fake-API prüft die Regeln der echten API) |
+| C29 | Nur ein Anhang, ohne Text bzw. nur mit Leerzeichen | die Antwort kommt |
 | C30 | Fehlerseiten der Plattform ohne JSON (413, 502, 504) bei Chat, Upload und Bild | deutsche Meldung mit nächstem Schritt statt „Fehler 413“ |
 
 ### D · Modelle und Denktiefe
@@ -186,6 +193,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | E10 | Admin-Link, Abmelden | führen an die richtige Stelle |
 | E11 | Import mit Feldern vom falschen Typ; Chat, der sich nicht anzeigen lässt | Ungültiges fällt weg, der Chat bleibt nutzbar und wird vom Server angenommen; sonst Hinweis mit „Als Datei sichern“/„Chat löschen“ statt weißer Seite |
 | E12 | Älteren Export erneut importieren | Chats mit gleicher ID werden überschrieben (so gewollt) |
+| E13 | Falsche Datei beim Import (PDF, Bild, leer, Markdown-Export, fremdes JSON) | Meldung sagt, was es ist und welche Datei stattdessen |
 | E15 | Zwei Tabs mit demselben Chat, beide senden | während einer Antwort sendet der andere Tab nicht dazwischen (Hinweis, Text bleibt); Verlauf bleibt Frage/Antwort |
 | E16 | Browser-Speicher voll | Meldung, Text und Anhänge bleiben im Eingabefeld |
 
@@ -203,10 +211,14 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | F08 | Uploads bzw. Transkription im Admin aus | Meldung im Chat **und** Sperre in der API |
 | F09 | Anhänge im weiteren Gespräch | bleiben Teil des Verlaufs, erscheinen in Nachricht und Export |
 | F10 | Eingabeleiste mit Anhängen, breit und schmal | Senden-Button bleibt rechts in der Werkzeugzeile; die Token-Summe steht bei den Anhängen |
+| F11 | Upload läuft → „Neuer Chat“, Chatwechsel, Neuladen | der Anhang bleibt und wird fertig, Senden erst danach; beim Neuladen fragt der Browser nach, danach hängt nichts |
+| F12 | Dieselbe Datei zweimal angehängt (nacheinander bzw. gleichzeitig) | Hinweis „Ist schon angehängt“, sie geht nur einmal mit |
 | F13 | Dateinamen ohne lateinische Buchstaben („Отчет.txt“, „📊.csv“), Endung in Großbuchstaben, sehr lange Namen | werden verarbeitet, der Originalname bleibt sichtbar |
 | F14 | CSV aus deutschem Excel (Windows-1252, Semikolon, Dezimalkomma, Datum), UTF-16- und UTF-8-Text mit BOM | Umlaute, Zahlen und Daten kommen unverändert beim Modell an |
 | F15 | Text mit Nullbytes und Steuerzeichen; Datei nur aus Nullbytes | wird ohne diese Zeichen ausgelesen bzw. „kein lesbarer Text“ – nie „interner Fehler“ |
+| F16 | Typische falsche Formate (.doc, .ppt, .odt, .pages, .heic, .msg, .zip, ohne Endung) | Meldung mit Tipp, wie es doch geht („als .docx speichern“, „als JPG speichern“, „entpacken“) |
 | F17 | Datei auf die Seitenleiste (neben die Ablagefläche) fallen gelassen | Freebie bleibt offen, die Datei wird angehängt (bei Pause: Hinweis) |
+| F18 | Netz bricht beim Hochladen, Auslesen oder Transkribieren ab | klare Meldung, dieselbe Datei lässt sich erneut anhängen und senden, nichts hängt |
 
 ### G · Audio-Transkription
 
@@ -409,6 +421,8 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | W04 | **Schulungssituation:** 25 Personen gleichzeitig, eine IP | keine Sperre, keine Fehler, Antwort-Cache wird geteilt |
 | W05 | 25 Personen einer Gruppe schreiben sich gleichzeitig Mails, alle Postfächer fragen ab | keine Fehler, keine Sperre, jede Mail kommt an |
 | W06 | 25 Personen einer Gruppe in drei Gruppenchats posten gleichzeitig, alle fragen ab, zwei rufen `@Freebie` | keine Fehler, keine Sperre, jeder Beitrag kommt bei allen in derselben Reihenfolge an, genau eine Antwort je Chat und Runde |
+| W07 | Zufallstest: zufällige Folgen aus 21 Teilnehmer-Aktionen (tippen, einfügen, doppelt senden, stoppen, bearbeiten, Dateien, Chats wechseln und löschen, Posteingang, neu laden, Diktat …) mit festen Seeds | nach jedem Schritt: Frage/Antwort im Wechsel, „Stoppen“ nur bei laufender Antwort, kein Mikrofon ohne Aufnahme, keine internen Fehlertexte, höchstens ein neuer Chat; am Ende öffnet sich jeder Chat. CI: 5 Seeds × 40 Schritte, nachts 50 neue Seeds × 60 Schritte |
+| W08 | Sehr lange Chats: 420 und 500 Nachrichten, über 4,5 MB (viele Websuchen), Verlauf länger als das Kontextfenster (Fake-API) | ab 400 Nachrichten bzw. großem Verlauf ein Hinweis mit „Neuer Chat“; an der Grenze die Meldung „Dieser Chat ist zu lang geworden …“ statt eines Fehlercodes, über 4,5 MB ohne Anfrage |
 
 ### X · Live-Smoke (`freebie.stefanai.de`)
 
@@ -488,6 +502,7 @@ Browser vor.
 | Z15 | Barrierefreiheit | keine „serious“/„critical“-Befunde von axe im Posteingang, Lesebereich, Schreiben-Dialog (mit Adressbuch) und Menü „Verbindungen“, hell und dunkel; Esc schließt erst die Vorschläge, dann den Dialog |
 | Z16 | API des Posteingangs | 400 mit deutscher Meldung (Felder, Grenzen, Adressen), 404 für fremde und unbekannte IDs (fremde Mail bleibt unverändert), 403 bei fremder Origin, 429 ab der 21. Mail pro Minute, Adressbuch nur mit eigener Gruppe, Suche mit `%`/`_` wörtlich; Not-Aus: Lesen geht, Senden 503 |
 | Z17 | Freebie verschickt Mails | mit Verbindung und Auftrag von der eigenen Adresse: beim Empfänger „über Freebie“, in „Gesendet“, Karte „Gesendete E-Mails“; fremde Gruppe → Werkzeug-Fehler; ohne Verbindung nichts; höchstens 5 pro Antwort; „Neu generieren“ fragt nach |
+| Z18 | Adressen aus dem Mailprogramm (Anzeigename in Anführungszeichen, `mailto:`, Punkt oder Komma am Ende, mehrere mit Namen) | werden erkannt; fremde Adressen mit Meldung, welcher Teil nicht passt |
 
 ### GC · Gruppenchats
 
@@ -629,6 +644,21 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 | 60 | Browser-Speicher voll: „Senden“ tat nichts, ohne Meldung | E16 |
 | 61 | Zwei Tabs im selben Chat: Frage, Frage, Antwort, Antwort | E15 |
 
+**Grenzfälle der Teilnehmenden, Phase 3** (14. Oktober 2026)
+
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 62 | Nullbyte im Text (z. B. aus einem PDF kopiert): die Antwort endete mit „Es ist ein Fehler aufgetreten: Failed query: insert into "answer_cache" …“ – interner SQL-Text im Chat | C18, Unit `kodierung.test.ts` |
+| 63 | Cookies blockiert: die Anmeldung meldete Erfolg, man landete kommentarlos wieder auf der Anmeldeseite | A16 |
+| 64 | Dieselbe Datei zweimal angehängt ging zweimal ans Modell (doppelte Kosten) | F12 |
+| 65 | Falsche Formate (.doc, .heic, .msg, .zip …) nur mit „nicht unterstützt“ abgewiesen, ohne Tipp | F16, Unit `dateinamen.test.ts` |
+| 66 | Adressen aus dem Mailprogramm (`"Name" <adresse>`, `mailto:`, Punkt am Ende) im Posteingang abgelehnt | Z18, Unit `mail-address.test.ts` |
+| 67 | Lange Chats: kein Hinweis vorab; an der Grenze „Der Chat ist zu lang“ erst nach dem Senden bzw. die englische Meldung des Anbieters („prompt is too long“), über 4,5 MB eine Fehlerseite | W08, Unit `lange-chats.test.ts`, `errors.test.ts` |
+| 68 | Abmelden während einer Antwort: Fehler „Kein Konto gewählt“ im Browser, danach noch eine Titel-Anfrage | C27 |
+| 69 | Doppelklick auf „Export“ lud die Datei zweimal herunter; doppeltes Absenden der Anmeldung schickte zwei Anfragen; Import war während einer Antwort möglich | C23, A15, C27 |
+| 70 | Falsche Datei beim Import: immer dieselbe allgemeine Meldung | E13, Unit `import.test.ts` |
+| 71 | Seite während einer Antwort neu geladen, dann einfach weitergeschrieben: die erste Frage stand ohne Antwort und ohne Hinweis im Verlauf (gefunden vom Zufallstest, Seed 506) | C28, W07 |
+
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
@@ -670,10 +700,12 @@ liegt bei dir.
 | 10 · Gruppenchats | Bereich GC, Q24, V08, W06, X10; A10, E04/E06, E08, M03, N01/N03, Z10, U01–U03 und V05 angepasst; zweistellige Kürzel (`GRUPPENCHAT-PLAN.md`) | erledigt |
 | 11 · Grenzfälle, Phase 1 | A13/A14, C16/C17, C21/C22, F13–F15, H05, T19–T21; Fehler 45–53 (`GRENZFAELLE-PLAN.md`) | erledigt |
 | 12 · Grenzfälle, Phase 2 | C19/C20, C24–C26, C30, E11, E12, E15, E16, F17, H06; Fehler 54–61 (`GRENZFAELLE-PLAN.md`) | erledigt |
+| 13 · Grenzfälle, Phase 3 | A15/A16, C18, C23, C27–C29, E13, F11, F12, F16, F18, W07 (Zufallstest, nachts mit 50 Seeds), W08, Z18; Testhelfer `support/grenzfaelle.ts`; Fehler 62–71 (`GRENZFAELLE-PLAN.md`) | erledigt |
 
-Ergebnis: 345 E2E-Tests in 31 Dateien (plus 10 Live-Smoke-Tests) und 168 Unit-Tests; die komplette Suite läuft lokal
-in gut 10 Minuten (3 Worker). Nach Phase 1 und 2 der Grenzfälle (14. Oktober 2026) war sie vollständig grün, die 28
-Grenzfall-Tests auch dreimal hintereinander. Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den
+Ergebnis: 372 E2E-Tests in 32 Dateien (plus 10 Live-Smoke-Tests, dazu nachts der Zufallstest mit 50 Seeds) und 178
+Unit-Tests; die komplette Suite läuft lokal in gut 12 Minuten (3 Worker). Nach Phase 3 der Grenzfälle (14. Oktober
+2026) war sie vollständig grün, die 45 Grenzfall-Tests (Chat, Handy, Tablet) auch dreimal hintereinander; der
+Zufallstest lief vorab mit rund 60 Seeds. Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den
 Gruppenchats) war vollständig grün. Beim dreifachen Lauf vor den Gruppenchats (858 Läufe) scheiterte nur T13 zweimal an
 einer Reihenfolge-Abhängigkeit (das Postfach der Kursleitung teilen sich alle Chat-Tests); im Test behoben und in genau
 dieser Reihenfolge nachgeprüft. In der CI laufen zusätzlich die Chat-Tests in WebKit und Firefox.

@@ -6,6 +6,7 @@ import type { Attachment, ChatMessage, Effort, GeneratedImage, NativeTurn } from
 import { formatTime } from "@/lib/events/window";
 import { sniffImageMime } from "@/lib/files/sniff";
 import { libraryText } from "@/lib/library/catalog";
+import { stripControlChars } from "@/lib/shared/text";
 import { getFile } from "@/lib/storage";
 
 export type PreparedPart =
@@ -56,7 +57,8 @@ export async function prepareMessages(
     if (m.role === "assistant") {
       // Bild-IDs mitgeben, damit das Modell Bilder später weiterbearbeiten kann.
       const ids = (m.images ?? []).map((img) => img.id);
-      const text = ids.length ? `${m.text}\n\n[Erzeugte Bilder, Bild-IDs: ${ids.join(", ")}]` : m.text;
+      const answer = stripControlChars(m.text);
+      const text = ids.length ? `${answer}\n\n[Erzeugte Bilder, Bild-IDs: ${ids.join(", ")}]` : answer;
       prepared.push({ role: "assistant", text, native: m.native });
       continue;
     }
@@ -70,7 +72,10 @@ export async function prepareMessages(
     for (const a of m.attachments ?? []) {
       parts.push(...(await attachmentParts(a, model, texts, opts)));
     }
-    parts.push({ type: "text", text: m.text.trim() ? m.text : "(Siehe Anhang.)" });
+    // Mitkopierte Steuerzeichen (z. B. Nullbytes aus einem PDF) braucht das Modell nicht – und der Antwort-Cache
+    // (jsonb) lehnt Nullbytes ab.
+    const text = stripControlChars(m.text);
+    parts.push({ type: "text", text: text.trim() ? text : "(Siehe Anhang.)" });
     prepared.push({
       role: "user",
       parts: mergeTextParts(parts),

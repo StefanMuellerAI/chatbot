@@ -1,5 +1,5 @@
 import "server-only";
-import { providerErrorMessage } from "@/lib/errors";
+import { HttpError, isProviderError, providerErrorMessage, UNKNOWN_ERROR } from "@/lib/errors";
 import { createHash } from "node:crypto";
 import { usageTag, type UserSession } from "@/lib/auth/session";
 import { getModel, getPreset, providerConfigured } from "@/lib/models";
@@ -162,7 +162,8 @@ async function runChat(
     send,
   });
 
-  // 3) Antwort für identische Anfragen speichern (ohne Bilder, nur vollständige Antworten).
+  // 3) Antwort für identische Anfragen speichern (ohne Bilder, nur vollständige Antworten). Die Antwort ist zu
+  // diesem Zeitpunkt schon vollständig ausgeliefert – scheitert das Speichern, darf sie nicht als Fehler enden.
   if (useAnswerCache && imagesGenerated === 0 && result.stopReason === "end_turn" && result.text.trim()) {
     await storeAnswer(
       cacheKey,
@@ -177,7 +178,7 @@ async function runChat(
       usage,
       costUsd,
       settings.answerCacheHours,
-    );
+    ).catch((err) => console.error("answer cache store failed", err));
   }
 }
 
@@ -271,5 +272,9 @@ export async function runTurn(t: TurnInput): Promise<{ result: ProviderResult; u
 
 export function userMessageFor(err: unknown): string {
   if (err instanceof ProviderError) return err.userMessage;
-  return providerErrorMessage(err);
+  if (err instanceof HttpError) return err.message;
+  const message = providerErrorMessage(err);
+  // Unbekannte Fehler (Datenbank, Programmfehler) nicht im Wortlaut zeigen – sie stehen im Server-Log.
+  if (message.startsWith(UNKNOWN_ERROR) && !isProviderError(err)) return "Es ist ein interner Fehler aufgetreten. Bitte „Neu generieren“ verwenden.";
+  return message;
 }

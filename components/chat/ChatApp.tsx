@@ -6,6 +6,8 @@ import { api } from "@/lib/client/api";
 import { collectArtifacts, type ArtifactVersion } from "@/lib/client/artifacts";
 import { appendMessages, db, saveConversation, selectAccount, type Conversation } from "@/lib/client/db";
 import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/export";
+import { useLeaveWarning } from "@/lib/client/leave";
+import { longChatHint } from "@/lib/client/long-chat";
 import { streamChat } from "@/lib/client/api";
 import { formatContextDate } from "@/lib/shared/date";
 import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, MailRef, PublicConfig, PublicModel, StreamEvent } from "@/lib/shared/types";
@@ -65,6 +67,8 @@ function payloadMessages(messages: ChatMessage[]): ChatMessage[] {
     );
 }
 
+const ANSWER_MISSING = "Die Antwort fehlt – die Seite wurde während der Antwort neu geladen oder die Verbindung ist abgebrochen.";
+
 /** Zeitpunkt des Seitenaufrufs – ältere Antworten öffnen ihre Artefakte nicht von selbst. */
 const PAGE_LOADED_AT = Date.now();
 
@@ -85,6 +89,11 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const conversations = useLiveQuery(() => db.conversations.orderBy("updatedAt").reverse().toArray(), [], [] as Conversation[]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = useMemo(() => conversations.find((c) => c.id === activeId) ?? null, [conversations, activeId]);
+  // Rechtzeitig vor den Grenzen (500 Nachrichten, 4,5 MB pro Anfrage, Kontextfenster) zu einem neuen Chat raten.
+  const longHint = useMemo(
+    () => (active ? longChatHint(payloadMessages(active.messages), active.messages.findLast((m) => m.role === "assistant")?.usage) : null),
+    [active],
+  );
   // Geöffneter Gruppenchat (liegt auf dem Server) – schließt einen privaten Chat aus.
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [groupDialog, setGroupDialog] = useState(false);
@@ -101,7 +110,12 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   // Entwurf, der beim Bearbeiten einer früheren Nachricht beiseitegelegt wurde (null: es wird nicht bearbeitet).
   const draftRef = useRef<string | null>(null);
   const [streaming, setStreaming] = useState<{ conversationId: string; state: StreamingState } | null>(null);
+  // Neuladen, Schließen oder Zurückgehen während einer Antwort: erst nachfragen (Entscheidung 6).
+  useLeaveWarning(Boolean(streaming));
   const abortRef = useRef<AbortController | null>(null);
+  // Abmelden läuft: die Antwort endet, danach wird nichts mehr gespeichert oder nachgeladen (die Chats werden gleich
+  // vom Gerät gelöscht).
+  const leavingRef = useRef(false);
   // Geöffnetes Artefakt; ohne Version gilt die neueste.
   const [artifactSel, setArtifactSel] = useState<{ id: string; version?: number } | null>(null);
   const autoOpened = useRef<Set<string>>(new Set());
@@ -316,7 +330,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       createdAt: last.createdAt,
       modelId: active?.modelId,
       stopReason: "incomplete",
-      error: "Die Antwort fehlt – die Seite wurde während der Antwort neu geladen oder die Verbindung ist abgebrochen. Bitte „Neu generieren“ verwenden.",
+      error: `${ANSWER_MISSING} Bitte „Neu generieren“ verwenden.`,
     };
   }, [messages, streaming, active?.modelId]);
   const streamingHere = streaming && streaming.conversationId === active?.id ? streaming.state : null;
@@ -471,7 +485,9 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       fallbackModel: state.fallbackModel,
       mails: state.mails!.read.length || state.mails!.sent.length ? state.mails : undefined,
     };
-    await appendMessages(conv.id, [assistant]).catch((err: unknown) => storageFailed(err, "Die Antwort konnte nicht gespeichert werden."));
+    if (!leavingRef.current) {
+      await appendMessages(conv.id, [assistant]).catch((err: unknown) => storageFailed(err, "Die Antwort konnte nicht gespeichert werden."));
+    }
     setStreaming(null);
     abortRef.current = null;
   };
@@ -522,6 +538,14 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     let baseMessages = active?.messages ?? [];
     const allAttachments = attachments;
     if (editIndex !== null && active) baseMessages = baseMessages.slice(0, editIndex);
+    // Fehlte die Antwort auf die letzte Frage (Seite während der Antwort neu geladen), bleibt der Hinweis darauf im
+    // Verlauf stehen – sonst stünde die Frage nach dem Weiterschreiben ohne Antwort und ohne Erklärung da. Das Modell
+    // bekommt ihn nicht (Antworten ohne Text gehen nicht mit), es sieht beide Fragen.
+    const previous = baseMessages[baseMessages.length - 1];
+    const unanswered: ChatMessage[] =
+      previous?.role === "user"
+        ? [{ id: uuid(), role: "assistant", text: "", createdAt: now - 1, modelId: active?.modelId, stopReason: "incomplete", error: ANSWER_MISSING }]
+        : [];
     const userMsg: ChatMessage = {
       id: uuid(),
       role: "user",
@@ -546,12 +570,12 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       effort,
       webSearch,
       connections: mailConnected ? ["mailbox"] : [],
-      messages: [...baseMessages, userMsg],
+      messages: [...baseMessages, ...unanswered, userMsg],
     } as Conversation;
     try {
       if (active && editIndex === null) {
         // Normaler Fall: nur anhängen (ein parallel gesetzter Titel bleibt erhalten).
-        await appendMessages(active.id, [userMsg], { modelId: model.id, effort, webSearch, connections: mailConnected ? ["mailbox"] : [] });
+        await appendMessages(active.id, [...unanswered, userMsg], { modelId: model.id, effort, webSearch, connections: mailConnected ? ["mailbox"] : [] });
       } else {
         await saveConversation(conv);
       }
@@ -568,7 +592,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     else setText("");
     const isFirst = baseMessages.length === 0;
     await runAssistant(conv, false);
-    if (isFirst && !active) generateTitle(conv.id, rawText || allAttachments.map((a) => a.name).join(", "));
+    if (isFirst && !active && !leavingRef.current) generateTitle(conv.id, rawText || allAttachments.map((a) => a.name).join(", "));
   };
 
   const regenerate = async () => {
@@ -749,6 +773,10 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
           onNew={newChat}
           onDelete={deleteConversation}
           busy={Boolean(streaming) || groupBusy}
+          onLeaving={(on) => {
+            leavingRef.current = on;
+            if (on) abortRef.current?.abort();
+          }}
           groups={
             groupEnabled
               ? {
@@ -1008,6 +1036,14 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
         </div>
 
         <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 sm:px-4 print:hidden">
+          {longHint && editIndex === null && (
+            <div role="status" className="mb-2 flex items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-2 text-sm text-warning">
+              <span>{longHint}</span>
+              <button type="button" className="shrink-0 font-medium underline disabled:opacity-50" onClick={newChat} disabled={Boolean(streaming)}>
+                Neuer Chat
+              </button>
+            </div>
+          )}
           {editIndex !== null && (
             <div className="mb-2 flex items-center justify-between rounded-2xl bg-primary-soft px-4 py-2 text-sm text-primary">
               <span>Du bearbeitest eine frühere Nachricht. Beim Senden wird das Gespräch ab dort neu fortgesetzt.</span>

@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { and, eq, gt, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
+import { withoutNullBytes } from "@/lib/shared/text";
 import type { ChatMessage, Citation, NativeTurn, UsageInfo } from "@/lib/shared/types";
 
 export const ANSWER_CACHE_VERSION = 1;
@@ -91,6 +92,8 @@ export async function storeAnswer(
 ): Promise<void> {
   const db = await getDb();
   const expiresAt = new Date(Date.now() + hours * 3_600_000);
+  // jsonb nimmt keine Nullbytes an (z. B. aus einem Werkzeug-Ergebnis).
+  answer = withoutNullBytes(answer);
   // Die erste Antwort bleibt die gemeinsame – nur abgelaufene Einträge (vom Aufräumjob noch
   // nicht gelöscht) werden ersetzt, sonst ließe sich der Cache bis dahin nicht neu füllen.
   await db

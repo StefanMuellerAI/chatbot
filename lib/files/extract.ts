@@ -1,6 +1,7 @@
 import "server-only";
 import { strFromU8, unzipSync } from "fflate";
 import { HttpError } from "@/lib/errors";
+import { stripControlChars } from "@/lib/shared/text";
 
 export type ExtractKind = "pdf" | "docx" | "sheet" | "pptx" | "mail" | "text";
 
@@ -60,12 +61,10 @@ export async function extractText(data: Buffer, name: string, mime: string): Pro
   }
   // Nullbytes und Steuerzeichen (aus Logdateien, manchen PDF-Schriften) – Postgres lehnt Nullbytes ab, das Modell
   // braucht keines davon. Zeilenumbruch und Tabulator bleiben.
-  text = text.replace(CONTROL_CHARS, "");
+  text = stripControlChars(text);
   if (!text.trim()) throw new HttpError(422, "In der Datei wurde kein lesbarer Text gefunden (z. B. ein eingescanntes PDF).");
   return text;
 }
-
-const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
 async function extractByKind(data: Buffer, name: string, mime: string): Promise<string> {
   const kind = detectKind(name, mime);

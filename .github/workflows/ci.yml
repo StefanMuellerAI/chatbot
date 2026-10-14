@@ -41,7 +41,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - name: Playwright (Chat, Admin, API, Anbieter, Handy, Tablet, Belastung)
+      - name: Playwright (Chat, Admin, API, Anbieter, Handy, Tablet, Belastung, Zufall)
         run: npx playwright test
       - name: Bericht hochladen
         if: ${{ !cancelled() }}

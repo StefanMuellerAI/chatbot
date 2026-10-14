@@ -93,6 +93,7 @@ function scenario(text) {
     fallback: has("ersatzmodell"),
     abort: has("abbruch"),
     slow: has("langsam"),
+    tooLong: has("zu-lang"),
     status: status ? Number(status) : null,
     mailbox: has("postfach"),
     sendTo: /#fake:senden:(\S+)/.exec(text)?.[1] ?? null,
@@ -160,11 +161,33 @@ function sendError(res, provider, status) {
 
 // ---------------------------------------------------------------- Anthropic
 
+/**
+ * Grundregeln der echten Messages-API für den Verlauf (C28: nach Fehlern und „Stoppen“). Verletzt der Adapter sie,
+ * antwortet die Fake-API wie das Original mit 400 – der Test sieht dann eine Fehlermeldung im Chat.
+ */
+function invalidAnthropicMessages(messages) {
+  const turns = messages.filter((m) => m.role !== "system");
+  if (turns.length === 0) return "messages: at least one message is required";
+  if (turns[0].role !== "user") return 'messages: first message must use the "user" role';
+  for (const [i, m] of messages.entries()) {
+    if (m.role === "system") continue;
+    const blocks = typeof m.content === "string" ? [{ type: "text", text: m.content }] : (m.content ?? []);
+    const last = i === messages.length - 1 && m.role === "assistant";
+    if (blocks.length === 0 && !last) return `messages.${i}: all messages must have non-empty content except for the optional final assistant message`;
+    if (blocks.some((b) => b.type === "text" && !b.text)) return `messages.${i}: text content blocks must be non-empty`;
+  }
+  return null;
+}
+
 async function anthropicMessages(req, res, body) {
   const messages = body.messages ?? [];
+  const invalid = invalidAnthropicMessages(messages);
+  if (invalid) return json(res, 400, { type: "error", error: { type: "invalid_request_error", message: invalid } }, { "x-should-retry": "false" });
   const text = lastUserText(messages);
   const s = scenario(text);
   if (s.status) return sendError(res, "anthropic", s.status);
+  // Verlauf passt nicht mehr ins Kontextfenster (W08) – Wortlaut wie bei der echten API.
+  if (s.tooLong) return json(res, 400, { type: "error", error: { type: "invalid_request_error", message: "prompt is too long: 213456 tokens > 200000 maximum" } }, { "x-should-retry": "false" });
   const last = messages.at(-1);
   const continuing = last?.role === "assistant"; // Fortsetzung nach pause_turn
   const afterTool = last?.role === "user" && Array.isArray(last.content) && last.content.some((b) => b.type === "tool_result");
@@ -327,6 +350,10 @@ async function openaiResponses(req, res, body) {
   const text = lastUserText(input);
   const s = scenario(text);
   if (s.status) return sendError(res, "openai", s.status);
+  if (s.tooLong) {
+    const message = "Your input exceeds the context window of this model. Please adjust your input and try again.";
+    return json(res, 400, { error: { message, type: "invalid_request_error", code: "context_length_exceeded", param: "input" } }, { "x-should-retry": "false" });
+  }
   const last = input.at(-1);
   const afterTool = last?.type === "function_call_output";
   const usage = {

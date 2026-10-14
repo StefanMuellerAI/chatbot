@@ -1,9 +1,10 @@
 "use client";
 import { ArrowUp, Brain, Check, ChevronDown, Database, Globe, ImagePlus, Loader2, Mail, Paperclip, Plug, Square, X } from "lucide-react";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from "react";
-import { ACCEPT_ATTRIBUTE, MAX_ATTACHMENTS, MAX_MESSAGE_CHARS, maxBytesFor } from "@/lib/files/limits";
+import { ACCEPT_ATTRIBUTE, MAX_ATTACHMENTS, MAX_MESSAGE_CHARS, maxBytesFor, unsupportedMessage } from "@/lib/files/limits";
 import { attachFromLibrary } from "@/lib/client/library";
-import { prepareImage, processUpload, transcribeUpload, uploadCategory, uploadFile } from "@/lib/client/upload";
+import { useLeaveWarning } from "@/lib/client/leave";
+import { prepareImage, processUpload, transcribeUpload, UPLOAD_OFFLINE, uploadCategory, uploadFile } from "@/lib/client/upload";
 import { EFFORT_LEVELS, type Attachment, type Effort, type PublicConfig, type PublicModel } from "@/lib/shared/types";
 import { cn } from "@/components/ui/cn";
 import { LogoMark } from "@/components/ui/Logo";
@@ -70,6 +71,9 @@ export interface ConnectionsProps {
   unavailable?: string;
 }
 
+const DUPLICATE = "Ist schon angehängt – geht nur einmal mit.";
+const sameFile = (a: Attachment, b: Attachment) => a.kind === b.kind && a.sha256 === b.sha256;
+
 const patchList = (list: Pending[], localId: string, patch: Partial<Pending>) => list.map((p) => (p.localId === localId ? { ...p, ...patch } : p));
 
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(props, ref) {
@@ -110,7 +114,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
           continue;
         }
         if (!kind) {
-          fail("Dieses Format wird nicht unterstützt.");
+          fail(unsupportedMessage(original.name));
           continue;
         }
         if (kind === "audio" && !features.transcription) {
@@ -145,6 +149,11 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             } else {
               update(localId, { label: kind === "image" ? "Wird geprüft …" : "Text wird ausgelesen …", progress: 0.85 });
               attachment = await processUpload(key, file.name, signal);
+            }
+            // Dieselbe Datei ist schon angehängt (zweimal ausgewählt oder eingefügt): nur ein Hinweis, sie geht einmal mit.
+            if (pendingRef.current.some((p) => p.localId !== localId && p.status === "ready" && p.attachment && sameFile(p.attachment, attachment))) {
+              update(localId, { status: "error", error: DUPLICATE });
+              return;
             }
             update(localId, { status: "ready", progress: 1, attachment, label: "" });
           } catch (err) {
@@ -228,7 +237,13 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   }, [text]);
 
   const working = pending.some((p) => p.status === "working");
-  const ready = pending.filter((p) => p.status === "ready" && p.attachment).map((p) => p.attachment!);
+  // Ein laufender Upload ginge beim Neuladen oder Schließen verloren.
+  useLeaveWarning(working);
+  // Gleicher Inhalt zweimal (gleichzeitig fertig geworden) geht trotzdem nur einmal mit.
+  const ready = pending
+    .filter((p) => p.status === "ready" && p.attachment)
+    .map((p) => p.attachment!)
+    .filter((a, i, all) => all.findIndex((b) => sameFile(a, b)) === i);
   const tooLong = text.length > maxChars;
   // „@Freebie“ vorschlagen, solange das Wort am Ende angefangen, aber noch nicht fertig ist.
   const [mentionClosed, setMentionClosed] = useState(false);
@@ -486,7 +501,7 @@ function isFormattedText(data: DataTransfer): boolean {
 /** Verständliche Meldung für fehlgeschlagene Uploads (auch Fehler des Blob-SDKs). */
 function uploadErrorMessage(err: unknown): string {
   const message = err instanceof Error ? err.message : "";
-  if (/failed to fetch|network|load failed/i.test(message)) return "Upload fehlgeschlagen (Netzwerk).";
+  if (/failed to fetch|network|load failed/i.test(message)) return UPLOAD_OFFLINE;
   if (/^Vercel Blob:/.test(message)) return "Upload fehlgeschlagen. Bitte erneut versuchen.";
   return message || "Fehler beim Hochladen";
 }

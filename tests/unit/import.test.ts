@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { normalizeConversation } from "@/lib/client/db";
+import { importProblem } from "@/lib/client/export";
 import { ChatMessageSchema } from "@/lib/shared/schemas";
 
 // E11: Wie kaputt eine Import-Datei auch ist – was übernommen wird, zeigt die Oberfläche an und nimmt der Server an.
@@ -74,5 +75,16 @@ describe("Import: Normalisierung beliebiger Dateien", () => {
     expect(conv.messages[1].citations).toEqual([{ url: "https://stefanai.de", title: "StefanAI" }]);
     expect(conv.messages[1].images).toBeUndefined();
     expect(conv.messages[1].usage).toBeUndefined();
+  });
+});
+
+// E13: Falsche Datei gewählt – die Meldung sagt, was es ist und was stattdessen.
+describe("Import: Meldung bei falscher Datei", () => {
+  it("erkennt leere Dateien, PDFs, Bilder und Markdown-Exporte", () => {
+    expect(importProblem("leer.json", "  \n")).toMatch(/^Die Datei ist leer\. Importieren lassen sich nur Export-Dateien von Freebie/);
+    expect(importProblem("scan.bin", "%PDF-1.7 …")).toMatch(/^Das ist eine PDF-Datei\..* PDFs lassen sich stattdessen im Chat anhängen\.$/);
+    expect(importProblem("Foto.JPG", "\uFFFD\uFFFD")).toMatch(/^Das ist ein Bild\./);
+    expect(importProblem("chat.txt", "# Mein Chat\n\n## Du")).toMatch(/^Das ist ein einzelner Chat als Markdown/);
+    expect(importProblem("daten.json", '{"x":1}')).toMatch(/^Die Datei konnte nicht importiert werden\./);
   });
 });

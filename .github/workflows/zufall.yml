@@ -1,0 +1,52 @@
+name: Zufallstest
+
+# W07 nachts mit 50 neuen Seeds (in der normalen CI laufen 5 feste). Ein Fehler nennt Seed, Schritt und
+# Aktionsliste; über „Run workflow“ lässt sich ein einzelner Seed nachspielen.
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Einzelnen Seed nachspielen (leer: 50 neue Seeds)"
+        required: false
+      schritte:
+        description: "Schritte pro Seed"
+        required: false
+        default: "60"
+
+concurrency:
+  group: zufall
+  cancel-in-progress: false
+
+jobs:
+  zufall:
+    name: W07 Zufallstest
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Zufällige Bedienfolgen
+        run: npx playwright test --project=zufall
+        env:
+          ZUFALL_SEED: ${{ inputs.seed }}
+          # Jede Nacht andere Seeds: 1000 je Lauf, damit sich Bereiche nicht überschneiden.
+          ZUFALL_START: ${{ github.run_number }}000
+          ZUFALL_ANZAHL: "50"
+          ZUFALL_SCHRITTE: ${{ inputs.schritte || '60' }}
+      - name: Bericht hochladen
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-zufall
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
