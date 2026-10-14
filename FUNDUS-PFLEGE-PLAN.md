@@ -1,6 +1,6 @@
 # Plan: Fundus pflegen – eigene Dateien, E-Mail-Verläufe und Prompts mit Platzhaltern
 
-Stand: 14. Oktober 2026, **Entwurf** · Entscheidungen offen (Abschnitt 16, je mit Empfehlung) · Grundlage: aktueller Code
+Stand: 14. Oktober 2026, **Entwurf** · Entscheidungen getroffen bis auf Nr. 4 (Abschnitt 16) · Grundlage: aktueller Code
 (Fundus in `library/`, `lib/library`, `components/chat/library`; Admin in `components/admin`, `app/api/admin`; Ablage in
 `lib/storage.ts`; Extraktion in `lib/files`), Fundus aus [FUNDUS-PLAN.md](FUNDUS-PLAN.md), Grenzfälle aus
 [GRENZFAELLE-PLAN.md](GRENZFAELLE-PLAN.md), E2E-Suite aus [TESTPLAN.md](TESTPLAN.md), Handbuch unter
@@ -16,8 +16,9 @@ Der Fundus wird **im Admin-Bereich pflegbar** und bekommt einen dritten Bereich 
    wie die 40 mitgelieferten Verläufe ganz oder mailweise anhängen.
 3. Die Kursleitung **legt Prompts mit Platzhaltern an**, ordnet sie **Kategorien** zu und sortiert beides. Teilnehmende
    filtern im Fundus nach Kategorie und suchen im Text.
-4. Wählt eine Person einen Prompt, erscheint **vor dem Einfügen eine Maske**. Dort füllt sie die Platzhalter. Erst
-   danach landet der **fertig ausgefüllte Text im Eingabefeld**. Gesendet wird nichts automatisch.
+4. Wählt eine Person einen Prompt, erscheint **vor dem Einfügen eine Maske**. Dort füllt sie die Platzhalter, und zwar
+   **alle**: Jeder Platzhalter ist ein Pflichtfeld. Erst danach landet der **fertig ausgefüllte Text im Eingabefeld**.
+   Gesendet wird nichts automatisch.
 5. Mitgelieferte Einträge kann die Kursleitung **ausblenden**. Bearbeiten lassen sie sich nicht, denn sie entstehen
    beim Build aus dem Code.
 
@@ -49,7 +50,8 @@ Der Server führt beide Quellen zu **einem Katalog** zusammen. Für Teilnehmende
    Fortschritt je Datei.
 3. Im **Prüfschritt** sieht sie für jede Datei: erkannten Typ, Tokens, Länge („Kurz/Mittel/Lang“), aufklappbare
    Vorschau und Hinweise (z. B. „enthält eine echte E-Mail-Adresse“ oder „gibt es schon als …“).
-   - Für alle Dateien gemeinsam setzt sie: Verwaltung, Einheit, Datum, Merkmale, Stichwörter, Kurzbeschreibung.
+   - Für alle Dateien gemeinsam setzt sie: Datum, Merkmale, Stichwörter, Kurzbeschreibung. Die Verwaltung ist immer
+     „Eigene Inhalte“ (Entscheidung 2).
    - Je Datei kann sie Titel und Angaben überschreiben.
 4. Bestätigt „Keine echten personenbezogenen oder vertraulichen Daten“ und klickt **„Speichern (3 Dateien)“**.
    Fehlerhafte Dateien bleiben mit Meldung stehen, die übrigen werden gespeichert.
@@ -60,8 +62,7 @@ Der Server führt beide Quellen zu **einem Katalog** zusammen. Für Teilnehmende
    „nach unten“.
 7. **Prompts:** „Neuer Prompt“ öffnet einen Dialog mit diesen Feldern:
    - Titel, Kategorie, Kurzbeschreibung und Text. Tippt sie `{{Zielgruppe}}`, erscheint unten eine Zeile für diesen
-     Platzhalter: Beschriftung, Hinweis, Art (einzeilig, mehrzeilig, Auswahl), Standardwert, Pflicht.
-   - Optional bis zu drei **Übungsdateien** aus dem Fundus.
+     Platzhalter: Beschriftung, Hinweis, Art (einzeilig, mehrzeilig, Auswahl), Standardwert.
    - „So sieht es im Chat aus“ zeigt die Maske zum Ausprobieren.
 8. Blendet bei Bedarf mitgelieferte Einträge aus, die nicht zum Kurs passen.
 
@@ -69,11 +70,11 @@ Der Server führt beide Quellen zu **einem Katalog** zusammen. Für Teilnehmende
 
 1. Öffnet den Fundus (Datenbank-Symbol). Neu ist der dritte Reiter **„Prompts (24)“** neben „Dokumente“ und „E-Mails“.
 2. Filtert nach Kategorie oder sucht („einfache sprache“ findet auch „Einfache Sprache“).
-3. Rechts erscheint die Vorschau: Text mit hervorgehobenen Platzhaltern, Beschreibung, Felder, Übungsdatei.
-4. Klickt **„Ausfüllen und einfügen“**. Die **Maske** öffnet sich mit einem Feld je Platzhalter und einer
-   Live-Vorschau. Optional ist das Häkchen „Übungsdatei mitnehmen“ gesetzt.
-5. Füllt aus und klickt **„Einfügen“**. Der Text steht im Eingabefeld, die Übungsdatei hängt an, der Cursor steht am
-   Ende. Die Person kann noch ändern und schickt dann selbst ab.
+3. Rechts erscheint die Vorschau: Text mit hervorgehobenen Platzhaltern, Beschreibung, Felder.
+4. Klickt **„Ausfüllen und einfügen“**. Die **Maske** öffnet sich mit einem Pflichtfeld je Platzhalter und einer
+   Live-Vorschau.
+5. Füllt alle Felder aus und klickt **„Einfügen“**. Der Text steht im Eingabefeld, der Cursor steht am Ende. Die Person
+   kann noch ändern, hängt bei Bedarf selbst eine Datei aus dem Fundus an und schickt dann ab.
 6. Steht schon Text im Eingabefeld, fragt die Maske: **„Ersetzen“** oder **„Anfügen“** (Entscheidung 6).
 
 ## 3. So sieht es aus
@@ -85,10 +86,9 @@ Reiter „Prompts“, die Maske und der Admin-Reiter.
 
 - Filterzeile: Suchfeld, Kategorie-Chips mit Zahl (mehrere = oder), „Filter zurücksetzen“. Kategorien ohne aktive
   Prompts fehlen.
-- Liste gruppiert nach Kategorie in der Reihenfolge aus dem Admin. Je Eintrag: Titel, Kurzbeschreibung, „2 Platzhalter
-  · mit Übungsdatei“.
+- Liste gruppiert nach Kategorie in der Reihenfolge aus dem Admin. Je Eintrag: Titel, Kurzbeschreibung, „2 Platzhalter“.
 - Einzelauswahl, keine Häkchen (anders als bei Dokumenten). Mit Pfeiltasten wählt man aus, `Enter` öffnet die Maske.
-- Vorschau: Kategorie, Titel, Beschreibung, Text mit hervorgehobenen Platzhaltern, Liste der Felder, Übungsdateien.
+- Vorschau: Kategorie, Titel, Beschreibung, Text mit hervorgehobenen Platzhaltern, Liste der Felder.
 - Fußzeile: „Ausfüllen und einfügen“ (ohne Platzhalter: „Einfügen“).
 
 **Maske „Prompt ausfüllen“** (eigener Dialog über dem Fundus; Handy: Vollbild)
@@ -97,22 +97,23 @@ Reiter „Prompts“, die Maske und der Admin-Reiter.
 ┌ Prompt ausfüllen ──────────────────────────────────────────── ✕ ┐
 │ E-Mail-Verlauf zusammenfassen · Zusammenfassen                  │
 │                                                                 │
-│ Zielgruppe *        [ z. B. die Amtsleitung                 ]   │
-│ Anzahl Punkte *     [ 5                                     ]   │
-│ Was ist dir wichtig? (optional)                                 │
+│ Zielgruppe          [ z. B. die Amtsleitung                 ]   │
+│ Anzahl Punkte       [ 5                                     ]   │
+│ Was ist dir wichtig?                                            │
 │                     [                                       ]   │
 │                     [                                       ]   │
 │ Vorschau                                                        │
 │ Fasse den angehängten E-Mail-Verlauf für ▒Zielgruppe▒ in 5      │
 │ Punkten zusammen: Wer will was von wem? Welche Fristen laufen?  │
+│ Achte besonders auf ▒Was ist dir wichtig?▒                      │
 │                                                                 │
-│ ☑ Übungsdatei mitnehmen: AW Rahmenvertrag B3-2025-031, Los 1    │
 │ ⓘ Im Eingabefeld steht schon Text.                              │
 │                          [Abbrechen]  [Anfügen]  [Ersetzen]     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-- Felder in der Reihenfolge des ersten Vorkommens. Pflichtfelder haben ein Sternchen, Fehler erscheinen direkt am Feld.
+- Felder in der Reihenfolge des ersten Vorkommens. **Alle Felder sind Pflicht** (Entscheidung 13), deshalb gibt es
+  kein Sternchen, sondern einen Satz über den Feldern: „Bitte alle Felder ausfüllen.“ Fehler erscheinen direkt am Feld.
 - Die Vorschau zeigt ausgefüllte Werte normal und offene Platzhalter hervorgehoben.
 - Ohne Entwurf gibt es nur „Abbrechen“ und „Einfügen“.
 
@@ -125,12 +126,11 @@ Reiter „Prompts“, die Maske und der Admin-Reiter.
 - Unterreiter **Dokumente · E-Mail-Verläufe · Prompts · Kategorien**.
 - **Dokumente/Verläufe:**
   - Suche und Auswahl „Eigene / Mitgelieferte / Ausgeblendet“.
-  - Zeilen mit Typ-Symbol, Titel, Verwaltung, Datum, Tokens und Kennzeichen „eigen“, „mitgeliefert“, „ausgeblendet“,
-    „inaktiv“.
+  - Zeilen mit Typ-Symbol, Titel, Verwaltung (bei eigenen immer „Eigene Inhalte“), Datum, Tokens und Kennzeichen
+    „eigen“, „mitgeliefert“, „ausgeblendet“, „inaktiv“.
   - Eigene Einträge: Bearbeiten (Angaben), Aktiv-Schalter, Herunterladen, Löschen.
   - Mitgelieferte Einträge: Vorschau, Ausblenden/Einblenden, „Alle einblenden“.
-- **Prompts:** gruppiert nach Kategorie, mit „nach oben/unten“, Aktiv, Bearbeiten, Löschen. Fehlt eine verknüpfte
-  Übungsdatei, steht in der Zeile ein Warnhinweis.
+- **Prompts:** gruppiert nach Kategorie, mit „nach oben/unten“, Aktiv, Bearbeiten, Löschen.
 - **Kategorien:** Name, Zahl der Prompts, „nach oben/unten“, Umbenennen, Löschen (nur wenn leer).
 
 ## 4. Platzhalter: Schreibweise und Regeln
@@ -144,11 +144,12 @@ Server-Prüfung nutzen dieselben Funktionen `parsePlaceholders`, `validatePrompt
 | Gültiger Name | 1–40 Zeichen: Buchstaben (auch Umlaute), Ziffern, Leerzeichen, `-`, `_`. Leerzeichen direkt nach `{{` und vor `}}` zählen nicht (`{{ Zielgruppe }}`) |
 | Gleicher Platzhalter | Vergleich ohne Groß/klein und mit ä=ae, ö=oe, ü=ue, ß=ss (`fold()` aus `lib/library/search.ts`) → **ein** Feld, überall eingesetzt; angezeigt wird die erste Schreibweise |
 | Kein Platzhalter | `{{}}`, `{{a{{b}}`, `{x}`, `{{ungültig!}}` bleiben wörtlich im Text; der Admin-Dialog warnt bei `{{` ohne `}}` und bei ungültigen Namen (Zeile und Stelle) |
-| Je Platzhalter einstellbar | Beschriftung (Standard: Name), Hinweis (grauer Platzhaltertext, z. B. „z. B. den Hauptausschuss“), Art (einzeilig, mehrzeilig, Auswahl), Auswahlwerte (2–20, je ≤ 100 Zeichen), Standardwert, Pflicht (Standard: ja) |
+| Je Platzhalter einstellbar | Beschriftung (Standard: Name), Hinweis (grauer Platzhaltertext, z. B. „z. B. den Hauptausschuss“), Art (einzeilig, mehrzeilig, Auswahl), Auswahlwerte (2–20, je ≤ 100 Zeichen), Standardwert (vorausgefüllt, änderbar) |
+| Pflicht | **Jeder Platzhalter muss ausgefüllt werden** – es gibt keine optionalen Platzhalter und keine Einstellung dafür (Entscheidung 13). Ein Standardwert zählt als ausgefüllt, solange er nicht gelöscht wird |
 | Grenzen | Text ≤ 8.000 Zeichen (wie die Anweisung einer Vorlage), ≤ 20 Platzhalter |
 | Ausfüllen | **ein Durchgang**, Werte gehen **wörtlich** hinein: `{{…}}`, `$&`, `$1` und `\` im Wert werden nicht ersetzt. Umgesetzt mit `split` statt `String.replace` mit Ersetzungsmustern |
 | Bereinigen | Steuerzeichen außer Zeilenumbruch und Tab werden entfernt, auch Null-Byte; `\r\n` wird `\n`. Einzeilige Werte: Zeilenumbrüche werden Leerzeichen |
-| Leer | Nur Leerzeichen gilt als leer. Bei Pflichtfeldern erscheint eine Meldung am Feld. Leere optionale Felder lassen den Platzhalter entfallen; dadurch entstehende doppelte Leerzeichen in der Zeile werden zu einem |
+| Leer | Nur Leerzeichen gilt als leer. Bei leeren Feldern erscheint „Bitte ausfüllen.“ am Feld, der Fokus springt auf das erste leere Feld, „Einfügen“ fügt nichts ein. `fillPrompt` selbst verweigert unvollständige Werte (Fehler statt halbem Text) |
 | Länge | einzeilig ≤ 300, mehrzeilig ≤ 50.000 Zeichen; das Ergebnis darf die Grenze des Eingabefelds nicht überschreiten (privat 400.000, Gruppenchat 50.000 Zeichen) – sonst ist „Einfügen“ gesperrt und eine Meldung nennt die Zahl |
 | Werte merken | Bis zum Neuladen der Seite bleiben die Werte je Prompt im Speicher, nie in `localStorage` (sie können Inhalte aus der Behörde enthalten) |
 
@@ -163,7 +164,7 @@ Wie bisher: `CREATE TABLE IF NOT EXISTS` in `lib/db/bootstrap.ts`, passende `pgT
 fundus_items          eigene Dokumente und Verläufe
   id            text PK        "eigen-<slug>-<4 hex>", passt zu LIBRARY_ID, kollidiert nie mit mitgelieferten IDs
   kind          text           'document' | 'thread'
-  title, summary text; org_id text; unit_id text NULL; date text (YYYY-MM-DD)
+  title, summary text; date text (YYYY-MM-DD)   Verwaltung immer „Eigene Inhalte“, keine Einheit
   tags, keywords jsonb         Merkmale (Länge automatisch) und Stichwörter
   doc_type      text NULL      word | excel | powerpoint | pdf
   file_name, file_key, mime, size, sha256, text, tokens   nur Dokumente; file_key = fundus/<uuid>/<name>
@@ -180,9 +181,12 @@ prompt_categories
   id text PK ("kat-<slug>"), name text (eindeutig ohne Groß/klein und ä/ae), sort_order int, updated_at
 prompts
   id text PK ("prompt-<slug>-<4 hex>"), category_id → prompt_categories (ON DELETE RESTRICT),
-  title, description, text, placeholders jsonb, attach_ids jsonb (≤ 3 Fundus-IDs),
+  title, description, text, placeholders jsonb (Beschriftung, Hinweis, Art, Auswahlwerte, Standardwert je Platzhalter),
   enabled bool, sort_order int, created_at, updated_at
 ```
+
+Prompts verweisen **nicht** auf Dateien (Entscheidung 8). Das Übungsmaterial liegt schon im Fundus; die Person hängt
+es selbst an. Löschen oder Ausblenden von Dateien berührt Prompts deshalb nie.
 
 - **Text liegt in der Tabelle.** Der Aufräumjob löscht `file_cache` nach `fileRetentionDays`. Eigene Fundus-Anhänge
   holen ihren Text dann aus `fundus_items.text` bzw. `fundus_mails.text`, so wie mitgelieferte aus `.library/`
@@ -193,26 +197,31 @@ prompts
 - **Startbestand:** 12 Prompts in 6 Kategorien (Tabelle unten). Sie werden **einmalig** angelegt, wenn die Zeile
   `settings.key = 'fundus-start'` fehlt, und danach markiert. Anders als bei den Vorlagen kommt nach „alles löschen“
   beim nächsten Kaltstart nichts zurück. Alle Start-Prompts sind frei bearbeitbar.
-- **Verwaltung eigener Einträge:** eine der neun Verwaltungen (mit Einheit) oder die feste Pseudo-Verwaltung
-  **„Eigene Inhalte“** (`id = 'eigen'`, Ebene „Kursleitung“). `LEVEL_LABELS` bekommt `eigen`. Im Katalog erscheint
-  sie nur, wenn es Einträge gibt (Entscheidung 2).
+- **Verwaltung eigener Einträge:** immer die feste Pseudo-Verwaltung **„Eigene Inhalte“** (`orgId = 'eigen'`, Ebene
+  „Kursleitung“, ohne Einheiten; Entscheidung 2). Die Tabelle braucht deshalb keine Spalten für Verwaltung und
+  Einheit.
+  - `LEVEL_LABELS` bekommt `eigen`.
+  - `unitId` wird im Katalog-Typ optional; `unitLabel` und der Einheiten-Filter kommen damit klar (Filter bleibt bei
+    „Eigene Inhalte“ gesperrt).
+  - Im Katalog erscheint „Eigene Inhalte“ nur, wenn es Einträge gibt.
 
-**Startbestand** (Texte aus dem abgenommenen Entwurf, Übungsdateien aus dem mitgelieferten Fundus)
+**Startbestand** (Texte aus dem abgenommenen Entwurf; passende Übungsdateien liegen im mitgelieferten Fundus, die
+Prompts verweisen aber nicht darauf)
 
-| Kategorie | Prompt | Platzhalter | Übungsdatei |
-|---|---|---|---|
-| Schreiben | Bürgeranfrage freundlich beantworten | Fachbereich, Wortzahl | Beschwerde zur Haltestelle Moorweg |
-| Schreiben | Absage höflich formulieren | Empfänger, Anliegen | – |
-| Schreiben | Pressemitteilung entwerfen | Anlass, Person | – |
-| Zusammenfassen | Vorlage in Stichpunkten zusammenfassen | Anzahl, Zielgruppe | Haushaltsplanentwurf 2027 |
-| Zusammenfassen | E-Mail-Verlauf zusammenfassen | Zielgruppe, Anzahl Punkte | Rahmenvertrag B3-2025-031, Los 1 |
-| Zusammenfassen | Aufgaben aus einem Protokoll ziehen | – (direkt einfügen) | Niederschrift Kreistag 11.12.2025 |
-| Einfache Sprache | Behördentext in Einfache Sprache | Zielgruppe | Abkochgebot Heidhof |
-| Einfache Sprache | Text auf Verständlichkeit prüfen | Zielgruppe, Text (mehrzeilig) | – |
-| Auswerten | Tabelle auswerten und als Diagramm zeigen | Anzahl, Zielgruppe | Abfallgebührenkalkulation 2026 |
-| Auswerten | Widersprüche zwischen Dokumenten finden | – | Vermerk Ausländerbehörde |
-| Recherche | Fakten mit Quellen prüfen | Thema | – |
-| Prompten lernen | Meinen Prompt verbessern lassen | Dein Prompt (mehrzeilig) | – |
+| Kategorie | Prompt | Platzhalter |
+|---|---|---|
+| Schreiben | Bürgeranfrage freundlich beantworten | Fachbereich, Wortzahl |
+| Schreiben | Absage höflich formulieren | Empfänger, Anliegen |
+| Schreiben | Pressemitteilung entwerfen | Anlass, Person |
+| Zusammenfassen | Vorlage in Stichpunkten zusammenfassen | Anzahl, Zielgruppe |
+| Zusammenfassen | E-Mail-Verlauf zusammenfassen | Zielgruppe, Anzahl Punkte, Schwerpunkt (mehrzeilig, Beschriftung „Was ist dir wichtig?“) |
+| Zusammenfassen | Aufgaben aus einem Protokoll ziehen | – (direkt einfügen) |
+| Einfache Sprache | Behördentext in Einfache Sprache | Zielgruppe |
+| Einfache Sprache | Text auf Verständlichkeit prüfen | Zielgruppe, Text (mehrzeilig) |
+| Auswerten | Tabelle auswerten und als Diagramm zeigen | Anzahl, Zielgruppe |
+| Auswerten | Widersprüche zwischen Dokumenten finden | – (direkt einfügen) |
+| Recherche | Fakten mit Quellen prüfen | Thema |
+| Prompten lernen | Meinen Prompt verbessern lassen | Dein Prompt (mehrzeilig) |
 
 ## 6. Hochladen, Prüfen, Speichern
 
@@ -273,8 +282,7 @@ prompts
 lädt sie neu hoch und löscht die alte (Entscheidung 5). So bleiben Prüfsummen, Datei-Cache, Antwort-Cache und
 Vorschau-Cache (1 Stunde im Browser) stimmig.
 
-**Grenzen:** 500 eigene Dokumente, 200 Verläufe, 500 Prompts, 50 Kategorien, 20 Dateien je Upload, 3 Übungsdateien je
-Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
+**Grenzen:** 500 eigene Dokumente, 200 Verläufe, 500 Prompts, 50 Kategorien, 20 Dateien je Upload. Meldungen sind verständlich, nichts wird halb angelegt.
 
 ## 7. Katalog, Chat und Caches
 
@@ -407,17 +415,17 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
 | FP05 | Hinweis auf echte Daten | `echte-daten.docx` → Warnung je Fundstelle; „Speichern“ erst mit Bestätigung (immer nötig); API ohne Bestätigung 400 |
 | FP06 | E-Mail-Verlauf hochladen | drei `.eml` in falscher Reihenfolge → nach Datum sortiert; Titel ohne „AW:“/„WG:“; Beteiligte; docx-Anhang als Dokument des Verlaufs; im Chat wie mitgelieferte Verläufe (Y23) |
 | FP07 | Prüfungen Verlauf | `.msg` mit Tipp; Datei ohne Kopfzeilen (422); doppelte Mail; Mail ohne Datum (Hinweis, Stelle der Auswahl); mehr als 50 Mails; nicht unterstützte Anhänge nur genannt; kodierte Betreffs und Umlaute korrekt |
-| FP08 | Eigene Einträge bearbeiten | Titel, Verwaltung, Einheit, Datum, Merkmale, Stichwörter, Beschreibung, Aktiv; Wirkung im Chat beim nächsten Öffnen; Prüfsumme und Datei unverändert |
-| FP09 | Eigene Einträge löschen | Rückfrage nennt verknüpfte Prompts und Anhang-Dokumente; Datei und Zeilen weg (Download 404); Verlauf nimmt seine Anhänge mit; Anhang-Dokument einzeln 409; Prompts zeigen „Übungsdatei fehlt“ |
+| FP08 | Eigene Einträge bearbeiten | Titel, Datum, Merkmale, Stichwörter, Beschreibung, Aktiv; Wirkung im Chat beim nächsten Öffnen; Prüfsumme und Datei unverändert |
+| FP09 | Eigene Einträge löschen | Rückfrage nennt die Anhang-Dokumente eines Verlaufs; Datei und Zeilen weg (Download 404); Verlauf nimmt seine Anhänge mit; Anhang-Dokument einzeln 409; Prompts bleiben unberührt |
 | FP10 | Mitgelieferte ausblenden | einzeln aus- und einblenden, „Alle einblenden“; ausgeblendet fehlt im Chat-Katalog und beim Anhängen (404) |
 | FP11 | Kategorien | anlegen, umbenennen, nach oben/unten (Maus und Tastatur); doppelter Name (auch „Einfache sprache“, „Einfache Sprache “) abgelehnt; leer oder zu lang; Löschen nur leer (409 nennt die Zahl) |
-| FP12 | Prompt anlegen | Titel, Kategorie (auch „Neue Kategorie …“ im Dialog), Beschreibung, Text; Platzhalter-Tabelle erscheint beim Tippen; je Platzhalter Beschriftung, Hinweis, Art, Auswahlwerte, Standardwert, Pflicht; Probe-Maske; nach dem Speichern im Chat |
-| FP13 | Prompt-Prüfungen | leere Pflichtangaben, Text über 8.000 Zeichen, ungültiger Name, `{{` ohne `}}` (Warnung mit Stelle), 21 Platzhalter, Auswahl ohne bzw. mit zu vielen Werten, Standardwert nicht in der Auswahl, Hinweis „ohne Platzhalter“; Einstellung eines kurz entfernten Platzhalters bleibt bis zum Speichern |
-| FP14 | Prompts ordnen und pflegen | nach oben/unten innerhalb der Kategorie, Kategorie wechseln, deaktivieren, löschen (Rückfrage); Übungsdateien suchen und verknüpfen (bis 3), ausgeblendete oder gelöschte → Warnung |
+| FP12 | Prompt anlegen | Titel, Kategorie (auch „Neue Kategorie …“ im Dialog), Beschreibung, Text; Platzhalter-Tabelle erscheint beim Tippen; je Platzhalter Beschriftung, Hinweis, Art, Auswahlwerte, Standardwert (keine Einstellung „Pflicht“); Probe-Maske; nach dem Speichern im Chat |
+| FP13 | Prompt-Prüfungen | Titel, Kategorie oder Text fehlt, Text über 8.000 Zeichen, ungültiger Name, `{{` ohne `}}` (Warnung mit Stelle), 21 Platzhalter, Auswahl ohne bzw. mit zu vielen Werten, Standardwert nicht in der Auswahl, Hinweis „ohne Platzhalter“; Einstellung eines kurz entfernten Platzhalters bleibt bis zum Speichern |
+| FP14 | Prompts ordnen und pflegen | nach oben/unten innerhalb der Kategorie, Kategorie wechseln, deaktivieren, löschen (Rückfrage) |
 | FP15 | Startbestand | frische Installation: 12 Prompts in 6 Kategorien; alle löschen, Server neu starten → bleibt leer; Start-Prompts frei bearbeitbar |
 | FP16 | Admin-API des Fundus | 401, 403 (Gast, fremde Origin), 400 mit deutscher Meldung (Felder, Grenzen, IDs, Schlüssel außerhalb `fundus/`, ungeprüfte Schlüssel), 404, 409, 413, 422; während der Pause geht die Pflege |
 | FP17 | Speicher und Aufräumjob | Aufräumjob nach abgelaufener Frist: eigene Fundus-Dateien und Texte bleiben, abgebrochene Uploads und abgelaufener Datei-Cache gehen; nach Neustart ist alles da; Gäste erreichen `fundus/` weder über `/api/files` noch über die Upload-Wege (400) |
-| FP18 | Grenzen | 500 Prompts, 50 Kategorien, 20 Dateien je Upload, 3 Übungsdateien: verständliche Meldungen, nichts halb angelegt (Dokumente und Verläufe: Unit-Test) |
+| FP18 | Grenzen | 500 Prompts, 50 Kategorien, 20 Platzhalter, 20 Dateien je Upload: verständliche Meldungen, nichts halb angelegt (Dokumente und Verläufe: Unit-Test) |
 | FP19 | Barrierefreiheit und Tastatur | axe ohne „serious/critical“ für Reiter, Upload-, Verlauf-, Prompt- und Kategorien-Dialog, hell und dunkel; Platzhalter-Tabelle per Tastatur; Fehler mit `aria-invalid` und `aria-describedby`; Fokus kehrt zurück |
 
 **Neuer Bereich PR · Prompts im Chat**
@@ -426,18 +434,17 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
 |---|---|---|
 | PR01 | Reiter „Prompts“ | Zahl im Reiter wie in der API; gruppiert nach Kategorie in Admin-Reihenfolge; leere Kategorien fehlen; Reiter und Filter bleiben beim Schließen |
 | PR02 | Filter und Suche | Kategorie-Chips mit Zahl (mehrere = oder); Suche in Titel, Beschreibung, Text und Platzhaltern (groß/klein, ä/ae, ß/ss); kombiniert; „Keine Treffer.“; „Filter zurücksetzen“ |
-| PR03 | Vorschau | Kategorie, Beschreibung, Text mit hervorgehobenen Platzhaltern, Liste der Felder, Übungsdatei; Pfeiltasten wechseln, `Enter` öffnet die Maske |
+| PR03 | Vorschau | Kategorie, Beschreibung, Text mit hervorgehobenen Platzhaltern, Liste der Felder; Pfeiltasten wechseln, `Enter` öffnet die Maske |
 | PR04 | Maske ausfüllen und einfügen | ein Feld je Platzhalter in Reihenfolge des ersten Vorkommens (doppelter Platzhalter → ein Feld, zweimal eingesetzt); Beschriftung, Hinweis, Standardwert, Auswahl, mehrzeilig; Live-Vorschau; „Einfügen“ → Text im Eingabefeld, Cursor am Ende, beide Dialoge zu, nichts gesendet |
-| PR05 | Pflicht und Prüfungen | leeres Pflichtfeld (auch nur Leerzeichen) → Meldung am Feld, Fokus aufs erste; optional leer → Platzhalter entfällt ohne doppelte Leerzeichen; Länge je Feld; Ergebnis über der Grenze des Eingabefelds → „Einfügen“ gesperrt mit Zahl |
+| PR05 | Alle Felder Pflicht | ein leeres Feld (auch nur Leerzeichen, auch ein gelöschter Standardwert) → „Bitte ausfüllen.“ am Feld, Fokus aufs erste leere, nichts eingefügt; erst alle gefüllt → Einfügen; Länge je Feld; Ergebnis über der Grenze des Eingabefelds → „Einfügen“ gesperrt mit Zahl |
 | PR06 | Werte aus dem echten Leben | Umlaute, Emoji, Arabisch (RTL), geschütztes Leerzeichen, eingefügter Word-Text mit Zeilen; `{{Zielgruppe}}`, `$&`, `$1`, `\` im Wert bleiben wörtlich; Steuerzeichen und Null-Byte entfernt; einzeilig ohne Zeilenumbruch |
 | PR07 | Entwurf im Eingabefeld | Maske zeigt Hinweis, „Ersetzen“ und „Anfügen“ (Leerzeile dazwischen); ein unverändert eingefügter Prompt gilt nicht als Entwurf; beim Bearbeiten einer früheren Nachricht landet der Prompt im Bearbeitungsfeld, der Entwurf kommt danach zurück; „Abbrechen“ ändert nichts |
 | PR08 | Prompt ohne Platzhalter | „Einfügen“ ohne Maske; Entwurfsschutz wie C25 (Hinweis mit „Ersetzen“) |
-| PR09 | Übungsdatei | Häkchen „Übungsdatei mitnehmen“ (Standard an) hängt sie wie Y08 an; schon angehängt → nicht doppelt; Grenze von 20 Anhängen; inzwischen ausgeblendet oder gelöscht → kein Häkchen, der Text kommt trotzdem |
-| PR10 | Senden und Caches | gefüllter Prompt geht als normale Nachricht (Mock: Text wörtlich, keine Platzhalter mehr, keine Zeile „Vorlage“); zweiter Gast mit gleichen Werten → Antwort aus dem Cache; zusammen mit einer Vorlage nutzbar (Zeile „Vorlage“ nennt die Vorlage) |
-| PR11 | Gruppenchat | Prompts im Fundus des Gruppenchats; eingefügter Text beginnt mit „@Freebie “; Grenze 50.000 Zeichen; die anderen sehen erst nach dem Senden etwas |
-| PR12 | Doppelklick und Tastatur | Doppelklick und doppeltes `Enter` auf „Einfügen“ fügen einmal ein; `Enter` im einzeiligen Feld → nächstes Feld, im letzten = Einfügen; `Strg`/`Cmd`+`Enter` fügt ein; im mehrzeiligen Feld macht `Enter` eine neue Zeile (auch iPad); `Esc` schließt erst die Maske, dann den Fundus; Werte bleiben beim erneuten Öffnen desselben Prompts bis zum Neuladen |
-| PR13 | Handy und Tablet (`@mobil`, `@tablet`) | Reiter erreichbar, Liste/Detail im Wechsel, Maske im Vollbild, aktives Feld nicht von der Tastatur verdeckt, kein seitliches Scrollen |
-| PR14 | Barrierefreiheit | Felder mit Beschriftung, `aria-required`, Fehler mit `aria-invalid`/`aria-describedby`; axe ohne „serious/critical“ in Reiter und Maske, hell und dunkel; Fokus kehrt ins Eingabefeld |
+| PR09 | Senden und Caches | gefüllter Prompt geht als normale Nachricht (Mock: Text wörtlich, keine Platzhalter mehr, keine Zeile „Vorlage“); zweiter Gast mit gleichen Werten → Antwort aus dem Cache; zusammen mit einer Vorlage nutzbar (Zeile „Vorlage“ nennt die Vorlage) |
+| PR10 | Gruppenchat | Prompts im Fundus des Gruppenchats; eingefügter Text beginnt mit „@Freebie “; Grenze 50.000 Zeichen; die anderen sehen erst nach dem Senden etwas |
+| PR11 | Doppelklick und Tastatur | Doppelklick und doppeltes `Enter` auf „Einfügen“ fügen einmal ein; `Enter` im einzeiligen Feld → nächstes Feld, im letzten = Einfügen; `Strg`/`Cmd`+`Enter` fügt ein; im mehrzeiligen Feld macht `Enter` eine neue Zeile (auch iPad); `Esc` schließt erst die Maske, dann den Fundus; Werte bleiben beim erneuten Öffnen desselben Prompts bis zum Neuladen |
+| PR12 | Handy und Tablet (`@mobil`, `@tablet`) | Reiter erreichbar, Liste/Detail im Wechsel, Maske im Vollbild, aktives Feld nicht von der Tastatur verdeckt, kein seitliches Scrollen |
+| PR13 | Barrierefreiheit | Felder mit Beschriftung, `aria-required`, Fehler mit `aria-invalid`/`aria-describedby`; axe ohne „serious/critical“ in Reiter und Maske, hell und dunkel; Fokus kehrt ins Eingabefeld |
 
 **Fortsetzung Y · eigene Inhalte im Chat**
 
@@ -488,8 +495,8 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
     - Werte mit `{{x}}`, `$&`, `$1`, `$$`, `\`, Emoji, RTL, NBSP
     - Steuerzeichen, Null-Byte, `\r\n`
     - einzeilig mit Umbruch
-    - optional leer (keine doppelten Leerzeichen, Satzzeichen bleiben)
-    - nur Leerzeichen
+    - fehlender oder leerer Wert (auch nur Leerzeichen) → Fehler, nie halber Text
+    - Standardwert gilt als Wert
     - Längen je Art, Ergebnis über der Grenze
   - Determinismus: gleiche Eingaben ergeben gleichen Text.
   - Zufallstest mit festem Seed (1.000 Texte): kein Absturz; ausgefüllt enthält kein gültiges `{{Name}}` eines
@@ -534,14 +541,15 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
 |---|---|---|
 | Einfügen aus Word und Co. | Werte mit Zeilen, Tabulator, NBSP, Nullbreite, Steuerzeichen | PR06, Unit |
 | Sonderzeichen in Werten | `{{…}}`, `$&`, `$1`, `\`, Emoji, RTL | PR06, Unit |
-| Doppelklick / doppeltes Enter | Einfügen, Speichern im Admin, Hochladen | PR12, FP04 |
+| Doppelklick / doppeltes Enter | Einfügen, Speichern im Admin, Hochladen | PR11, FP04 |
 | Entwurfsschutz | Entwurf, Bearbeiten einer früheren Nachricht, Abbrechen | PR07, PR08 |
 | Reihenfolge und Gleichzeitigkeit | Admin ändert während Gäste wählen; gelöscht während angehängt | Y24, Y25, W09 |
-| Doppelte Dateien | gleiche Datei, gleiche Mail, schon angehängte Übungsdatei | FP04, FP07, PR09 |
+| Doppelte Dateien | gleiche Datei, gleiche Mail | FP04, FP07 |
 | Dateien aus dem echten Leben | falsche Endung, umbenannt, leer, riesig, kaputt, Zip-Bombe, nur Bilder, `.msg`, Umlaute im Namen | FP03, FP07 |
 | Netz und Abbruch | Upload abgebrochen, Katalogfehler, Datei-Cache abgelaufen | FP04, Y11, Y26 |
-| Grenzen | Platzhalter, Längen, Anzahl, Eingabefeld privat und Gruppenchat | PR05, FP13, FP18, PR11 |
-| Geräte | iPad-Enter im mehrzeiligen Feld, Handy-Tastatur | PR12, PR13 |
+| Leere Felder | nur Leerzeichen, gelöschter Standardwert, Doppelklick auf „Einfügen“ mit leeren Feldern | PR05, PR11, Unit |
+| Grenzen | Platzhalter, Längen, Anzahl, Eingabefeld privat und Gruppenchat | PR05, FP13, FP18, PR10 |
+| Geräte | iPad-Enter im mehrzeiligen Feld, Handy-Tastatur | PR11, PR12 |
 | Zufall | Zufallsfolgen mit Prompts und eigenen Dateien | W07, Unit |
 
 **Absicherung**
@@ -552,7 +560,7 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
     - „Verlauf hochladen“, Prompt-Dialog, Platzhalter-Tabelle, Probe-Maske
     - Kategorien „nach oben/unten“, „Ausblenden“, „Alle einblenden“
     - Reiter „Prompts“, Kategorie-Chips, „Ausfüllen und einfügen“
-    - Maske mit „Ersetzen/Anfügen“, „Übungsdatei mitnehmen“
+    - Maske mit „Ersetzen/Anfügen“
   - Keine neue Einstellung, also kein neuer Q-Eintrag (Entscheidung 11).
 - **`robustheit.spec.ts`:** `ADMIN_ROUTES`, U02- und U03-Listen nachziehen.
 - **Fertig heißt:**
@@ -573,8 +581,8 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
 | `FUNDUS-PLAN.md` | Abschnitt 7 („Kursleitung lädt eigene Dateien hoch“, PDFs) verweist auf diesen Plan; Abschnitt 4.2 korrigieren (`getFile` liest keine `library/`-Pfade) |
 | `FUNDUS-PFLEGE-PLAN.md` | dieser Plan, nach der Umsetzung mit Stand je Phase und Abweichungen |
 | `tests/e2e/coverage.json` | neue Routen und Bedienelemente |
-| **Handbuch Kursleitung** (`docs/handbuch/handbuch.html`) | 1.3 Schulungstag: Schritt „Fundus vorbereiten“; 2.4 Fragen stellen: Unterschied Vorlage ↔ Prompt (Verweis 2.9); **2.9 Fundus**: „Drei Reiter“, neues h3 „Prompts mit Platzhaltern“ (Reiter, Maske, Ersetzen/Anfügen, Übungsdatei), h3 „Eigene Inhalte der Kursleitung“ (Verweis 3.7); **neues Kapitel 3.7 „Fundus pflegen“** (Sicherheit wird 3.8; es gibt keine Querverweise auf 3.7) mit h3 Aufbau, Dokumente hochladen (Schritte, Formate, Grenzen, Prüfschritt, Kasten „Echte Daten“), E-Mail-Verläufe hochladen (Outlook „Speichern unter“ → `.eml`, Reihenfolge, Anhänge), Prompts anlegen (Tabelle Platzhalter-Schreibweise, Arten, Pflicht, Beispiel, Übungsdateien), Kategorien, Mitgelieferte ausblenden, Kasten „Gute Prompts für Übungen“; 3.5 Einstellungen: Zeile „Fundus“ (gilt auch für Prompts, Pflege bleibt möglich); Teil 4: Löschregeln (eigene Inhalte bleiben bis zum Löschen, Aufräumjob lässt sie stehen), was an die Anbieter geht (eigene Dateien nur beim Anhängen), Checkliste (Prompts und Kategorien vor dem Kurs prüfen), häufige Fragen („Eigene Datei fehlt im Fundus“, „Platzhalter erscheint nicht als Feld“, „.msg statt .eml“) |
-| **Handbuch Teilnehmende** (`docs/handbuch/teilnehmende.html`) | 2.4: Hinweis auf Prompts im Fundus; **2.9 Fundus**: „Drei Reiter“, h3 „Prompts: ausfüllen und einfügen“ in der Du-Form mit Maske, „Ersetzen/Anfügen“, Übungsdatei, h4 Ideen zum Ausprobieren; 2.15 Gruppenchat: Prompt beginnt mit „@Freebie“; 3.4 häufige Fragen („Ich sehe keine Prompts“, „Was passiert mit meinen Eingaben in der Maske?“) |
+| **Handbuch Kursleitung** (`docs/handbuch/handbuch.html`) | 1.3 Schulungstag: Schritt „Fundus vorbereiten“; 2.4 Fragen stellen: Unterschied Vorlage ↔ Prompt (Verweis 2.9); **2.9 Fundus**: „Drei Reiter“, neues h3 „Prompts mit Platzhaltern“ (Reiter, Maske, alle Felder Pflicht, Ersetzen/Anfügen, Tipp: Übungsdatei aus dem Fundus selbst anhängen), h3 „Eigene Inhalte der Kursleitung“ (Verweis 3.7); **neues Kapitel 3.7 „Fundus pflegen“** (Sicherheit wird 3.8; es gibt keine Querverweise auf 3.7) mit h3 Aufbau, Dokumente hochladen (Schritte, Formate, Grenzen, Prüfschritt, Kasten „Echte Daten“), E-Mail-Verläufe hochladen (Outlook „Speichern unter“ → `.eml`, Reihenfolge, Anhänge), Prompts anlegen (Tabelle Platzhalter-Schreibweise, Arten, Standardwert, „jeder Platzhalter muss ausgefüllt werden“, Beispiel), Kategorien, Mitgelieferte ausblenden, Kasten „Gute Prompts für Übungen“; 3.5 Einstellungen: Zeile „Fundus“ (gilt auch für Prompts, Pflege bleibt möglich); Teil 4: Löschregeln (eigene Inhalte bleiben bis zum Löschen, Aufräumjob lässt sie stehen), was an die Anbieter geht (eigene Dateien nur beim Anhängen), Checkliste (Prompts und Kategorien vor dem Kurs prüfen), häufige Fragen („Eigene Datei fehlt im Fundus“, „Platzhalter erscheint nicht als Feld“, „.msg statt .eml“) |
+| **Handbuch Teilnehmende** (`docs/handbuch/teilnehmende.html`) | 2.4: Hinweis auf Prompts im Fundus; **2.9 Fundus**: „Drei Reiter“, h3 „Prompts: ausfüllen und einfügen“ in der Du-Form mit Maske (alle Felder ausfüllen), „Ersetzen/Anfügen“, Tipp „passende Datei aus dem Fundus dazu anhängen“, h4 Ideen zum Ausprobieren; 2.15 Gruppenchat: Prompt beginnt mit „@Freebie“; 3.4 häufige Fragen („Ich sehe keine Prompts“, „Was passiert mit meinen Eingaben in der Maske?“) |
 | `docs/handbuch/screenshots.mjs`, `beispieldaten.mjs` | Beispieldaten über die Admin-API: ein hochgeladenes Dokument (erzeugte docx) und ein Verlauf aus drei `.eml`, Startbestand der Prompts; neue Bilder: `c36-fundus-prompts`, `c37-prompt-maske`, `c38-prompt-eingefuegt`, `a16-fundus-dokumente`, `a17-fundus-pruefen`, `a18-fundus-verlauf`, `a19-prompt-dialog`, `a20-kategorien`; `c27-fundus` zeigt drei Reiter; danach `npm run docs:handbuch` und beide PDFs einchecken |
 | `docs/handbuch/README.md` | neue Bilder in der Liste |
 
@@ -585,7 +593,7 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
 | 0 · Abnahme | Entscheidungen (Abschnitt 16); klickbarer Entwurf von Admin-Reiter, Reiter „Prompts“ und Maske | – |
 | 1 · Grundlage | Platzhalter-Logik, Tabellen, Startbestand, Store mit Grenzen und Revision, Ablage `fundus/` mit Frist, Prüfen und Vorschau, Admin-API, Katalog zusammenführen, `libraryText`, Pfad-Trennung, Tracing-Fix | Unit-Tests; FP16, FP17, Y21, U01–U03 |
 | 2 · Admin | Reiter „Fundus“ mit Unterreitern, Upload- und Prüfdialog, Verläufe, Prompt-Dialog mit Platzhalter-Tabelle und Probe-Maske, Kategorien, Ausblenden | FP01–FP15, FP18, FP19, O01 |
-| 3 · Chat | Reiter „Prompts“, Filter, Vorschau, Maske, Ersetzen/Anfügen, Übungsdatei, Gruppenchat, eigene Dateien und Verläufe im Chat, PDF-Typ, Revalidierung | PR01–PR14, Y22–Y26, Q21, V09 |
+| 3 · Chat | Reiter „Prompts“, Filter, Vorschau, Maske, Ersetzen/Anfügen, Gruppenchat, eigene Dateien und Verläufe im Chat, PDF-Typ, Revalidierung | PR01–PR13, Y22–Y26, Q21, V09 |
 | 4 · Abschluss | Doku inkl. beider Handbücher, Belastung, Zufallstest, Live-Smoke, Stabilitätslauf (3 ×), CI in drei Browsern | W07, W09, X08, X11 |
 
 **Wie schnell?**
@@ -625,7 +633,8 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
 
 ## 15. Bewusst nicht enthalten (später möglich)
 
-- **Mitgelieferte Einträge bearbeiten:** nur Ausblenden (Entscheidung 4). Die Inhalte entstehen aus dem Code.
+- **Mitgelieferte Einträge bearbeiten:** nur Ausblenden (Entscheidung 4, offen). Die Inhalte entstehen aus dem Code.
+- **Übungsdateien am Prompt** (Entscheidung 8): Das Übungsmaterial liegt im Fundus, die Person hängt es selbst an.
 - **Eigene Prompts der Teilnehmenden**, Favoriten und Teilen in der Gruppe (Entwurf 3 der Ideensammlung).
 - **Prompts auf der Startseite** („Übung des Tages“, Entwurf 4) und **`/` im Eingabefeld** (Entwurf 2). Beides baut auf
   diesem Plan auf und ist danach klein.
@@ -636,20 +645,25 @@ Prompt. Meldungen sind verständlich, nichts wird halb angelegt.
 
 ## 16. Entscheidungen
 
-Offen – je mit meiner Empfehlung:
+Getroffen am 14. Oktober 2026:
 
-| # | Frage | Empfehlung |
+| # | Frage | Entscheidung |
 |---|---|---|
-| 1 | Wie heißt der neue Bereich? | Reiter **„Prompts“**, Einzahl „Prompt“, Felder „Platzhalter“, Dialog „Prompt ausfüllen“. Nie „Vorlage“, das sind die Rollen |
-| 2 | Zu welcher Verwaltung gehören eigene Dateien? | Auswahl aus den neun Verwaltungen (mit Einheit) **oder** fest „Eigene Inhalte“ (Standard). Keine eigenen Verwaltungen anlegen |
-| 3 | Welche Formate? | Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), **PDF** neu; Verläufe aus `.eml`. Alte Formate mit Tipp ablehnen |
-| 4 | Mitgelieferte Einträge? | **Nur ausblenden**, nicht bearbeiten |
-| 5 | Datei ersetzen? | **Nein.** Neu hochladen und alte löschen; Angaben bleiben bearbeitbar. Hält Prüfsummen und Caches stimmig |
-| 6 | Text steht schon im Eingabefeld | Die **Maske** fragt: „Ersetzen“ oder „Anfügen“. Ein Hinweis erst nach dem Schließen ginge verloren und mit ihm die ausgefüllten Werte |
+| 1 | Wie heißt der neue Bereich? | **„Prompts“**: Reiter „Prompts“, Einzahl „Prompt“, Felder „Platzhalter“, Dialog „Prompt ausfüllen“. Nie „Vorlage“, das sind die Rollen |
+| 2 | Zu welcher Verwaltung gehören eigene Dateien? | **Immer „Eigene Inhalte“.** Keine Zuordnung zu den neun erfundenen Verwaltungen, keine Einheiten, keine eigenen Verwaltungen |
+| 3 | Welche Formate? | Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), **PDF** neu; Verläufe aus `.eml`. Alte Formate werden mit Tipp abgelehnt |
+| 5 | Datei ersetzen? | **Nein.** Nur hochladen und löschen; die Angaben (Titel, Datum, Merkmale …) bleiben bearbeitbar |
+| 6 | Text steht schon im Eingabefeld | Die **Maske** fragt: „Ersetzen“ oder „Anfügen“ |
 | 7 | Prompt ohne Platzhalter | Erlaubt, wird **direkt eingefügt**; der Admin-Dialog zeigt einen Hinweis |
-| 8 | Übungsdatei am Prompt | **Ja**, optional bis zu drei; in der Maske als Häkchen, Standard an |
+| 8 | Übungsdatei am Prompt | **Nein.** Das Übungsmaterial liegt schon im Fundus; Prompts verweisen auf keine Dateien |
 | 9 | Echte Daten | **Warnung** bei Fundstellen und **immer** eine Bestätigung beim Speichern |
 | 10 | Startbestand | **12 Prompts in 6 Kategorien**, einmalig angelegt, frei bearbeitbar |
 | 11 | Eigener Schalter für Prompts? | **Nein**, der Schalter „Fundus“ gilt für alles |
 | 12 | Gruppenchat | Eingefügter Prompt beginnt mit **„@Freebie “** |
-| 13 | Platzhalter Pflicht oder optional? | **Pflicht als Standard**, je Platzhalter umstellbar |
+| 13 | Platzhalter Pflicht oder optional? | **Jeder Platzhalter muss ausgefüllt werden**, ohne Ausnahme und ohne Einstellung dafür |
+
+**Noch offen:**
+
+| # | Frage | Erklärung und Empfehlung |
+|---|---|---|
+| 4 | Was darf die Kursleitung mit den **mitgelieferten** Einträgen tun? | „Mitgeliefert“ sind die 150 Dokumente und 40 E-Mail-Verläufe, die heute schon im Fundus stehen (z. B. „Norovirus-Ausbruch im Gemeindekindergarten Lindenhof“). Sie stehen als Daten im Code und werden bei jedem Deployment neu als Dateien erzeugt. Darum lassen sie sich im Admin **nicht ändern oder löschen**: Eine Änderung wäre beim nächsten Deployment wieder weg. **Empfehlung: Ausblenden.** Im Admin hat jeder mitgelieferte Eintrag einen Knopf „Ausblenden“. Teilnehmende sehen ihn danach nicht mehr im Fundus. „Einblenden“ oder „Alle einblenden“ holt ihn zurück, und Chats, in denen er schon hängt, funktionieren weiter. **Alternativen:** (a) gar nichts – mitgelieferte Einträge sind immer sichtbar, gepflegt werden nur eigene; spart den Unterreiter-Filter „Ausgeblendet“ und FP10. (b) zusätzlich „Alle mitgelieferten ausblenden“, wenn ein Kurs nur mit eigenen Inhalten arbeiten soll. (c) Titel, Beschreibung und Merkmale überschreiben – rate ich ab, weil der Inhalt der Datei dann nicht mehr zum Titel passen kann |
