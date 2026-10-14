@@ -168,20 +168,23 @@ test("X06 Websuche mit Quellen und ein kleines Artefakt", async ({ page }) => {
   await expect(page.getByRole("region", { name: /^Artefakt:/ })).toBeVisible();
 });
 
-test("X09 Posteingang: Claude Haiku liest den Betreff über die Verbindung; Abmelden leert das Postfach", async ({ page }) => {
+test("X09 Posteingang: Claude Haiku liest die Mail über die Verbindung; Abmelden leert das Postfach", async ({ page }) => {
   await login(page);
   const config = (await (await page.request.get("/api/config")).json()) as { features: { mailbox?: boolean } };
   test.skip(!config.features.mailbox, "Der Posteingang ist in den Einstellungen ausgeschaltet.");
   const subject = `Live-Smoke Raum ${uniq()}`;
-  const sent = await page.request.post("/api/mail", { data: { to: [guest.username], cc: [], subject, body: "Notiz an mich selbst." } });
+  // Die Raumnummer steht hinter den 140 Zeichen der Vorschau: Freebie muss die Mail wirklich öffnen (mailbox_read).
+  const room = `R-${uniq()}`;
+  const body = `Notiz an mich selbst. ${"Dieser Absatz ist nur Fülltext, damit die Angabe nicht in der Vorschau steht. ".repeat(3)}\n\nRaumnummer: ${room}`;
+  const sent = await page.request.post("/api/mail", { data: { to: [guest.username], cc: [], subject, body } });
   expect(sent.status(), await sent.text()).toBe(200);
 
   await newChat(page);
   await chooseModel(page, "Claude Haiku 5.5");
   await setConnection(page, true);
-  const answer = await ask(page, `Wie lautet der Betreff der neuesten E-Mail in meinem Posteingang? Antworte nur mit dem Betreff. (Smoke ${uniq()})`);
-  await expect(answer).toContainText(subject);
-  await expect(answer.getByRole("navigation", { name: "Gelesene E-Mails" })).toBeVisible();
+  const answer = await ask(page, `Öffne die neueste E-Mail in meinem Posteingang und nenne nur die Raumnummer am Ende. (Smoke ${uniq()})`);
+  await expect(answer).toContainText(room);
+  await expect(answer.getByRole("navigation", { name: "Gelesene E-Mails" })).toContainText(subject);
 
   page.once("dialog", (d) => void d.accept());
   await page.getByRole("button", { name: "Abmelden" }).click();

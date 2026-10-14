@@ -402,7 +402,7 @@ Gruppenchat (X10) kommt ein eigener Termin mit zwei Gästen einer Gruppe dazu
 | X06 | eine Websuche-Frage und ein kleines Artefakt | Quellen; Artefakt-Panel öffnet sich |
 | X07 | Gast meldet sich über das Formular an; Termin wird gelöscht | nur Chat, kein Admin; nach dem Löschen spätestens nach 15 Sekunden abgemeldet („abgelaufen“) |
 | X08 | eine Fundus-Datei anhängen und befragen | Fundus wird aus dem Deployment gelesen, Anhang bereit, Antwort |
-| X09 | Gast schreibt sich selbst eine Mail, verbindet den Posteingang und fragt Claude Haiku („Niedrig“) nach dem Betreff; meldet sich ab | Antwort nennt den Betreff, Karte „Gelesene E-Mails“; nach erneuter Anmeldung ist das Postfach geleert (übersprungen, wenn der Posteingang ausgeschaltet ist) |
+| X09 | Gast schreibt sich selbst eine Mail (Raumnummer hinter der Vorschau), verbindet den Posteingang und fragt Claude Haiku („Niedrig“) nach der Raumnummer; meldet sich ab | Antwort nennt die Raumnummer, Karte „Gelesene E-Mails“ mit dem Betreff; nach erneuter Anmeldung ist das Postfach geleert (übersprungen, wenn der Posteingang ausgeschaltet ist) |
 | X10 | Live: zwei Gäste einer Gruppe, A startet einen Gruppenchat mit B, beide posten eine Notiz, B fragt `@Freebie` (Claude Haiku, „Niedrig“) nach einer Zusammenfassung | Antwort nennt beide Notizen; nach dem Löschen des Termins ist der Chat weg (< 0,01 $; übersprungen, wenn der Schalter aus ist) |
 
 Geschätzte Kosten: unter 0,10 $ pro Lauf.
