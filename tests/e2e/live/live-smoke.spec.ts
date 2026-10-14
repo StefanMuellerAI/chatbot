@@ -193,6 +193,52 @@ test("X09 Posteingang: Claude Haiku liest den Betreff über die Verbindung; Abme
   expect((await (await page.request.get("/api/mail?folder=sent")).json()).total).toBe(0);
 });
 
+test("X10 Gruppenchat: zwei Gäste posten je eine Notiz, Claude Haiku fasst auf @Freebie beide zusammen; danach ist der Termin samt Chat weg", async ({}, testInfo) => {
+  const config = (await (await admin.get("/api/config")).json()) as { features: { groupChats?: boolean }; models: { id: string; displayName: string }[] };
+  test.skip(!config.features.groupChats, "Gruppenchats sind in den Einstellungen ausgeschaltet.");
+  const haiku = config.models.find((m) => m.displayName.startsWith("Claude Haiku"));
+  expect(haiku, "Claude Haiku ist aktiv").toBeTruthy();
+  // Eigener Termin mit zwei Gästen einer Gruppe.
+  const event = await admin.post("/api/admin/events", { data: { name: `Live-Smoke Gruppenchat ${uniq()}`, startsAt: inMinutes(-5), endsAt: inMinutes(30) } });
+  expect(event.status(), await event.text()).toBe(200);
+  const groupEventId = ((await event.json()) as { id: string }).id;
+  const group = await admin.post("/api/admin/events/groups", { data: { eventId: groupEventId, name: "Smoke", count: 2 } });
+  const [a, b] = ((await group.json()) as { guests: { username: string; password: string }[] }).guests;
+  const as = async (g: typeof a) => {
+    const api = await playwrightRequest.newContext({ baseURL: testInfo.project.use.baseURL });
+    expect((await api.post("/api/auth/login", { data: g })).status()).toBe(200);
+    return api;
+  };
+  const [apiA, apiB] = [await as(a), await as(b)];
+  try {
+    const started = await apiA.post("/api/groupchats", { data: { title: "Live-Smoke Protokoll", members: [b.username] } });
+    expect(started.status(), await started.text()).toBe(200);
+    const { id } = ((await started.json()) as { chat: { id: string } }).chat;
+    const post = async (api: APIRequestContext, text: string) => expect((await api.post(`/api/groupchats/${id}/messages`, { data: { text } })).status()).toBe(200);
+    await post(apiA, "Notiz: Der Workshop findet im Raum Ahorn statt.");
+    await post(apiB, "Notiz: Mittagessen gibt es um 12:30 Uhr.");
+    await post(apiB, "@Freebie Fasse beide Notizen in zwei kurzen Stichpunkten zusammen.");
+    const res = await apiB.post(`/api/groupchats/${id}/freebie`, { data: { modelId: haiku!.id, effort: "low", webSearch: false }, timeout: ANSWER_TIMEOUT });
+    expect(res.status(), await res.text()).toBe(200);
+    await res.body();
+    const chat = ((await (await apiA.get(`/api/groupchats/${id}`)).json()) as { chat: { messages: { kind: string; status?: string; text: string }[] } }).chat;
+    const answer = chat.messages.find((m) => m.kind === "freebie")!;
+    expect(answer.status).toBe("done");
+    expect(answer.text).toMatch(/Ahorn/);
+    expect(answer.text).toMatch(/12[:.]30/);
+
+    // Termin gelöscht: Zugänge und Gruppenchat sind weg.
+    expect((await admin.delete(`/api/admin/events?id=${groupEventId}`)).status()).toBe(200);
+    await expect(async () => {
+      expect((await apiA.get(`/api/groupchats/${id}`)).status()).toBe(401);
+    }).toPass({ timeout: 30_000 });
+    expect((await apiB.post("/api/auth/login", { data: b })).status()).toBe(401);
+  } finally {
+    await admin.delete(`/api/admin/events?id=${groupEventId}`);
+    await Promise.all([apiA.dispose(), apiB.dispose()]);
+  }
+});
+
 test("X07 Gast-Zugang: Anmeldung über das Formular, nur Chat; Termin gelöscht – sofort abgemeldet", async ({ page }) => {
   await page.goto("/login");
   await page.getByLabel("Benutzername").fill(guest.username);

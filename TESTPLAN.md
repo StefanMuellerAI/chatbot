@@ -1,6 +1,6 @@
 # Testplan Freebie – vollständige E2E-Abdeckung
 
-Stand: 9. Oktober 2026 · Grundlage: Inventur aller Bedienelemente, Einstellungen und API-Routen im aktuellen Code
+Stand: 9. Oktober 2026, ergänzt am 13. Oktober 2026 um Gruppenchats · Grundlage: Inventur aller Bedienelemente, Einstellungen und API-Routen im aktuellen Code
 
 ## 1. Ziel und Maßstab
 
@@ -306,6 +306,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | Q21 | Funktionsschalter „Fundus“ | aus: kein Datenbank-Symbol, Fundus-API 403; Upload aus, Fundus an: nur das Datenbank-Symbol, Anhängen geht; Pause sperrt Symbol und API (503) |
 | Q22 | Schalter „Posteingang“ aus und wieder an | Umschalter, Verbindung, Werkzeuge (Mock-Diagnose „aus“) und API (403) weg, alter Link führt zum Chat; wieder an: alles da, vorhandene Mails bleiben |
 | Q23 | Begrüßungs-E-Mail ändern bzw. leeren | neue Postfächer bekommen den neuen Text (einmal, auch bei erneuter Anmeldung), leer: keine Begrüßung; zu lang: Meldung |
+| Q24 | Schalter „Gruppenchats“ aus und wieder an | Symbol, Abschnitt und API (403) weg; offener Gruppenchat wechselt sauber zu „Neuer Chat“; wieder an: alles da, vorhandene Chats bleiben; Posteingang davon unberührt |
 
 ### R · Admin: Vorlagen
 
@@ -371,6 +372,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | V05 | **Caching-Vertrag über 3 Runden** | System-Prompt, Werkzeuge und frühere Nachrichten byte-gleich; Cache-Marker korrekt; Effort-Wechsel ohne Präfixbruch; gleicher Cache-Schlüssel bei GPT; Werkzeuge mit und ohne Verbindung „Posteingang“ byte-gleich, Umschalten ändert keinen früheren Teil der Anfrage |
 | V06 | Titel, Transkription, Bilder, Modell-Listen | Anfragen in der erwarteten Form |
 | V07 | Claude und GPT lesen den Posteingang und senden (Werkzeug-Schleife) | Liste → Lesen → Antwort mit Betreff; Senden → Mail beim Empfänger; Statuszeilen; Karten „Gelesene E-Mails“ und „Gesendete E-Mails“; ohne Verbindung Werkzeug-Fehler mit Hinweis |
+| V08 | Claude und GPT im Gruppenchat (Fake-API) | Beiträge mit Autor und Uhrzeit in einer Nutzernachricht; **Caching-Vertrag über 3 Runden mit Beiträgen dazwischen**: System-Prompt, Werkzeuge und frühere Runden byte-gleich, Cache-Marker korrekt, gleicher Cache-Schlüssel für alle Mitglieder; zweites Mitglied mit anderem Modell funktioniert |
 
 ### W · Belastbarkeit
 
@@ -381,11 +383,13 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | W03 | Chat mit 100 Nachrichten, 500 Chats in der Leiste | bleibt flüssig (Zeitbudget je Aktion) |
 | W04 | **Schulungssituation:** 25 Personen gleichzeitig, eine IP | keine Sperre, keine Fehler, Antwort-Cache wird geteilt |
 | W05 | 25 Personen einer Gruppe schreiben sich gleichzeitig Mails, alle Postfächer fragen ab | keine Fehler, keine Sperre, jede Mail kommt an |
+| W06 | 25 Personen einer Gruppe in drei Gruppenchats posten gleichzeitig, alle fragen ab, zwei rufen `@Freebie` | keine Fehler, keine Sperre, jeder Beitrag kommt bei allen in derselben Reihenfolge an, genau eine Antwort je Chat und Runde |
 
 ### X · Live-Smoke (`freebie.stefanai.de`)
 
 Nach jedem Production-Deploy und auf Abruf, ohne Einstellungen zu ändern. Der Test legt mit dem Admin-Zugang einen
-Termin für eine Stunde mit einem Gast an, chattet als dieser Gast und löscht den Termin am Ende wieder
+Termin für eine Stunde mit einem Gast an, chattet als dieser Gast und löscht den Termin am Ende wieder; für den
+Gruppenchat (X10) kommt ein eigener Termin mit zwei Gästen einer Gruppe dazu
 (`LIVE=1 LIVE_ADMIN_PASSWORD=… npm run test:e2e:live`):
 
 | ID | Schritt | Erwartete Wirkung |
@@ -399,6 +403,7 @@ Termin für eine Stunde mit einem Gast an, chattet als dieser Gast und löscht d
 | X07 | Gast meldet sich über das Formular an; Termin wird gelöscht | nur Chat, kein Admin; nach dem Löschen spätestens nach 15 Sekunden abgemeldet („abgelaufen“) |
 | X08 | eine Fundus-Datei anhängen und befragen | Fundus wird aus dem Deployment gelesen, Anhang bereit, Antwort |
 | X09 | Gast schreibt sich selbst eine Mail, verbindet den Posteingang und fragt Claude Haiku („Niedrig“) nach dem Betreff; meldet sich ab | Antwort nennt den Betreff, Karte „Gelesene E-Mails“; nach erneuter Anmeldung ist das Postfach geleert (übersprungen, wenn der Posteingang ausgeschaltet ist) |
+| X10 | Live: zwei Gäste einer Gruppe, A startet einen Gruppenchat mit B, beide posten eine Notiz, B fragt `@Freebie` (Claude Haiku, „Niedrig“) nach einer Zusammenfassung | Antwort nennt beide Notizen; nach dem Löschen des Termins ist der Chat weg (< 0,01 $; übersprungen, wenn der Schalter aus ist) |
 
 Geschätzte Kosten: unter 0,10 $ pro Lauf.
 
@@ -459,6 +464,41 @@ Browser vor.
 | Z16 | API des Posteingangs | 400 mit deutscher Meldung (Felder, Grenzen, Adressen), 404 für fremde und unbekannte IDs (fremde Mail bleibt unverändert), 403 bei fremder Origin, 429 ab der 21. Mail pro Minute, Adressbuch nur mit eigener Gruppe, Suche mit `%`/`_` wörtlich; Not-Aus: Lesen geht, Senden 503 |
 | Z17 | Freebie verschickt Mails | mit Verbindung und Auftrag von der eigenen Adresse: beim Empfänger „über Freebie“, in „Gesendet“, Karte „Gesendete E-Mails“; fremde Gruppe → Werkzeug-Fehler; ohne Verbindung nichts; höchstens 5 pro Antwort; „Neu generieren“ fragt nach |
 
+### GC · Gruppenchats
+
+Teilnehmende einer Gruppe chatten gemeinsam, Freebie antwortet auf „@Freebie“ (Plan: `GRUPPENCHAT-PLAN.md`). Das
+Kürzel ist zweistellig, weil alle 26 Buchstaben vergeben sind. Jeder Test legt einen eigenen Termin an; die Abfrage
+(4 Sekunden im offenen Chat, 15 Sekunden für Einladungen) spulen die Tests mit der Browser-Uhr vor. Die Mock-Diagnose
+nennt im Gruppenchat Zahl und Autoren der Beiträge der Runde („Gruppenchat: 2 Beiträge von …“).
+
+Angepasst wurden dafür: **A10** (GC13: Rückfrage nennt die Gruppenchats), **E04/E06** (Abschnitt „Gruppenchats“, Suche
+am Namen, statt Papierkorb „Verlassen“ bzw. „Für alle löschen“), **E08** (GC15: Gruppenchats im Export), **M03** (GC12:
+Gruppenchats nie im Antwort-Cache), **N01/N03** (GC16/GC17), **Z10** (GC11: im Gruppenchat kein Menü „Verbindungen“),
+**U01–U03** (neue Routen), **V05** (Abschnitt im System-Prompt bricht den Präfix privater Chats nicht), **X** (X10).
+
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| GC01 | Gruppenchat starten: Symbol neben „Neuer Chat“, Dialog mit Name, Suche, „Alle auswählen“; Prüfungen (leerer oder zu langer Name, niemand gewählt) | Chat oben unter „Gruppenchats“, Kopfzeile mit Name und Avataren, Systemzeile „… hat … eingeladen“; deutsche Meldungen |
+| GC02 | Einladung kommt an (zwei Browser) | B sieht den Chat ohne Neuladen mit Hinweis und „Öffnen“, Punkt in der Seitenleiste und am Umschalter „Chat“; C aus derselben Gruppe, aber nicht eingeladen, sieht nichts |
+| GC03 | Beiträge untereinander | A postet, B sieht ihn binnen Sekunden links mit Avatar und Name, eigene rechts; ohne `@Freebie` keine Anfrage an den Anbieter (Fake-API zählt 0) und keine Kosten; Reihenfolge stimmt bei gleichzeitigem Posten |
+| GC04 | `@Freebie` | Vorschlagsliste bei `@` (Maus und Tastatur); Freebie antwortet mit Bezug auf die Beiträge aller (Mock-Diagnose nennt Autoren und Zahl); fragende Person sieht den Stream, die anderen „Freebie antwortet …“ und dann die fertige Antwort auf einmal (keine Zwischenstände); Kosten bei der fragenden Person (Termin und Gruppe) |
+| GC05 | Zwei Personen fragen gleichzeitig | eine Antwort, zweite Anfrage mit „Freebie antwortet gerade …“; normale Beiträge gehen weiter und stehen hinter der Antwort; sie gehören zur nächsten Runde |
+| GC06 | Stoppen, Fehler, Neu generieren, hängengebliebene Antwort | Stoppen nur für die fragende Person; Fehler bei allen sichtbar; „Neu generieren“ nur an der letzten Antwort, solange danach nichts kam; nach Abbruch des fragenden Browsers ist der Chat nach der Frist wieder frei |
+| GC07 | Mitglieder verwalten | nachträglich einladen, entfernen (Rückfrage), umbenennen; Entfernte können nicht mehr schreiben und lesen nur bis zum Zeitpunkt des Entfernens (die API liefert nichts Späteres); erneut eingeladen sehen sie wieder alles; Systemzeilen; nur die startende Person hat diese Knöpfe |
+| GC08 | Verlassen und für alle löschen | Verlassen mit Rückfrage; danach „verlassen“ in der Seitenleiste, Verlauf bis zum Verlassen lesbar, keine Eingabeleiste; spätere Beiträge und Freebie-Antworten kommen nicht an (auch nicht über API und Statusabfrage); „Aus meiner Liste entfernen“; die startende Person hat kein „Verlassen“ (API 403); „Für alle löschen“ → bei allen weg, auch bei Verlassenen, offene Ansicht wechselt sauber zu „Neuer Chat“ |
+| GC09 | Kursleitung führt vor | Symbol auch für die Kursleitung; Dialog mit Auswahl „Gruppe“, Personenliste nur dieser Gruppe; Personen aus zwei Gruppen in einem Chat → Meldung, nichts angelegt; Gäste können die Kursleitung nicht einladen; Abmelden der Kursleitung lässt ihre Gruppenchats bestehen |
+| GC10 | Nur die eigene Gruppe | Auswahl zeigt nur die eigene Gruppe; API lehnt Gäste anderer Gruppen, anderer Termine, abgelaufene Gäste und „kursleitung“ ab (Meldung, nichts angelegt) |
+| GC11 | Anhänge, Fundus, Websuche, Artefakte | Datei von A ist bei B sichtbar, Freebie bekommt den Inhalt; Artefakt-Panel bei allen; „Verbindungen“ und „Bild-Modus“ werden nicht angeboten |
+| GC12 | Datenschutz | Posteingang nie verbunden, auch wenn das Modell es versucht (Werkzeug-Fehler mit Hinweis); nie aus dem Antwort-Cache und nie hinein; fremde Chat-IDs 404; Nicht-Mitglieder erfahren über `/api/status` nichts |
+| GC13 | Abmelden und „Alle abmelden“ | Rückfrage nennt die Gruppenchats; private Chats wie bisher vom Gerät gelöscht; nach erneuter Anmeldung (auch in neuem Browser) sind die Gruppenchats wieder da; nächster Gast am selben Gerät sieht sie nicht |
+| GC14 | Termin-Ende, „Jetzt beenden“, Gast, Gruppe oder Termin löschen, Aufräumjob | Gruppenchats des Termins weg; Beiträge eines gelöschten Gasts bleiben mit Namen; hat er den Chat gestartet, ist der Chat weg; der Aufräumjob meldet die Zahl |
+| GC15 | Export | Warnung vor dem Ende und „Export“ nehmen die Gruppenchats mit; Import ergibt private Chats mit Autoren; Markdown-Export und Drucken nennen die Autoren |
+| GC16 | Handy und Tablet (`@mobil`, `@tablet`) | Abschnitt in der Leiste, Dialoge im Vollbild, Personen-Symbol in der Kopfzeile, Vorschlagsliste erreichbar, kein seitliches Scrollen |
+| GC17 | Barrierefreiheit | keine „serious“/„critical“-Befunde von axe in Start- und Mitglieder-Dialog, Vorschlagsliste und Gruppenchat, hell und dunkel; Beiträge heißen „Nachricht von wolke83“; Esc schließt erst die Vorschläge, dann den Dialog; Fokus kehrt zurück |
+| GC18 | API der Gruppenchats | 401, 403 (Schalter aus, fremde Origin, Schreiben nach dem Verlassen, startende Person verlässt), 400 mit deutscher Meldung (Felder, Grenzen), 404 (fremde und unbekannte IDs, fremder Beitrag bleibt unverändert), 409 (laufende Antwort), 429 (Senderate); Not-Aus: Lesen geht, Schreiben und Freebie 503 |
+| GC19 | Neues und Abfrage | Punkt verschwindet beim Öffnen, eigene Beiträge zählen nicht; Hinweis nur bei Einladungen; Abfrage nur bei sichtbarem Tab, schneller im offenen Chat, langsamer bei Ruhe (Uhr vorgespult) |
+| GC20 | Grenzen | 30 Mitglieder, 10 eigene Chats, 1.000 Beiträge, 50.000 Zeichen: verständliche Meldungen, nichts halb angelegt |
+
 ## 5. Abdeckungsmatrix
 
 `tests/e2e/coverage.json` ordnet jeder Einstellung (aus `lib/shared/settings-defaults.ts`), jeder API-Route (aus
@@ -466,6 +506,10 @@ Browser vor.
 jede Katalog-ID aus Abschnitt 4 hat einen Test, jede neue Einstellung und Route steht in der Matrix, und jede dort
 genannte ID gibt es als Test. Neue Einstellungen oder Routen ohne Test machen die CI rot.
 `node tests/e2e/coverage.mjs --markdown` gibt die Matrix ID → Tests als Tabelle aus.
+
+Kürzel sind ein oder zwei Großbuchstaben plus zwei Ziffern (`A01`, `GC04`); Testnamen dürfen mehrere IDs tragen
+(`GC15/E08 …`), Tabellen Bereiche (`Q02–Q10`, `GC01–GC20`). Die Erkennung steht in `tests/e2e/coverage-ids.mjs` und hat
+einen eigenen Unit-Test (`tests/unit/coverage-ids.test.ts`).
 
 ## 6. Bei der Inventur gefundene Fehler
 
@@ -525,6 +569,14 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 | 40 | Ordner-Knopf „Posteingang 1“ ohne sauberen Namen für Screenreader | Z01 |
 | 41 | Import: kaputte Felder für Verbindungen und Mail-Karten konnten die Anzeige zum Absturz bringen | E08 |
 
+**Beim Bau der Gruppenchats gefunden und behoben** (13. Oktober 2026)
+
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 42 | Die Postfach-Werkzeuge nannten die Adresse der fragenden Person – im Gruppenchat brach so jede Frage eines anderen Mitglieds den Prompt-Cache | V08 |
+| 43 | Hinweise oben im Chat (z. B. „… hat dich in „…“ eingeladen“) wurden auf dem Handy auf halbe Breite abgeschnitten statt umzubrechen | GC16 |
+| 44 | Die Zahl im Reiter des Fundus-Dialogs war durch Transparenz zu blass (Kontrast 3,6 : 1); in der CI seit dem Fundus-Ausbau rot, lokal unauffällig | Y19 |
+
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
@@ -563,10 +615,12 @@ liegt bei dir.
 | 7 · Live | Live-Smoke X | Test fertig; erster Lauf nach dem Merge mit den echten Passwörtern |
 | 8 · Zugänge | Bereich T (Termine, Gruppen, Gast-Zugänge), A/O/S angepasst | erledigt |
 | 9 · Posteingang | Bereich Z, Q22/Q23, V07, W05, X09; V05, A10, E08, N01 und U01 angepasst (`POSTEINGANG-PLAN.md`) | erledigt |
+| 10 · Gruppenchats | Bereich GC, Q24, V08, W06, X10; A10, E04/E06, E08, M03, N01/N03, Z10, U01–U03 und V05 angepasst; zweistellige Kürzel (`GRUPPENCHAT-PLAN.md`) | erledigt |
 
-Ergebnis: 286 E2E-Tests in 26 Dateien (plus 9 Live-Smoke-Tests) und 118 Unit-Tests; die komplette Suite läuft lokal in knapp 7 Minuten
-(3 Worker). Beim dreifachen Lauf ohne Wiederholungen (858 Läufe) scheiterte nur T13 zweimal an einer
-Reihenfolge-Abhängigkeit (das Postfach der Kursleitung teilen sich alle Chat-Tests); im Test behoben und in genau
+Ergebnis: 316 E2E-Tests in 30 Dateien (plus 10 Live-Smoke-Tests) und 153 Unit-Tests; die komplette Suite läuft lokal
+in gut 11 Minuten (3 Worker). Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den
+Gruppenchats) war vollständig grün. Beim dreifachen Lauf vor den Gruppenchats (858 Läufe) scheiterte nur T13 zweimal an
+einer Reihenfolge-Abhängigkeit (das Postfach der Kursleitung teilen sich alle Chat-Tests); im Test behoben und in genau
 dieser Reihenfolge nachgeprüft. In der CI laufen zusätzlich die Chat-Tests in WebKit und Firefox.
 
 ## 9. Was automatisiert nicht geht – kurze manuelle Abnahme

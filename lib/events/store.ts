@@ -6,6 +6,7 @@ import { open, seal } from "@/lib/auth/secretbox";
 import { adminCredentials } from "@/lib/auth/tokens";
 import { getDb, schema } from "@/lib/db/client";
 import { HttpError } from "@/lib/errors";
+import { deleteEventGroupChats, purgeGroupChats } from "@/lib/groupchat/store";
 import { deleteEventMails, purgeMail } from "@/lib/mail/store";
 import { generatePassword, generateUsername, normalizeUsername } from "./credentials";
 import { EARLY_LOGIN_MS, effectiveEnd, eventStatus, guestAccess, validateEventTimes, type EventStatus, type EventTimes } from "./window";
@@ -169,8 +170,9 @@ export async function endEventNow(id: string): Promise<void> {
   const db = await getDb();
   await db.update(schema.events).set({ endedEarlyAt: new Date() }).where(eq(schema.events.id, id));
   await db.delete(schema.guests).where(eq(schema.guests.eventId, id));
-  // Auch die Kopien bei der Kursleitung (Gast-Postfächer verschwinden mit den Gästen).
+  // Auch die Kopien bei der Kursleitung (Gast-Postfächer verschwinden mit den Gästen) und die Gruppenchats.
   await deleteEventMails(id);
+  await deleteEventGroupChats(id);
   invalidateGuestCache();
 }
 
@@ -384,8 +386,9 @@ export async function purgeExpiredGuests(): Promise<number> {
   `)) as unknown as { rows?: unknown[] } | unknown[];
   const n = Array.isArray(res) ? res.length : (res.rows?.length ?? 0);
   if (n) invalidateGuestCache();
-  // Postfächer beendeter Termine gleich mit (auch die Kopien bei der Kursleitung).
+  // Postfächer und Gruppenchats beendeter Termine gleich mit (auch die der Kursleitung).
   await purgeMail();
+  await purgeGroupChats();
   return n;
 }
 

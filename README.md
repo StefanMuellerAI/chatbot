@@ -15,6 +15,9 @@ Teilnehmende ohne eigenes ChatGPT- oder Claude-Konto mit aktuellen KI-Modellen a
 - **Artefakte**: HTML-Seiten, Charts, Mermaid-Diagramme, SVG und Dokumente im Seitenpanel mit Vorschau und Download
 - **Posteingang**: eigenes Übungs-Postfach je Gast (`name@freebie.example`) – E-Mails an die eigene Gruppe und die
   Kursleitung, mit Antworten, Weiterleiten, Suche und Adressbuch; wird beim Abmelden geleert
+- **Gruppenchats**: Teilnehmende einer Gruppe laden sich in einen gemeinsamen Chat ein, posten Notizen und Texte und
+  fragen Freebie mit **@Freebie** – etwa nach einer Zusammenfassung oder Aufgabenliste. Nur innerhalb einer Gruppe;
+  die Kursleitung kann Gruppenchats zum Vorführen starten (Plan: [GRUPPENCHAT-PLAN.md](GRUPPENCHAT-PLAN.md))
 - **Verbindungen**: im Chat pro Gespräch zuschaltbar – mit der Verbindung „Posteingang“ liest Freebie die eigenen
   E-Mails und kann im Namen der Person senden (gekennzeichnet „über Freebie“)
 - **Admin-Bereich**: Modelle, Funktionen, Vorlagen, Hinweistext, Begrüßungs-E-Mail, Not-Aus, Termine und Gast-Zugänge,
@@ -65,6 +68,11 @@ Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
   laufender Termine. Es geht keine Mail nach draußen. Beim Abmelden wird das eigene Postfach geleert (Mails an
   andere bleiben bei ihnen), zum Termin-Ende verschwinden alle Postfächer des Termins. Abschalten lässt sich alles
   mit dem Schalter **Posteingang**.
+- **Gruppenchats:** Wer einen Gruppenchat startet, lädt Personen aus der eigenen Gruppe ein (die Kursleitung wählt
+  dafür eine Gruppe eines laufenden Termins); nur sie kann einladen, entfernen, umbenennen und den Chat für alle
+  löschen. Alle anderen können ihn verlassen und sehen danach nur noch den Verlauf bis dahin. Gruppenchats liegen auf
+  dem Server und bleiben beim Abmelden erhalten; zum Termin-Ende (und wenn Termin, Gruppe oder die startende Person
+  gelöscht wird) verschwinden sie. Abschalten lässt sich alles mit dem Schalter **Gruppenchats**.
 - `APP_PASSWORD` aus früheren Versionen wird nicht mehr verwendet und kann in Vercel gelöscht werden.
 
 Alle Funktionen von Chat und Admin-Bereich beschreibt das Handbuch [docs/Freebie-Handbuch.pdf](docs/Freebie-Handbuch.pdf).
@@ -110,7 +118,7 @@ Freebie-Instanzen mit frischer Datenbank und eine nachgebaute Anthropic-/OpenAI-
 | `admin` | Admin-Bereich, ändert Einstellungen (Rücksetzen nach jedem Test) | Mock, seriell |
 | `api` | alle Routen ohne Browser | Mock, parallel |
 | `provider`, `provider-serial` | echte Claude-/GPT-Adapter gegen die Fake-API inkl. Caching-Vertrag | Fake-API |
-| `belastung` | Neustart, Abbrüche, 500 Chats, 25 Personen über eine IP (Chat und Posteingang) | Mock |
+| `belastung` | Neustart, Abbrüche, 500 Chats, 25 Personen über eine IP (Chat, Posteingang und Gruppenchats) | Mock |
 | `chat-webkit`, `chat-firefox` | Chat-Tests in Safari-Engine und Firefox (`E2E_BROWSERS=webkit,firefox`) | Mock |
 
 Einzelne Bereiche: `npx playwright test --project=admin`, einzelne Tests: `-g "Q14"`. Testdateien
@@ -125,20 +133,24 @@ app/                 Seiten (Chat, Login, Admin) und API-Routen
   api/transcribe     Audio in Etappen: start (ffmpeg teilt) → chunk (parallel) → finish
   api/library        Fundus: Katalog, Vorschau, Download, Anhängen (liest .library/ aus dem Deployment)
   api/admin          Modelle, Einstellungen, Vorlagen, Sicherheit, Übersicht, Termine
-  api/mail           Posteingang: Liste, Lesen, Senden, Markieren, Löschen, Status (Abfrage alle 15 s), Adressbuch
+  api/mail           Posteingang: Liste, Lesen, Senden, Markieren, Löschen, Adressbuch
+  api/groupchats     Gruppenchats: Starten, Mitglieder, Beiträge, Abfrage „seit Stand n“, Antwort von Freebie (SSE)
+  api/status         gemeinsame Abfrage alle 15 s: neue Mails und Gruppenchats (Einladungen, Neues)
 lib/providers        Adapter für Anthropic (Messages API) und OpenAI (Responses API) + Mock
 lib/tools            Eigene Werkzeuge für die Tool-Schleife (Bild erzeugen)
 lib/mail             Postfächer in Postgres (eine Zeile je Kopie), Werkzeuge der Verbindung „Posteingang“
+lib/groupchat        Gruppenchats in Postgres: Rechte, Mitglieder, Beiträge, Sperre „eine Antwort zur Zeit“, Aufräumen
 lib/chat             System-Prompt, Aufbereitung der Nachrichten, Antwort-Cache, Ablaufsteuerung
 lib/db               Drizzle-Schema, Bootstrap (CREATE TABLE IF NOT EXISTS), Startbelegung
-components/          Chat-Oberfläche, Posteingang (components/mail), Artefakt-Panel, Fundus-Dialog, Admin-Oberfläche, UI-Bausteine
+components/          Chat-Oberfläche, Posteingang (components/mail), Gruppenchats (components/groupchat), Artefakt-Panel, Fundus-Dialog, Admin-Oberfläche, UI-Bausteine
 library/             Fundus: erfundenes Weltmodell, Inhalte als Daten und der Generator für .docx/.xlsx/.pptx/.eml
 proxy.ts             Schützt alle Seiten und APIs per signiertem Sitzungs-Cookie
 ```
 
 Der Chatverlauf liegt ausschließlich im Browser (IndexedDB) und lässt sich als JSON exportieren und importieren.
 Die Mails des Posteingangs liegen dagegen auf dem Server (Postgres), weil sie zwischen den Teilnehmenden ausgetauscht
-werden – nur so lange, wie der Termin läuft bzw. bis zum Abmelden.
+werden – nur so lange, wie der Termin läuft bzw. bis zum Abmelden. Auch Gruppenchats liegen auf dem Server
+(alle Mitglieder sehen denselben Stand); sie bleiben bis zum Termin-Ende und nehmen beim Export eine Kopie mit.
 
 ## Caching – so spart Freebie Budget
 
@@ -154,6 +166,10 @@ werden – nur so lange, wie der Termin läuft bzw. bis zum Abmelden.
    Inhalte) werden nicht gecacht. Die Werkzeuge des Posteingangs sind immer Teil der Anfrage, ob verbunden oder
    nicht – so bleibt der Präfix beim Umschalten gleich; der Hinweis aufs Umschalten steht nur in der jeweiligen
    Nachricht.
+   Gruppenchats nutzen den Antwort-Cache nie (jeder Verlauf ist anders und gehört der Gruppe). Dafür teilen sich
+   alle Mitglieder eines Gruppenchats den Prompt-Cache: Die Beiträge gehen mit Autor und Uhrzeit als Runden an das
+   Modell, der Cache-Schlüssel hängt am Chat, und die Werkzeuge nennen keine persönliche Adresse – egal, wer fragt,
+   bleibt der Präfix byte-gleich (V08).
 3. **Datei- und Transkript-Cache.** Dateien werden per SHA-256 erkannt und nur einmal ausgelesen bzw. transkribiert.
 
 Die Wirkung zeigt das Admin-Dashboard (Cache-Quote, Ersparnis in USD, Antwort-Cache-Treffer).
@@ -172,3 +188,8 @@ Die Wirkung zeigt das Admin-Dashboard (Cache-Quote, Ersparnis in USD, Antwort-Ca
   angewiesen ist, Anweisungen darin nicht zu folgen; gesendet wird nur auf ausdrücklichen Auftrag, höchstens 5 Mails pro Antwort, sichtbar als
   „über Freebie“. Postfächer werden beim Abmelden und zum Termin-Ende gelöscht. Empfehlung für den Hinweistext:
   „Bitte keine echten oder vertraulichen Daten in Chats und Mails.“
+- **Gruppenchats:** nur innerhalb einer Gruppe eines laufenden Termins; der Server prüft jede Einladung. Nicht-Mitglieder
+  bekommen auf alles 404, wer gegangen ist, sieht nichts Späteres. Der Posteingang ist im Gruppenchat nie verbunden
+  (Freebie würde sonst private Mails in den Chat holen). Beiträge gehen als markierte Nachrichten mit Autor an das
+  Modell; ein Beitrag kann den Rahmen nicht schließen oder einen fremden vortäuschen. Unter der Eingabe steht
+  „Alle Mitglieder sehen, was du hier schreibst.“

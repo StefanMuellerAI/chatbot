@@ -91,6 +91,8 @@ export interface FeatureFlags {
   mailbox: boolean;
   /** Fundus: erfundene Beispieldateien und E-Mails zum Anhängen. */
   library: boolean;
+  /** Gruppenchats: gemeinsam mit der eigenen Gruppe schreiben und Freebie mit @Freebie fragen. */
+  groupChats: boolean;
 }
 
 export type AttachmentKind = "image" | "document" | "transcript";
@@ -167,6 +169,8 @@ export interface ChatMessage {
   webSearch?: boolean;
   /** Verbindungen, die für diese Nachricht eingeschaltet waren. */
   connections?: ConnectionId[];
+  /** Aus einem Gruppenchat übernommen: wer den Beitrag geschrieben hat (nur Anzeige und Export). */
+  author?: string;
   // Assistenten-Nachricht
   modelId?: string;
   thinking?: string;

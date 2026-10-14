@@ -40,6 +40,7 @@ const FEATURES: { key: keyof FeatureFlags; label: string; hint: string }[] = [
   { key: "showCacheBadge", label: "Cache-Hinweis anzeigen", hint: "Kennzeichnet Antworten aus dem Antwort-Cache" },
   { key: "showCost", label: "Kosten pro Antwort anzeigen", hint: "Zeigt Teilnehmenden die geschätzten Kosten" },
   { key: "mailbox", label: "Posteingang", hint: "Übungs-Postfach für alle und Verbindung „Posteingang“ im Chat" },
+  { key: "groupChats", label: "Gruppenchats", hint: "Teilnehmende chatten gemeinsam mit ihrer Gruppe und fragen Freebie mit @Freebie" },
 ];
 
 /** Nur geänderte Felder (bei Funktionen: nur geänderte Schalter) – so überschreiben sich zwei Admins nicht. */

@@ -43,8 +43,9 @@ export interface StreamingState {
 
 export function UserMessage({ message, onEdit }: { message: ChatMessage; onEdit?: () => void }) {
   return (
-    <article aria-label="Deine Nachricht" className="group flex justify-end">
+    <article aria-label={message.author ? `Nachricht von ${mailName(message.author)}` : "Deine Nachricht"} className="group flex justify-end">
       <div className="flex max-w-[85%] flex-col items-end gap-2">
+        {message.author && <span className="text-xs font-semibold text-muted">{mailName(message.author)}</span>}
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex flex-wrap justify-end gap-2">
             {message.attachments.map((a) => (

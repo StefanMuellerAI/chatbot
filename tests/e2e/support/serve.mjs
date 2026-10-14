@@ -27,7 +27,9 @@ Object.assign(env, SERVER_ENV.common, SERVER_ENV[mode], {
   FREEBIE_FILES_DIR: path.join(dataDir, "files"),
 });
 
-const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", port], { env, stdio: "inherit" });
+// Ruhende Verbindungen erst nach 2 Minuten schließen (Standard: 5 Sekunden). Sonst nimmt ein Test-Client
+// gelegentlich genau die Verbindung, die der Server gerade schließt, und bekommt ECONNRESET.
+const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "-p", port, "--keepAliveTimeout", "120000"], { env, stdio: "inherit" });
 const stop = () => child.kill("SIGTERM");
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);

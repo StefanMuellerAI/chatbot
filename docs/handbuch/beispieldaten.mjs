@@ -59,6 +59,42 @@ Eure Kursleitung
 > Jens Albers`;
 
 /** Beispiel-Chats im Export-Format von Freebie (werden über „Import“ geladen); `me` ist der Gast im Screenshot. */
+// ---------------------------------------------------------------- Gruppenchat
+
+export const GROUP_TITLE = "Protokoll Teamrunde";
+
+/** Notizen aus der Teamrunde: [Autor (Index in der Gruppe), Text]. Die eigene Frage stellt der Gast im Bild. */
+export function groupNotes(names) {
+  return [
+    [0, "Meine Notizen aus der Teamrunde Bürgerservice:\n- Online-Terminbuchung läuft gut, Wartezeit im Schnitt 9 Minuten\n- Drucker im Wartebereich ist seit Montag defekt\n- Neue Kollegin startet am 1. November"],
+    [1, `Ergänzung: Die Beschwerde von Herrn Albers ist noch offen. Ich schreibe bis Donnerstag eine Antwort, ${names[2]} schaut drüber.`],
+    [2, "Und für den Tag der offenen Tür brauchen wir noch zwei Freiwillige am Infostand."],
+  ];
+}
+
+export const GROUP_QUESTION = "@Freebie fasse unsere Notizen als kurzes Protokoll mit Aufgabenliste zusammen";
+
+/** Antwort von Freebie im Gruppenchat (ersetzt im Bild die Antwort des Testmodus). */
+export function groupAnswer(names) {
+  return `**Protokoll der Teamrunde Bürgerservice**
+
+**Ergebnisse**
+- Die Online-Terminbuchung läuft gut; die Wartezeit liegt im Schnitt bei 9 Minuten.
+- Der Drucker im Wartebereich ist seit Montag defekt.
+- Am 1. November startet eine neue Kollegin.
+
+**Aufgaben**
+
+| Aufgabe | Wer | Bis wann |
+|---|---|---|
+| Antwort auf die Beschwerde von Herrn Albers | ${names[1]}, gegengelesen von ${names[2]} | Donnerstag |
+| Reparatur des Druckers beauftragen | noch offen | – |
+| Zwei Freiwillige für den Infostand finden | noch offen | vor dem Tag der offenen Tür |
+| Einarbeitung der neuen Kollegin vorbereiten | noch offen | 31. Oktober |
+
+Offene Punkte ohne Namen solltet ihr noch verteilen. Soll ich daraus eine E-Mail an das ganze Team formulieren?`;
+}
+
 export function sampleChats(me = "fuchs27") {
   const exercise = { id: "doku-mail-uebung", folder: "inbox", from: "kursleitung", to: [me], subject: EXERCISE_SUBJECT };
   return {

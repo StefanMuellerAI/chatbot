@@ -6,6 +6,7 @@ import { attachFromLibrary } from "@/lib/client/library";
 import { prepareImage, processUpload, transcribeUpload, uploadCategory, uploadFile } from "@/lib/client/upload";
 import { EFFORT_LEVELS, type Attachment, type Effort, type PublicConfig, type PublicModel } from "@/lib/shared/types";
 import { cn } from "@/components/ui/cn";
+import { LogoMark } from "@/components/ui/Logo";
 import { LibraryDialog, type LibraryPick } from "./library/LibraryDialog";
 import { AttachmentChip } from "./Message";
 import { VoiceButton } from "./VoiceButton";
@@ -48,6 +49,14 @@ interface Props {
   onImageMode: () => void;
   /** Menü „Verbindungen“ (nur wenn der Posteingang eingeschaltet ist). */
   connections?: ConnectionsProps;
+  /** Eigener Platzhalter (Gruppenchat: Hinweis auf @Freebie). */
+  placeholder?: string;
+  /** Knopf „Bild-Modus“ anbieten (im Gruppenchat nicht). */
+  imageMode?: boolean;
+  /** Vorschlagsliste „@Freebie“ beim Tippen von „@“ (Gruppenchat). */
+  mentions?: boolean;
+  /** Höchstlänge der Nachricht (Gruppenchat: kürzer als im privaten Chat). */
+  maxChars?: number;
 }
 
 export interface ConnectionsProps {
@@ -59,6 +68,7 @@ export interface ConnectionsProps {
 
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(props, ref) {
   const { config, model, text, onTextChange, effort, onEffortChange, webSearch, onWebSearchChange, streaming, disabledReason, onSend, onStop, onImageMode, connections } = props;
+  const maxChars = props.maxChars ?? MAX_MESSAGE_CHARS;
   const disabled = Boolean(disabledReason);
   const [pending, setPending] = useState<Pending[]>([]);
   const pendingRef = useRef<Pending[]>([]);
@@ -190,7 +200,16 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
 
   const working = pending.some((p) => p.status === "working");
   const ready = pending.filter((p) => p.status === "ready" && p.attachment).map((p) => p.attachment!);
-  const tooLong = text.length > MAX_MESSAGE_CHARS;
+  const tooLong = text.length > maxChars;
+  // „@Freebie“ vorschlagen, solange das Wort am Ende angefangen, aber noch nicht fertig ist.
+  const [mentionClosed, setMentionClosed] = useState(false);
+  const typedMention = props.mentions ? /(^|\s)@(\w*)$/.exec(text)?.[2]?.toLowerCase() : undefined;
+  const mentionOpen = typedMention !== undefined && "freebie".startsWith(typedMention) && typedMention !== "freebie" && !mentionClosed && !disabled;
+  const applyMention = () => {
+    onTextChange(text.replace(/@(\w*)$/, "@Freebie "));
+    setMentionClosed(false);
+    textareaRef.current?.focus();
+  };
   const canSend = !streaming && !disabled && !working && !tooLong && (text.trim().length > 0 || ready.length > 0);
   const blindImages = Boolean(model && !model.capabilities.vision && ready.some((a) => a.kind === "image"));
 
@@ -251,15 +270,49 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
       {(tooLong || blindImages) && (
         <p role="alert" className="mx-4 mt-3 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning">
           {tooLong
-            ? `Die Nachricht ist zu lang (höchstens ${new Intl.NumberFormat("de-DE").format(MAX_MESSAGE_CHARS)} Zeichen). Lange Texte besser als Datei anhängen.`
+            ? `Die Nachricht ist zu lang (höchstens ${new Intl.NumberFormat("de-DE").format(maxChars)} Zeichen). Lange Texte besser als Datei anhängen.`
             : "Das gewählte Modell kann keine Bilder sehen. Wähle für Bilder ein anderes Modell."}
         </p>
+      )}
+      {mentionOpen && (
+        <div className="relative">
+          <div role="listbox" aria-label="Vorschläge" className="absolute bottom-full left-3 z-30 mb-2 w-80 max-w-[calc(100%-1.5rem)] rounded-2xl border border-border bg-surface p-1.5 shadow-xl">
+            <button
+              type="button"
+              role="option"
+              aria-selected="true"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={applyMention}
+              className="flex w-full items-center gap-2.5 rounded-xl bg-primary-soft px-2.5 py-2 text-left"
+            >
+              <LogoMark size={28} />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">@Freebie</span>
+                <span className="block text-xs text-muted">liest den Verlauf und antwortet allen</span>
+              </span>
+              <kbd className="ml-auto shrink-0 rounded-md border border-border px-1.5 text-[0.7rem] text-muted">Enter</kbd>
+            </button>
+          </div>
+        </div>
       )}
       <textarea
         ref={textareaRef}
         value={text}
-        onChange={(e) => onTextChange(e.target.value)}
+        onChange={(e) => {
+          setMentionClosed(false);
+          onTextChange(e.target.value);
+        }}
         onKeyDown={(e) => {
+          if (mentionOpen && (e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            applyMention();
+            return;
+          }
+          if (mentionOpen && e.key === "Escape") {
+            e.preventDefault();
+            setMentionClosed(true);
+            return;
+          }
           if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             send();
@@ -273,7 +326,8 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
           }
         }}
         rows={1}
-        placeholder={disabledReason ?? "Frag Freebie etwas …"}
+        placeholder={disabledReason ?? props.placeholder ?? "Frag Freebie etwas …"}
+        aria-autocomplete={props.mentions ? "list" : undefined}
         disabled={disabled}
         className="block max-h-[280px] w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[0.97rem] leading-relaxed outline-none placeholder:text-subtle"
         aria-label="Nachricht"
@@ -325,7 +379,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
           )}
           {connections && <ConnectionsMenu {...connections} disabled={disabled} />}
           {efforts.length > 0 && <EffortMenu value={effort} options={efforts} onChange={onEffortChange} disabled={disabled} />}
-          {features.imageGeneration && (
+          {features.imageGeneration && props.imageMode !== false && (
             <ToolButton onClick={onImageMode} disabled={streaming || disabled} title="Bild-Modus: direkt ein Bild erzeugen" label="Bild" ariaLabel="Bild-Modus">
               <ImagePlus className="h-4.5 w-4.5" />
             </ToolButton>

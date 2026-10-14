@@ -72,6 +72,11 @@ export async function streamChat(
     body: payload,
     signal,
   });
+  await readEventStream(res, onEvent, signal);
+}
+
+/** Liest die Server-Sent Events einer Antwort (Chat und Gruppenchat) und meldet Fehler auf Deutsch. */
+export async function readEventStream(res: Response, onEvent: (event: StreamEvent) => void, signal: AbortSignal): Promise<void> {
   if (!res.ok || !res.body) {
     handleUnauthorized(res.status);
     let message = `Fehler ${res.status}`;
@@ -112,4 +117,9 @@ export async function streamChat(
       }
     }
   }
+}
+
+/** POST mit JSON für Streams (Gruppenchat) – mit deutscher Meldung, wenn das Netz fehlt. */
+export function postForStream(url: string, json: unknown, signal: AbortSignal): Promise<Response> {
+  return request(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(json), signal });
 }

@@ -305,3 +305,69 @@ async function browserChat(browser: Browser, baseURL: string, ip: string, guest:
   await chat.open();
   return chat;
 }
+
+// ---------------------------------------------------------------- W06 Gruppenchats unter Last
+
+test("W06 25 Personen einer Gruppe in drei Gruppenchats posten gleichzeitig, alle fragen ab, zwei rufen @Freebie", async ({ baseURL, ip, admin }) => {
+  const { id: eventId } = await admin.json<{ id: string }>("POST", "/api/admin/events", {
+    name: `Gruppenarbeit ${uniq()}`,
+    startsAt: new Date(Date.now() - 60_000).toISOString(),
+    endsAt: new Date(Date.now() + 3 * 3_600_000).toISOString(),
+  });
+  const { guests } = await admin.json<{ guests: { username: string; password: string }[] }>("POST", "/api/admin/events/groups", { eventId, name: "Gruppe A", count: 25 });
+  const group = await participants(baseURL!, ip, 25);
+  try {
+    const logins = await Promise.all(group.map((api, i) => api.post("/api/auth/login", { data: guests[i] })));
+    expect(logins.map((r) => r.status())).toEqual(Array(25).fill(200));
+
+    // Drei Gruppenchats: Person k startet Chat k mit allen, deren Nummer bei Division durch 3 den Rest k lässt.
+    const members = [0, 1, 2].map((k) => guests.map((_, i) => i).filter((i) => i % 3 === k));
+    const chats = await Promise.all(
+      [0, 1, 2].map(async (k) => {
+        const res = await group[k].post("/api/groupchats", { data: { title: `Runde ${k}`, members: members[k].filter((i) => i !== k).map((i) => guests[i].username) } });
+        expect(res.status(), await res.text()).toBe(200);
+        return ((await res.json()) as { chat: { id: string } }).chat.id;
+      }),
+    );
+    const chatOf = (i: number) => chats[i % 3];
+
+    const started = Date.now();
+    // Alle posten zweimal; gleichzeitig fragen alle ab wie der Browser (Status alle 15 s, offener Chat alle 4 s).
+    const [posts, polls] = await Promise.all([
+      Promise.all(group.flatMap((api, i) => [1, 2].map((n) => api.post(`/api/groupchats/${chatOf(i)}/messages`, { data: { text: `Notiz ${n} von ${i}` } })))),
+      Promise.all(group.flatMap((api, i) => [api.get("/api/status"), api.get(`/api/groupchats/${chatOf(i)}?since=0`), api.get(`/api/groupchats/${chatOf(i)}?since=1`)])),
+    ]);
+    expect(posts.map((r) => r.status())).toEqual(Array(50).fill(200));
+    expect(polls.map((r) => r.status())).toEqual(Array(75).fill(200));
+
+    // Zwei Personen in Chat 0 rufen gleichzeitig @Freebie: genau eine Antwort.
+    const [x, y] = [members[0][1], members[0][2]];
+    await Promise.all([x, y].map((i) => group[i].post(`/api/groupchats/${chats[0]}/messages`, { data: { text: `@Freebie fasse zusammen (${i})` } })));
+    const asks = await Promise.all([x, y].map((i) => group[i].post(`/api/groupchats/${chats[0]}/freebie`, { data: { modelId: "claude-sonnet-5-5" }, timeout: 60_000 })));
+    expect(asks.map((r) => r.status()).sort()).toEqual([200, 409]);
+    await Promise.all(asks.map((r) => r.body()));
+
+    // Jeder Beitrag kommt bei allen in derselben Reihenfolge an.
+    const views = await Promise.all(
+      group.map(async (api, i) => {
+        const { chat } = (await (await api.get(`/api/groupchats/${chatOf(i)}?since=0`)).json()) as { chat: { messages: { id: string; kind: string; status?: string; text: string }[] } };
+        return { k: i % 3, ids: chat.messages.map((m) => m.id), messages: chat.messages };
+      }),
+    );
+    for (const k of [0, 1, 2]) {
+      const mine = views.filter((v) => v.k === k);
+      for (const v of mine) expect(v.ids).toEqual(mine[0].ids);
+      const posted = mine[0].messages.filter((m) => m.kind === "person");
+      expect(posted).toHaveLength(members[k].length * 2 + (k === 0 ? 2 : 0));
+      // Nichts fehlt, nichts doppelt (beide Beiträge einer Person liefen gleichzeitig – die Reihenfolge legt der Server fest).
+      for (const i of members[k]) {
+        expect(posted.filter((m) => m.text.endsWith(` von ${i}`)).map((m) => m.text).sort()).toEqual([`Notiz 1 von ${i}`, `Notiz 2 von ${i}`]);
+      }
+    }
+    const answers = views.find((v) => v.k === 0)!.messages.filter((m) => m.kind === "freebie");
+    expect(answers.map((m) => m.status)).toEqual(["done"]);
+    expect(Date.now() - started).toBeLessThan(30_000);
+  } finally {
+    await Promise.all(group.map((api) => api.dispose()));
+  }
+});

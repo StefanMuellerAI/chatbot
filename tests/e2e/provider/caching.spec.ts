@@ -51,6 +51,8 @@ test("V05 Claude: System, Werkzeuge und Verlauf bleiben über drei Runden byte-g
   }
   expect(r1.system.every((b: { cache_control?: unknown }) => b.cache_control)).toBe(true);
   expect(r1.cache_control).toEqual({ type: "ephemeral" });
+  // Der Abschnitt „Gruppenchats“ steht fest im System-Prompt und bricht den Präfix privater Chats nicht.
+  expect(json(r1.system)).toContain("# Gruppenchats");
 
   // Präfix: jede Runde beginnt exakt mit allen Nachrichten der vorigen.
   expect(json(r2.messages.slice(0, r1.messages.length))).toBe(json(r1.messages));

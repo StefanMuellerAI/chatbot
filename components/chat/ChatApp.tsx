@@ -10,14 +10,17 @@ import { streamChat } from "@/lib/client/api";
 import { formatContextDate } from "@/lib/shared/date";
 import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, MailRef, PublicConfig, StreamEvent } from "@/lib/shared/types";
 import { newDraft, type ComposeDraft } from "@/lib/client/mail";
-import type { MailFolder } from "@/lib/shared/mail";
+import { mailName, type MailFolder } from "@/lib/shared/mail";
+import type { GroupChatSummary } from "@/lib/shared/groupchat";
 import { ArtifactPanel } from "@/components/artifacts/ArtifactPanel";
 import { ComposeDialog } from "@/components/mail/ComposeDialog";
 import { MailView } from "@/components/mail/MailView";
-import { useMailbox } from "@/components/mail/useMailbox";
+import { GroupChatView } from "@/components/groupchat/GroupChatView";
+import { NewGroupChatDialog } from "@/components/groupchat/GroupDialogs";
 import { cn } from "@/components/ui/cn";
 import { useTheme } from "@/components/ui/theme";
 import { AccessExpiry } from "./AccessExpiry";
+import { useAppStatus } from "./useAppStatus";
 import { Composer, type ComposerHandle } from "./Composer";
 import { EmptyState } from "./EmptyState";
 import { ImageModeDialog } from "./ImageModeDialog";
@@ -81,6 +84,10 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const conversations = useLiveQuery(() => db.conversations.orderBy("updatedAt").reverse().toArray(), [], [] as Conversation[]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = useMemo(() => conversations.find((c) => c.id === activeId) ?? null, [conversations, activeId]);
+  // Geöffneter Gruppenchat (liegt auf dem Server) – schließt einen privaten Chat aus.
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  const [groupDialog, setGroupDialog] = useState(false);
+  const [groupBusy, setGroupBusy] = useState(false);
 
   const [modelId, setModelId] = useState("");
   const [presetId, setPresetId] = useState<string | null>(null);
@@ -158,7 +165,31 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     },
     [account.mailLocal, openMail, showToast],
   );
-  const mailbox = useMailbox(mailEnabled, onNewMail);
+  const groupEnabled = Boolean(config?.features.groupChats);
+  const openGroup = useCallback((id: string) => {
+    setView("chat");
+    setActiveId(null);
+    setEditIndex(null);
+    setArtifactSel(null);
+    setSidebarOpen(false);
+    setActiveGroupId(id);
+  }, []);
+  const onInvite = useCallback(
+    (chat: GroupChatSummary) =>
+      showToast({ text: `${mailName(chat.owner)} hat dich in „${chat.title}“ eingeladen`, action: { label: "Öffnen", onClick: () => openGroup(chat.id) } }),
+    [openGroup, showToast],
+  );
+  const status = useAppStatus({ mail: mailEnabled, groupChats: groupEnabled }, onNewMail, onInvite);
+  const mailbox = status.mail;
+  const groupGone = useCallback(
+    (message: string) => {
+      setActiveGroupId(null);
+      setGroupBusy(false);
+      showToast(message);
+      status.refresh();
+    },
+    [showToast, status],
+  );
   // Die Ansicht steht in der Adresse, damit Neuladen im Posteingang bleibt.
   useEffect(() => {
     if (!config) return;
@@ -169,7 +200,8 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   // Beim Wechsel des Chats dessen Einstellungen übernehmen
   const selectConversation = useCallback(
     (id: string | null) => {
-      if (streaming) return;
+      if (streaming || groupBusy) return;
+      setActiveGroupId(null);
       setActiveId(id);
       setEditIndex(null);
       setArtifactSel(null);
@@ -190,7 +222,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       setMailConnected(Boolean(conv.connections?.includes("mailbox")));
       composerRef.current?.setAttachments([]);
     },
-    [config, conversations, streaming],
+    [config, conversations, streaming, groupBusy],
   );
 
   // Vorlage wählen; ein empfohlenes Modell wird dabei übernommen (sofern verfügbar).
@@ -505,6 +537,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
 
   const resetToNewChat = () => {
     setActiveId(null);
+    setActiveGroupId(null);
     setEditIndex(null);
     setArtifactSel(null);
     setPresetId(null);
@@ -519,7 +552,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   };
 
   const newChat = () => {
-    if (streaming) return;
+    if (streaming || groupBusy) return;
     resetToNewChat();
   };
 
@@ -593,7 +626,17 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
           onSelect={selectConversation}
           onNew={newChat}
           onDelete={deleteConversation}
-          busy={Boolean(streaming)}
+          busy={Boolean(streaming) || groupBusy}
+          groups={
+            groupEnabled
+              ? {
+                  chats: status.groupChats,
+                  activeId: activeGroupId,
+                  onSelect: (id) => !streaming && !groupBusy && openGroup(id),
+                  onNew: () => setGroupDialog(true),
+                }
+              : undefined
+          }
           theme={theme}
           onTheme={setTheme}
           onClose={() => setSidebarOpen(false)}
@@ -603,6 +646,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
                   view,
                   onView: setView,
                   unread: mailbox.unread,
+                  chatUnread: status.groupChats.some((c) => c.unread && c.id !== activeGroupId),
                   total: mailbox.total,
                   folder: mailFolder,
                   onFolder: (f) => {
@@ -637,8 +681,31 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
         </main>
       )}
       {/* Der Chat bleibt beim Wechsel in den Posteingang eingehängt: laufende Antworten und Uploads gehen weiter. */}
+      {activeGroupId && config && (
+        <GroupChatView
+          key={activeGroupId}
+          chatId={activeGroupId}
+          me={account.mailLocal}
+          config={config}
+          model={model}
+          modelId={modelId}
+          onModelChange={(id) => void changeModel(id)}
+          effort={effort}
+          onEffortChange={setEffort}
+          webSearch={webSearch}
+          onWebSearchChange={setWebSearch}
+          isDark={isDark}
+          hidden={view === "mail"}
+          onOpenMenu={() => setSidebarOpen(true)}
+          onNewChat={newChat}
+          onToast={showToast}
+          onBusy={setGroupBusy}
+          onGone={groupGone}
+          onChanged={status.refresh}
+        />
+      )}
       <main
-        hidden={view === "mail"}
+        hidden={view === "mail" || Boolean(activeGroupId)}
         className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:block print:bg-white"
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("Files") && config && !config.paused && model) {
@@ -884,9 +951,9 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       {toast && (
         <div
           role="status"
-          className="fixed top-16 left-1/2 z-[60] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full bg-text py-2 pr-2 pl-4 text-sm text-bg shadow-lg"
+          className="fixed inset-x-3 top-16 z-[60] mx-auto flex w-fit max-w-xl items-center gap-3 rounded-[20px] bg-text py-2 pr-2 pl-4 text-sm leading-snug text-bg shadow-lg"
         >
-          <span className="min-w-0 truncate">{toast.text}</span>
+          <span className="min-w-0 py-0.5 break-words">{toast.text}</span>
           {toast.action && (
             <button
               type="button"
@@ -904,7 +971,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       )}
 
       {/* Artefakt-Panel */}
-      {view === "chat" && artifactVersions && artifactVersions.length > 0 && (
+      {view === "chat" && !activeGroupId && artifactVersions && artifactVersions.length > 0 && (
         <section className="fixed inset-0 z-50 border-border md:static md:border-l md:z-auto md:w-[min(46vw,760px)] md:shrink-0 print:hidden">
           <ArtifactPanel
             key={`${artifactSel?.id}:${artifactSel?.version ?? "neu"}`}
@@ -919,6 +986,19 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       {config && (
         <>
           <NoticeDialog text={config.notice.full} accountKey={account.key} forceOpen={noticeOpen} onClose={() => setNoticeOpen(false)} />
+          {groupEnabled && (
+            <NewGroupChatDialog
+              open={groupDialog}
+              onClose={() => setGroupDialog(false)}
+              isAdmin={account.role === "admin"}
+              onCreated={(chat) => {
+                setGroupDialog(false);
+                status.refresh();
+                openGroup(chat.id);
+                showToast(`Gruppenchat „${chat.title}“ gestartet – die Eingeladenen sehen ihn sofort.`);
+              }}
+            />
+          )}
           <ImageModeDialog open={imageMode} onClose={() => setImageMode(false)} defaults={config.imageDefaults} onResult={addImageModeResult} />
           {mailEnabled && (
             <ComposeDialog

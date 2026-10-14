@@ -6,16 +6,17 @@ import { getModel, getPreset, providerConfigured } from "@/lib/models";
 import { runAnthropic } from "@/lib/providers/anthropic";
 import { runMock } from "@/lib/providers/mock";
 import { runOpenAI } from "@/lib/providers/openai";
-import { ProviderError, type ProviderRequest, type ProviderResult } from "@/lib/providers/types";
-import { getSettings } from "@/lib/settings";
-import type { ChatRequestBody, StreamEvent } from "@/lib/shared/types";
+import { ProviderError, type ProviderRequest, type ProviderResult, type ToolSet } from "@/lib/providers/types";
+import { getSettings, type AppSettings } from "@/lib/settings";
+import type { ChatRequestBody, FeatureFlags, StreamEvent, UsageInfo } from "@/lib/shared/types";
+import type { ModelRow } from "@/lib/models";
 import { mailboxFor } from "@/lib/mail/store";
 import { mailboxTools } from "@/lib/mail/tools";
 import { generateImage } from "@/lib/tools/images";
 import { imageTool } from "@/lib/tools/image-tool";
 import { costOf, logUsage, modelPrices, promptCacheSavings } from "@/lib/usage";
 import { answerCacheKey, lookupAnswer, storeAnswer } from "./answer-cache";
-import { prepareMessages } from "./prepare";
+import { prepareMessages, type PreparedMessage } from "./prepare";
 import { buildSystemPrompt, promptVersion } from "./system-prompt";
 
 /** Führt eine Chat-Anfrage aus und liefert die Events als SSE-Stream. */
@@ -96,19 +97,13 @@ async function runChat(
   const features = settings.features;
   const systemPrompt = buildSystemPrompt(features, settings.systemPromptAddendum);
   const presetPrompt = preset?.promptAddendum.trim() || null;
-  const imageAvailable = mock || Boolean(process.env.OPENAI_API_KEY);
-  const tools = {
-    webSearch: features.webSearch && model.capabilities.webSearch,
-    generateImage: features.imageGeneration && imageAvailable && model.capabilities.tools,
-    mailbox: features.mailbox && model.capabilities.tools,
-  };
+  const tools = toolSetFor(features, model);
   // Verbunden ist der Posteingang, wenn er für die aktuelle Nachricht eingeschaltet war.
   const mailboxConnected = tools.mailbox && Boolean(last.connections?.includes("mailbox"));
   // Antworten mit Posteingang hängen vom eigenen Postfach ab (und können Mails verschicken):
   // nie aus dem gemeinsamen Antwort-Cache und nie hinein.
   const personal = body.messages.some((m) => m.role === "user" && m.connections?.includes("mailbox"));
   const useAnswerCache = features.answerCache && !personal;
-  const prices = modelPrices(model);
 
   // 1) Antwort-Cache: identischer Verlauf → gespeicherte Antwort ohne API-Aufruf.
   const cacheKey = answerCacheKey({
@@ -139,7 +134,6 @@ async function runChat(
       send({ type: "done", native: hit.answer.native, usage: hit.usage, stopReason: hit.answer.stopReason, fromCache: true });
       await logUsage({
         sessionHash: session.sessionHash,
-    ...usageTag(session),
         ...usageTag(session),
         modelId: model.id,
         feature: "chat",
@@ -154,9 +148,77 @@ async function runChat(
   // 2) Nachrichten deterministisch aufbereiten und Provider aufrufen.
   send({ type: "start", modelId: model.id, fromCache: false });
   const prepared = await prepareMessages(body.messages, model, { nativePdf: settings.nativePdf, mailbox: tools.mailbox });
+  const { result, usage, costUsd, imagesGenerated } = await runTurn({
+    session,
+    settings,
+    model,
+    systemPrompt,
+    presetPrompt,
+    prepared,
+    tools,
+    mailboxConnected,
+    conversationKey: `freebie-${createHash("sha256").update(body.conversationId).digest("hex").slice(0, 16)}`,
+    signal,
+    send,
+  });
+
+  // 3) Antwort für identische Anfragen speichern (ohne Bilder, nur vollständige Antworten).
+  if (useAnswerCache && imagesGenerated === 0 && result.stopReason === "end_turn" && result.text.trim()) {
+    await storeAnswer(
+      cacheKey,
+      model.id,
+      {
+        text: result.text,
+        thinking: result.thinking,
+        citations: result.citations,
+        native: result.native,
+        stopReason: result.stopReason,
+      },
+      usage,
+      costUsd,
+      settings.answerCacheHours,
+    );
+  }
+}
+
+/** Welche Werkzeuge in der Anfrage stehen – unabhängig davon, ob der Posteingang im Chat verbunden ist. */
+export function toolSetFor(features: FeatureFlags, model: ModelRow): ToolSet {
+  const imageAvailable = process.env.FREEBIE_MOCK === "1" || Boolean(process.env.OPENAI_API_KEY);
+  return {
+    webSearch: features.webSearch && model.capabilities.webSearch,
+    generateImage: features.imageGeneration && imageAvailable && model.capabilities.tools,
+    mailbox: features.mailbox && model.capabilities.tools,
+  };
+}
+
+export interface TurnInput {
+  session: UserSession;
+  settings: AppSettings;
+  model: ModelRow;
+  systemPrompt: string;
+  presetPrompt: string | null;
+  prepared: PreparedMessage[];
+  tools: ToolSet;
+  mailboxConnected: boolean;
+  /** Gesetzt im Gruppenchat: Der Posteingang ist dort nie verbunden, die Werkzeuge melden diesen Text. */
+  mailboxBlocked?: string;
+  groupChat?: boolean;
+  conversationKey: string;
+  signal: AbortSignal;
+  send: (e: StreamEvent) => void;
+}
+
+/**
+ * Eine Runde mit dem Anbieter (privater Chat und Gruppenchat): eigene Werkzeuge, Aufruf, Kosten,
+ * Hinweis bei Ablehnung, „done“-Event und Statistik.
+ */
+export async function runTurn(t: TurnInput): Promise<{ result: ProviderResult; usage: UsageInfo; costUsd: number; imagesGenerated: number }> {
+  const { session, settings, model, send } = t;
+  const mock = process.env.FREEBIE_MOCK === "1";
+  const prices = modelPrices(model);
   let imagesGenerated = 0;
   const customTools = [
-    ...(tools.generateImage
+    ...(t.tools.generateImage
       ? [
           imageTool(async (input) => {
             imagesGenerated++;
@@ -164,20 +226,21 @@ async function runChat(
           }, send),
         ]
       : []),
-    ...(tools.mailbox ? mailboxTools({ box: mailboxFor(session), connected: mailboxConnected, emit: send }) : []),
+    ...(t.tools.mailbox ? mailboxTools({ box: mailboxFor(session), connected: t.mailboxConnected, emit: send, blocked: t.mailboxBlocked }) : []),
   ].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
   const request: ProviderRequest = {
     model,
-    systemPrompt,
-    presetPrompt,
-    messages: prepared,
-    tools,
+    systemPrompt: t.systemPrompt,
+    presetPrompt: t.presetPrompt,
+    messages: t.prepared,
+    tools: t.tools,
     cacheTtl: settings.claudeCacheTtl,
-    conversationKey: `freebie-${createHash("sha256").update(body.conversationId).digest("hex").slice(0, 16)}`,
-    signal,
+    conversationKey: t.conversationKey,
+    signal: t.signal,
     emit: send,
     customTools,
-    mailboxConnected,
+    mailboxConnected: t.mailboxConnected,
+    groupChat: t.groupChat,
   };
 
   let result: ProviderResult;
@@ -203,27 +266,10 @@ async function runChat(
     costUsd,
     savedUsd: mock ? 0 : promptCacheSavings(result.usage, prices),
   });
-
-  // 3) Antwort für identische Anfragen speichern (ohne Bilder, nur vollständige Antworten).
-  if (useAnswerCache && imagesGenerated === 0 && result.stopReason === "end_turn" && result.text.trim()) {
-    await storeAnswer(
-      cacheKey,
-      model.id,
-      {
-        text: result.text,
-        thinking: result.thinking,
-        citations: result.citations,
-        native: result.native,
-        stopReason: result.stopReason,
-      },
-      usage,
-      costUsd,
-      settings.answerCacheHours,
-    );
-  }
+  return { result, usage, costUsd, imagesGenerated };
 }
 
-function userMessageFor(err: unknown): string {
+export function userMessageFor(err: unknown): string {
   if (err instanceof ProviderError) return err.userMessage;
   return providerErrorMessage(err);
 }

@@ -3,7 +3,17 @@
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { request } from "@playwright/test";
-import { EXERCISE_BODY, EXERCISE_SUBJECT, patchEvents, patchOverview, sampleChats } from "./beispieldaten.mjs";
+import {
+  EXERCISE_BODY,
+  EXERCISE_SUBJECT,
+  GROUP_QUESTION,
+  GROUP_TITLE,
+  groupAnswer,
+  groupNotes,
+  patchEvents,
+  patchOverview,
+  sampleChats,
+} from "./beispieldaten.mjs";
 
 const iso = (min) => new Date(Date.now() + min * 60_000).toISOString();
 let ipCounter = 10;
@@ -59,6 +69,20 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     const dialog = page.getByRole("dialog", { name: "Wichtiger Hinweis" });
     await dialog.waitFor();
     return dialog;
+  }
+
+  /** Im Testmodus antwortet Freebie mit einer Diagnose – im Bild steht stattdessen das Beispielprotokoll. */
+  async function patchGroupAnswers(context, text) {
+    await context.route(/\/api\/groupchats\/[^/?]+\?since=/, async (route) => {
+      const res = await route.fetch();
+      const body = await res.json();
+      for (const m of body.chat?.messages ?? []) {
+        if (m.kind !== "freebie" || m.status !== "done") continue;
+        m.text = text;
+        delete m.thinking;
+      }
+      await route.fulfill({ response: res, json: body });
+    });
   }
 
   async function ask(page, text) {
@@ -422,6 +446,67 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await shot(page, "c25-mail-antwort");
   });
 
+  // ---------------------------------------------------------------- Gruppenchat
+
+  const groupNames = g.slice(0, 3).map((x) => x.username);
+  const membersButton = (p) => p.getByRole("button", { name: /^Mitglieder \(\d+\)$/ }).filter({ visible: true });
+
+  await step("Neuer Gruppenchat", async () => {
+    await patchGroupAnswers(ctx, groupAnswer(groupNames));
+    await page.getByRole("button", { name: "Neuer Gruppenchat" }).click();
+    const d = page.getByRole("dialog", { name: "Neuer Gruppenchat" });
+    await d.getByRole("textbox", { name: "Name" }).fill(GROUP_TITLE);
+    for (const name of groupNames) await d.getByRole("checkbox", { name }).check();
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.waitForTimeout(400);
+    await shot(page, "c33-gruppenchat-neu");
+    await d.getByRole("button", { name: "Chat starten" }).click();
+    await d.waitFor({ state: "hidden" });
+  });
+
+  await step("Gruppenchat", async () => {
+    const { chats } = await (await page.request.get("/api/groupchats")).json();
+    const id = chats.find((c) => c.title === GROUP_TITLE).id;
+    for (const [i, text] of groupNotes(groupNames)) {
+      const c = await mailApi(g[i]);
+      const r = await c.post(`/api/groupchats/${id}/messages`, { data: { text } });
+      if (!r.ok()) throw new Error(`Beispiel-Beitrag: ${await r.text()}`);
+      await c.dispose();
+    }
+    await page.getByRole("textbox", { name: "Nachricht" }).fill(GROUP_QUESTION);
+    await page.getByRole("button", { name: "Senden", exact: true }).click();
+    await page.getByText("Protokoll der Teamrunde Bürgerservice").waitFor({ timeout: 30_000 });
+    // Der Hinweis „Gruppenchat … gestartet“ ist dann verschwunden.
+    await page.waitForTimeout(4500);
+    await page.setViewportSize({ width: 1280, height: 1150 });
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(500);
+    await shot(page, "c34-gruppenchat");
+    await page.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  await step("Gruppenchat: Vorschläge", async () => {
+    const input = page.getByRole("textbox", { name: "Nachricht" });
+    await input.fill("Danke dir! @");
+    const list = page.getByRole("listbox", { name: "Vorschläge" });
+    await list.waitFor();
+    await page.waitForTimeout(300);
+    const top = (await list.boundingBox()).y - 16;
+    const box = await input.locator("xpath=..").boundingBox();
+    const clip = { x: box.x - 16, y: top, width: box.width + 32, height: box.y + box.height + 16 - top };
+    await page.screenshot({ path: path.join(outDir, "c35-gruppenchat-vorschlaege.jpg"), type: "jpeg", quality: 86, animations: "disabled", clip });
+    console.log("  ✓", "c35-gruppenchat-vorschlaege");
+    await input.fill("");
+  });
+
+  await step("Gruppenchat: Mitglieder", async () => {
+    await membersButton(page).click();
+    await page.getByRole("dialog", { name: "Mitglieder" }).waitFor();
+    await page.waitForTimeout(400);
+    await shot(page, "c36-gruppenchat-mitglieder");
+    await page.keyboard.press("Escape");
+  });
+
   const storageState = await ctx.storageState();
   await ctx.close();
 
@@ -439,6 +524,14 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await p.getByRole("heading", { name: "Posteingang", level: 1 }).waitFor();
     await p.waitForTimeout(600);
     await shot(p, "c26-mobil-posteingang");
+    await patchGroupAnswers(mobile, groupAnswer(groupNames));
+    await p.getByRole("button", { name: "Menü öffnen" }).click();
+    await p.getByRole("group", { name: "Ansicht wechseln" }).getByRole("button", { name: /^Chat/ }).click();
+    await p.getByRole("button", { name: "Menü öffnen" }).click();
+    await p.getByRole("navigation", { name: "Chatverlauf" }).getByRole("button", { name: new RegExp(`^${GROUP_TITLE}`) }).click();
+    await p.getByText("Protokoll der Teamrunde Bürgerservice").waitFor();
+    await p.waitForTimeout(800);
+    await shot(p, "c37-mobil-gruppenchat");
     await mobile.close();
   });
 

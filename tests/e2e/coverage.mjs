@@ -8,6 +8,7 @@
 // Aufruf: node tests/e2e/coverage.mjs [--markdown]
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { catalogIds, idsFromTestName } from "./coverage-ids.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const read = (p) => readFileSync(path.join(root, p), "utf8");
@@ -17,13 +18,11 @@ const walk = (dir, filter) =>
     return statSync(path.join(root, rel)).isDirectory() ? walk(rel, filter) : filter(rel) ? [rel] : [];
   });
 
-// Test-IDs aus den Testnamen (auch „Q03/F08 …“ und Namen in Template-Strings).
+// Test-IDs aus den Testnamen (auch „Q03/F08 …“, zweistellige Kürzel wie „GC04“ und Namen in Template-Strings).
 const testIds = new Map();
 for (const file of walk("tests/e2e", (f) => f.endsWith(".spec.ts"))) {
   for (const m of read(file).matchAll(/test\(\s*([`"'])((?:(?!\1).)*)\1/g)) {
-    const prefix = /^((?:[A-Z]\d{2}\/?)+)\s/.exec(m[2]);
-    if (!prefix) continue;
-    for (const id of prefix[1].split("/").filter(Boolean)) {
+    for (const id of idsFromTestName(m[2])) {
       if (!testIds.has(id)) testIds.set(id, []);
       testIds.get(id).push(`${path.relative("tests/e2e", file)}: ${m[2]}`);
     }
@@ -31,11 +30,7 @@ for (const file of walk("tests/e2e", (f) => f.endsWith(".spec.ts"))) {
 }
 
 // Katalog-IDs aus den Tabellen in TESTPLAN.md (inkl. Bereichen wie „Q02–Q10“).
-const catalog = [];
-for (const m of read("TESTPLAN.md").matchAll(/^\| ([A-Z])(\d{2})(?:–[A-Z]?(\d{2}))? \|/gm)) {
-  const [from, to] = [Number(m[2]), Number(m[3] ?? m[2])];
-  for (let n = from; n <= to; n++) catalog.push(`${m[1]}${String(n).padStart(2, "0")}`);
-}
+const catalog = catalogIds(read("TESTPLAN.md"));
 
 // Einstellungen aus den Standardwerten (Funktionsschalter als features.*).
 const defaults = read("lib/shared/settings-defaults.ts");

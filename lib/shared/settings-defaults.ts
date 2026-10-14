@@ -55,6 +55,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showCost: false,
     mailbox: true,
     library: true,
+    groupChats: true,
   },
   imageModel: "gpt-image-2",
   imageDefaultQuality: "medium",
