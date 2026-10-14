@@ -275,7 +275,9 @@ test.describe("E · Verlauf und Seitenleiste", () => {
     await expect(nav.getByRole("link", { name: "Admin" })).toHaveCount(0);
     await expect(nav.getByText(/^Angemeldet als [a-z]+\d+ · gültig bis \d{2}:\d{2} Uhr$/)).toBeVisible();
 
-    // Als Admin: Link sichtbar, kein Gast-Hinweis.
+    // Als Admin: Link sichtbar, kein Gast-Hinweis. Erst die Gast-Seite verlassen (auf eine Datei ohne Skripte) –
+    // deren Statusabfrage (alle 15 Sekunden) liefe sonst während des Wechsels in eine 401 und leitete selbst weiter.
+    await page.goto("/icon.png");
     await page.context().clearCookies();
     expect((await page.request.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
     await page.goto("/");
