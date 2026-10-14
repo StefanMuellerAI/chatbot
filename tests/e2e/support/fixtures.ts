@@ -350,8 +350,9 @@ export const test = base.extend<Fixtures>({
   ip: async ({}, use, testInfo) => {
     await use(ipFor(`${testInfo.testId}-${testInfo.repeatEachIndex}-${testInfo.retry}`));
   },
-  context: async ({ context, ip }, use) => {
-    await context.setExtraHTTPHeaders({ "x-forwarded-for": ip });
+  context: async ({ context, ip }, use, testInfo) => {
+    // Live nicht: der Header ginge auch an den Blob-Upload (vercel.com) und scheitert dort an CORS; Vercel setzt die IP ohnehin selbst.
+    if (testInfo.project.name !== "live") await context.setExtraHTTPHeaders({ "x-forwarded-for": ip });
     browserErrors.length = 0;
     trackErrors(context);
     await use(context);
