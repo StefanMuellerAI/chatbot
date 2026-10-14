@@ -1,6 +1,7 @@
 # Plan: Fundus pflegen – eigene Dateien, E-Mail-Verläufe und Prompts mit Platzhaltern
 
-Stand: 14. Oktober 2026, **Entwurf** · Entscheidungen getroffen (Abschnitt 16) · Grundlage: aktueller Code
+Stand: 14. Oktober 2026, **Entwurf** · Entscheidungen getroffen (Abschnitt 16) · klickbarer Entwurf, Abnahme offen:
+[Artifact](https://claude.ai/artifact/2KpNsh6ULpm3ocyMu36AU2) · Grundlage: aktueller Code
 (Fundus in `library/`, `lib/library`, `components/chat/library`; Admin in `components/admin`, `app/api/admin`; Ablage in
 `lib/storage.ts`; Extraktion in `lib/files`), Fundus aus [FUNDUS-PLAN.md](FUNDUS-PLAN.md), Grenzfälle aus
 [GRENZFAELLE-PLAN.md](GRENZFAELLE-PLAN.md), E2E-Suite aus [TESTPLAN.md](TESTPLAN.md), Handbuch unter
@@ -590,7 +591,7 @@ Vorschau-Cache (1 Stunde im Browser) stimmig.
 
 | Phase | Inhalt | Tests |
 |---|---|---|
-| 0 · Abnahme | Entscheidungen getroffen (Abschnitt 16); offen: klickbarer Entwurf von Admin-Reiter, Reiter „Prompts“ und Maske | – |
+| 0 · Abnahme | Entscheidungen getroffen (Abschnitt 16); klickbarer Entwurf von Admin-Reiter, Reiter „Prompts“ und Maske liegt vor ([Artifact](https://claude.ai/artifact/2KpNsh6ULpm3ocyMu36AU2)), Abnahme offen | – |
 | 1 · Grundlage | Platzhalter-Logik, Tabellen, Startbestand, Store mit Grenzen und Revision, Ablage `fundus/` mit Frist, Prüfen und Vorschau, Admin-API, Katalog zusammenführen, `libraryText`, Pfad-Trennung, Tracing-Fix | Unit-Tests; FP16, FP17, Y21, U01–U03 |
 | 2 · Admin | Reiter „Fundus“ mit Unterreitern, Upload- und Prüfdialog, Verläufe, Prompt-Dialog mit Platzhalter-Tabelle und Probe-Maske, Kategorien, Ausblenden | FP01–FP15, FP18, FP19, O01 |
 | 3 · Chat | Reiter „Prompts“, Filter, Vorschau, Maske, Ersetzen/Anfügen, Gruppenchat, eigene Dateien und Verläufe im Chat, PDF-Typ, Revalidierung | PR01–PR13, Y22–Y26, Q21, V09 |
