@@ -1,6 +1,6 @@
 # Plan: Fundus pflegen – eigene Dateien, E-Mail-Verläufe und Prompts mit Platzhaltern
 
-Stand: 14. Oktober 2026, **Entwurf** · Entscheidungen getroffen bis auf Nr. 4 (Abschnitt 16) · Grundlage: aktueller Code
+Stand: 14. Oktober 2026, **Entwurf** · Entscheidungen getroffen (Abschnitt 16) · Grundlage: aktueller Code
 (Fundus in `library/`, `lib/library`, `components/chat/library`; Admin in `components/admin`, `app/api/admin`; Ablage in
 `lib/storage.ts`; Extraktion in `lib/files`), Fundus aus [FUNDUS-PLAN.md](FUNDUS-PLAN.md), Grenzfälle aus
 [GRENZFAELLE-PLAN.md](GRENZFAELLE-PLAN.md), E2E-Suite aus [TESTPLAN.md](TESTPLAN.md), Handbuch unter
@@ -590,7 +590,7 @@ Vorschau-Cache (1 Stunde im Browser) stimmig.
 
 | Phase | Inhalt | Tests |
 |---|---|---|
-| 0 · Abnahme | Entscheidungen (Abschnitt 16); klickbarer Entwurf von Admin-Reiter, Reiter „Prompts“ und Maske | – |
+| 0 · Abnahme | Entscheidungen getroffen (Abschnitt 16); offen: klickbarer Entwurf von Admin-Reiter, Reiter „Prompts“ und Maske | – |
 | 1 · Grundlage | Platzhalter-Logik, Tabellen, Startbestand, Store mit Grenzen und Revision, Ablage `fundus/` mit Frist, Prüfen und Vorschau, Admin-API, Katalog zusammenführen, `libraryText`, Pfad-Trennung, Tracing-Fix | Unit-Tests; FP16, FP17, Y21, U01–U03 |
 | 2 · Admin | Reiter „Fundus“ mit Unterreitern, Upload- und Prüfdialog, Verläufe, Prompt-Dialog mit Platzhalter-Tabelle und Probe-Maske, Kategorien, Ausblenden | FP01–FP15, FP18, FP19, O01 |
 | 3 · Chat | Reiter „Prompts“, Filter, Vorschau, Maske, Ersetzen/Anfügen, Gruppenchat, eigene Dateien und Verläufe im Chat, PDF-Typ, Revalidierung | PR01–PR13, Y22–Y26, Q21, V09 |
@@ -598,7 +598,7 @@ Vorschau-Cache (1 Stunde im Browser) stimmig.
 
 **Wie schnell?**
 
-- **Vorher (du):** Entscheidungen in Abschnitt 16, dann Abnahme des klickbaren Entwurfs.
+- **Vorher (du):** Die Entscheidungen sind getroffen. Offen ist nur noch die Abnahme des klickbaren Entwurfs.
 - **Umsetzung (ich):** mehr als bei den Gruppenchats, weil drei Dinge zusammenkommen. Ich rechne mit **rund
   anderthalb bis zwei Arbeitstagen**, inklusive dreifachem Stabilitätslauf und neu erzeugten Handbüchern.
   - Upload-Weg mit Prüfschritt und Vorschauen aus echten Dateien
@@ -633,7 +633,7 @@ Vorschau-Cache (1 Stunde im Browser) stimmig.
 
 ## 15. Bewusst nicht enthalten (später möglich)
 
-- **Mitgelieferte Einträge bearbeiten:** nur Ausblenden (Entscheidung 4, offen). Die Inhalte entstehen aus dem Code.
+- **Mitgelieferte Einträge bearbeiten:** nur Ausblenden (Entscheidung 4). Die Inhalte entstehen aus dem Code.
 - **Übungsdateien am Prompt** (Entscheidung 8): Das Übungsmaterial liegt im Fundus, die Person hängt es selbst an.
 - **Eigene Prompts der Teilnehmenden**, Favoriten und Teilen in der Gruppe (Entwurf 3 der Ideensammlung).
 - **Prompts auf der Startseite** („Übung des Tages“, Entwurf 4) und **`/` im Eingabefeld** (Entwurf 2). Beides baut auf
@@ -652,6 +652,7 @@ Getroffen am 14. Oktober 2026:
 | 1 | Wie heißt der neue Bereich? | **„Prompts“**: Reiter „Prompts“, Einzahl „Prompt“, Felder „Platzhalter“, Dialog „Prompt ausfüllen“. Nie „Vorlage“, das sind die Rollen |
 | 2 | Zu welcher Verwaltung gehören eigene Dateien? | **Immer „Eigene Inhalte“.** Keine Zuordnung zu den neun erfundenen Verwaltungen, keine Einheiten, keine eigenen Verwaltungen |
 | 3 | Welche Formate? | Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`), **PDF** neu; Verläufe aus `.eml`. Alte Formate werden mit Tipp abgelehnt |
+| 4 | Mitgelieferte Einträge (die 150 Dokumente und 40 Verläufe aus dem Code) | **Nicht änderbar, nur einzeln ausblenden.** „Einblenden“ und „Alle einblenden“ holen sie zurück; schon angehängte bleiben in bestehenden Chats nutzbar. Kein „Alle ausblenden“, kein Überschreiben von Titel oder Beschreibung |
 | 5 | Datei ersetzen? | **Nein.** Nur hochladen und löschen; die Angaben (Titel, Datum, Merkmale …) bleiben bearbeitbar |
 | 6 | Text steht schon im Eingabefeld | Die **Maske** fragt: „Ersetzen“ oder „Anfügen“ |
 | 7 | Prompt ohne Platzhalter | Erlaubt, wird **direkt eingefügt**; der Admin-Dialog zeigt einen Hinweis |
@@ -661,9 +662,3 @@ Getroffen am 14. Oktober 2026:
 | 11 | Eigener Schalter für Prompts? | **Nein**, der Schalter „Fundus“ gilt für alles |
 | 12 | Gruppenchat | Eingefügter Prompt beginnt mit **„@Freebie “** |
 | 13 | Platzhalter Pflicht oder optional? | **Jeder Platzhalter muss ausgefüllt werden**, ohne Ausnahme und ohne Einstellung dafür |
-
-**Noch offen:**
-
-| # | Frage | Erklärung und Empfehlung |
-|---|---|---|
-| 4 | Was darf die Kursleitung mit den **mitgelieferten** Einträgen tun? | „Mitgeliefert“ sind die 150 Dokumente und 40 E-Mail-Verläufe, die heute schon im Fundus stehen (z. B. „Norovirus-Ausbruch im Gemeindekindergarten Lindenhof“). Sie stehen als Daten im Code und werden bei jedem Deployment neu als Dateien erzeugt. Darum lassen sie sich im Admin **nicht ändern oder löschen**: Eine Änderung wäre beim nächsten Deployment wieder weg. **Empfehlung: Ausblenden.** Im Admin hat jeder mitgelieferte Eintrag einen Knopf „Ausblenden“. Teilnehmende sehen ihn danach nicht mehr im Fundus. „Einblenden“ oder „Alle einblenden“ holt ihn zurück, und Chats, in denen er schon hängt, funktionieren weiter. **Alternativen:** (a) gar nichts – mitgelieferte Einträge sind immer sichtbar, gepflegt werden nur eigene; spart den Unterreiter-Filter „Ausgeblendet“ und FP10. (b) zusätzlich „Alle mitgelieferten ausblenden“, wenn ein Kurs nur mit eigenen Inhalten arbeiten soll. (c) Titel, Beschreibung und Merkmale überschreiben – rate ich ab, weil der Inhalt der Datei dann nicht mehr zum Titel passen kann |
