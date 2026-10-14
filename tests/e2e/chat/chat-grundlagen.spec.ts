@@ -221,7 +221,11 @@ test.describe("C · Fehler und Grenzfälle", () => {
 
   test("C12 Sitzung läuft mitten im Chat ab: Weiterleitung zum Login", async ({ chat, page, context }) => {
     await context.clearCookies();
-    await chat.send(`Noch da? ${uniq()}`);
+    // Senden scheitert an der Sitzung – oder eine Abfrage im Hintergrund leitet schon vorher um (Safari).
+    await chat.composer
+      .fill(`Noch da? ${uniq()}`, { timeout: 5_000 })
+      .then(() => chat.sendButton.click({ timeout: 5_000 }))
+      .catch(() => {});
     await expect(page).toHaveURL(/\/login$/);
   });
 

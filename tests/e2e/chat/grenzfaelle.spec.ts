@@ -731,7 +731,8 @@ test.describe("C · Eingaben, Doppelklicks und Reihenfolgen (Phase 3)", () => {
     await chat.ask(`Erster ${id}`);
     await chat.newChat();
     await chat.ask(`Zweiter ${id}`);
-    await chat.send(`#langsam Läuft ${id}`);
+    // Lang genug, dass sie auch in langsamen Browsern noch läuft, während der Test alles prüft.
+    await chat.send(`#langsam #lang Läuft ${id}`);
     await expect(chat.stopButton).toBeVisible();
     await expect(nav(page).getByRole("button", { name: new RegExp(`^Erster ${id}`) })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Bild-Modus" })).toBeDisabled();
@@ -805,12 +806,15 @@ test.describe("C · Eingaben, Doppelklicks und Reihenfolgen (Phase 3)", () => {
     page.once("dialog", (d) => void d.accept());
     await page.reload();
     await nav(page).getByRole("button", { name: new RegExp(`^#langsam Abgerissen ${id}`) }).click();
-    await expect(chat.lastAnswer.getByRole("alert")).toHaveText(/^Die Antwort fehlt/);
+    // Chromium verlässt die Seite, bevor der abgerissene Stream auffällt („Antwort fehlt“); Safari und Firefox melden
+    // ihn noch und speichern „Verbindung abgebrochen“. Beides ist ein Hinweis an der Antwort.
+    const torn = /^(Die Antwort fehlt – die Seite wurde während der Antwort neu geladen|Die Verbindung ist während der Antwort abgebrochen\.)/;
+    await expect(chat.lastAnswer.getByRole("alert")).toHaveText(torn);
     const answer = await chat.ask(`Weiter ${id}`);
     await expect(answer.getByRole("alert")).toHaveCount(0);
     expect(await chat.diagnosis(answer, "Nachrichten im Verlauf")).toBe("2");
     expect(await messageOrder(page)).toBe("FAFA");
-    await expect(chat.answers.first().getByRole("alert")).toHaveText("Die Antwort fehlt – die Seite wurde während der Antwort neu geladen oder die Verbindung ist abgebrochen.");
+    await expect(chat.answers.first().getByRole("alert")).toHaveText(torn);
     // Bleibt auch nach dem Neuladen so.
     await page.reload();
     await nav(page).getByRole("button", { name: new RegExp(`^#langsam Abgerissen ${id}`) }).click();

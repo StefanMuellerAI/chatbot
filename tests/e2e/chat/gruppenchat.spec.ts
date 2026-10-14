@@ -276,7 +276,8 @@ test.describe("GC · Gruppenchats", () => {
     await expect(regenerate).toBeVisible();
     await regenerate.click();
     await gB.waitForAnswer(3);
-    await expect(gA.conversation.getByText(`Freebie · antwortet ${b.username}`)).toBeVisible();
+    // Zwei Antworten für B: die Fehlermeldung auf Bs Frage und die neu erzeugte (vorher A).
+    await expect(gA.conversation.getByText(`Freebie · antwortet ${b.username}`)).toHaveCount(2);
     await gA.post("Danach eine Notiz");
     await expect(gB.from(a.username).last()).toContainText("Danach eine Notiz");
     await expect(gB.answers.last().getByRole("button", { name: "Neu generieren" })).toHaveCount(0);
