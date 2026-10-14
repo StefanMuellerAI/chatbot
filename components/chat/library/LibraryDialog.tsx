@@ -170,7 +170,7 @@ export function LibraryDialog({
               )}
             >
               {t.label}
-              {catalog && <span className="ml-1.5 text-xs opacity-80"> ({t.count})</span>}
+              {catalog && <span className="ml-1.5 text-xs"> ({t.count})</span>}
             </button>
           ))}
         </div>

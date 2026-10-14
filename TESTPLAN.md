@@ -575,6 +575,7 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 |---|---|---|
 | 42 | Die Postfach-Werkzeuge nannten die Adresse der fragenden Person – im Gruppenchat brach so jede Frage eines anderen Mitglieds den Prompt-Cache | V08 |
 | 43 | Hinweise oben im Chat (z. B. „… hat dich in „…“ eingeladen“) wurden auf dem Handy auf halbe Breite abgeschnitten statt umzubrechen | GC16 |
+| 44 | Die Zahl im Reiter des Fundus-Dialogs war durch Transparenz zu blass (Kontrast 3,6 : 1); in der CI seit dem Fundus-Ausbau rot, lokal unauffällig | Y19 |
 
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
