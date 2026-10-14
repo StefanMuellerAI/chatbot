@@ -1,6 +1,6 @@
 "use client";
 import { ArrowUp, Brain, Check, ChevronDown, Database, Globe, ImagePlus, Loader2, Mail, Paperclip, Plug, Square, X } from "lucide-react";
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore } from "react";
 import { ACCEPT_ATTRIBUTE, MAX_ATTACHMENTS, MAX_MESSAGE_CHARS, maxBytesFor } from "@/lib/files/limits";
 import { attachFromLibrary } from "@/lib/client/library";
 import { prepareImage, processUpload, transcribeUpload, uploadCategory, uploadFile } from "@/lib/client/upload";
@@ -29,6 +29,10 @@ export interface ComposerHandle {
   addFiles: (files: File[]) => void;
   /** Übernimmt vorhandene Anhänge (z. B. beim Bearbeiten einer früheren Nachricht). */
   setAttachments: (attachments: Attachment[]) => void;
+  /** Legt die eigenen Anhänge beiseite (Bearbeiten einer früheren Nachricht) – laufende Uploads laufen weiter. */
+  stashDraft: () => void;
+  /** Holt die beiseitegelegten Anhänge zurück. */
+  restoreDraft: () => void;
   focus: () => void;
 }
 
@@ -66,6 +70,8 @@ export interface ConnectionsProps {
   unavailable?: string;
 }
 
+const patchList = (list: Pending[], localId: string, patch: Partial<Pending>) => list.map((p) => (p.localId === localId ? { ...p, ...patch } : p));
+
 export const Composer = forwardRef<ComposerHandle, Props>(function Composer(props, ref) {
   const { config, model, text, onTextChange, effort, onEffortChange, webSearch, onWebSearchChange, streaming, disabledReason, onSend, onStop, onImageMode, connections } = props;
   const maxChars = props.maxChars ?? MAX_MESSAGE_CHARS;
@@ -79,9 +85,15 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   const fileRef = useRef<HTMLInputElement>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const features = config.features;
+  const touchKeyboard = useTouchKeyboard();
 
-  const update = (localId: string, patch: Partial<Pending>) =>
-    setPending((list) => list.map((p) => (p.localId === localId ? { ...p, ...patch } : p)));
+  // Beiseitegelegte Anhänge des eigenen Entwurfs, solange eine frühere Nachricht bearbeitet wird.
+  const stashRef = useRef<Pending[] | null>(null);
+  const update = (localId: string, patch: Partial<Pending>) => {
+    setPending((list) => patchList(list, localId, patch));
+    // Ein beiseitegelegter Upload meldet seinen Fortschritt weiter, damit er beim Zurückholen stimmt.
+    if (stashRef.current) stashRef.current = patchList(stashRef.current, localId, patch);
+  };
 
   const addFiles = useCallback(
     (files: File[]) => {
@@ -188,7 +200,24 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
     });
   }, []);
 
-  useImperativeHandle(ref, () => ({ addFiles, setAttachments, focus: () => textareaRef.current?.focus() }), [addFiles, setAttachments]);
+  const stashDraft = useCallback(() => {
+    if (stashRef.current) return;
+    stashRef.current = pendingRef.current;
+    setPending([]);
+  }, []);
+
+  const restoreDraft = useCallback(() => {
+    const stash = stashRef.current;
+    if (!stash) return;
+    stashRef.current = null;
+    setPending((l) => {
+      // Was erst beim Bearbeiten dazukam, gehört nicht zum Entwurf – laufende Uploads davon abbrechen.
+      for (const p of l) p.controller?.abort();
+      return stash;
+    });
+  }, []);
+
+  useImperativeHandle(ref, () => ({ addFiles, setAttachments, stashDraft, restoreDraft, focus: () => textareaRef.current?.focus() }), [addFiles, setAttachments, stashDraft, restoreDraft]);
 
   // Höhe des Eingabefelds automatisch anpassen
   useEffect(() => {
@@ -313,7 +342,10 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             setMentionClosed(true);
             return;
           }
-          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+          // Am Rechner sendet Enter (Shift+Enter: neue Zeile). Auf dem iPad macht Enter eine neue Zeile – die
+          // Bildschirmtastatur hat kein Shift+Enter; gesendet wird mit dem Knopf oder Strg/Cmd+Enter.
+          const sendKey = touchKeyboard ? e.metaKey || e.ctrlKey : !e.shiftKey;
+          if (e.key === "Enter" && sendKey && !e.nativeEvent.isComposing) {
             e.preventDefault();
             send();
           }
@@ -407,7 +439,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             disabled={!canSend}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand-gradient text-white shadow-md transition hover:opacity-95 disabled:opacity-35"
             aria-label="Senden"
-            title="Senden (Enter)"
+            title={touchKeyboard ? "Senden" : "Senden (Enter)"}
           >
             {working ? <Loader2 className="h-4.5 w-4.5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
           </button>
@@ -429,6 +461,21 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
     </div>
   );
 });
+
+const TOUCH_QUERY = "(hover: none) and (pointer: coarse)";
+
+/** iPad und andere Geräte, die nur per Finger bedient werden (keine Maus, kein Trackpad). */
+function useTouchKeyboard(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(TOUCH_QUERY);
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(TOUCH_QUERY).matches,
+    () => false,
+  );
+}
 
 /** Formatierter Text aus Office, LibreOffice oder einer Webseite (Text plus HTML bzw. RTF). */
 function isFormattedText(data: DataTransfer): boolean {

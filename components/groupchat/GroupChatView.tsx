@@ -307,18 +307,21 @@ export function GroupChatView({
         hidden={hidden}
         className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:block print:bg-white"
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files") && !left && !config.paused) {
-            e.preventDefault();
-            setDragging(true);
-          }
+          // Dateien immer annehmen (sonst öffnet der Browser sie), Text wie gewohnt ins Eingabefeld.
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          if (!left && !config.paused) setDragging(true);
         }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
         }}
         onDrop={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
+          e.stopPropagation();
           setDragging(false);
-          if (!left) composerRef.current?.addFiles(Array.from(e.dataTransfer.files));
+          if (config.paused) onToast("Freebie macht gerade Pause – Dateien können nicht angehängt werden.");
+          else if (!left) composerRef.current?.addFiles(Array.from(e.dataTransfer.files));
         }}
       >
         <header className="flex h-14 shrink-0 items-center gap-1 px-2 sm:px-4 print:hidden">

@@ -20,6 +20,7 @@ import { NewGroupChatDialog } from "@/components/groupchat/GroupDialogs";
 import { cn } from "@/components/ui/cn";
 import { useTheme } from "@/components/ui/theme";
 import { AccessExpiry } from "./AccessExpiry";
+import { ChatErrorBoundary } from "./ChatErrorBoundary";
 import { useAppStatus } from "./useAppStatus";
 import { Composer, type ComposerHandle } from "./Composer";
 import { EmptyState } from "./EmptyState";
@@ -97,6 +98,8 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const [mailConnected, setMailConnected] = useState(false);
   const [text, setText] = useState("");
   const [editIndex, setEditIndex] = useState<number | null>(null);
+  // Entwurf, der beim Bearbeiten einer früheren Nachricht beiseitegelegt wurde (null: es wird nicht bearbeitet).
+  const draftRef = useRef<string | null>(null);
   const [streaming, setStreaming] = useState<{ conversationId: string; state: StreamingState } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   // Geöffnetes Artefakt; ohne Version gilt die neueste.
@@ -109,6 +112,16 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   const [dragging, setDragging] = useState(false);
   const [theme, setTheme, isDark] = useTheme();
   const composerRef = useRef<ComposerHandle>(null);
+
+  /** Beendet das Bearbeiten und holt den beiseitegelegten Entwurf zurück (Abbrechen, Chatwechsel, neuer Chat). */
+  const endEdit = useCallback(() => {
+    setEditIndex(null);
+    if (draftRef.current === null) return;
+    setText(draftRef.current);
+    draftRef.current = null;
+    composerRef.current?.restoreDraft();
+  }, []);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const userScrolling = useRef(false);
@@ -142,6 +155,17 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     toastTimer.current = setTimeout(() => setToast(null), next.action ? 8000 : 4000);
   }, []);
 
+  /** Schreiben in die Browser-Datenbank ist gescheitert (meist: Speicher voll) – nichts geht stillschweigend verloren. */
+  const storageFailed = (err: unknown, what: string) => {
+    console.error(err);
+    const full = err instanceof Error && /quota/i.test(`${err.name} ${err.message}`);
+    showToast(
+      full
+        ? `${what} Der Speicher dieses Browsers ist voll – bitte alte Chats exportieren und löschen.`
+        : `${what} Bitte die Seite neu laden und es noch einmal versuchen.`,
+    );
+  };
+
   // ---------------------------------------------------------------- Posteingang
   const mailEnabled = Boolean(config?.features.mailbox);
   const [viewChoice, setView] = useState<"chat" | "mail">(initialView);
@@ -166,14 +190,17 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     [account.mailLocal, openMail, showToast],
   );
   const groupEnabled = Boolean(config?.features.groupChats);
-  const openGroup = useCallback((id: string) => {
-    setView("chat");
-    setActiveId(null);
-    setEditIndex(null);
-    setArtifactSel(null);
-    setSidebarOpen(false);
-    setActiveGroupId(id);
-  }, []);
+  const openGroup = useCallback(
+    (id: string) => {
+      setView("chat");
+      setActiveId(null);
+      endEdit();
+      setArtifactSel(null);
+      setSidebarOpen(false);
+      setActiveGroupId(id);
+    },
+    [endEdit],
+  );
   const onInvite = useCallback(
     (chat: GroupChatSummary) =>
       showToast({ text: `${mailName(chat.owner)} hat dich in „${chat.title}“ eingeladen`, action: { label: "Öffnen", onClick: () => openGroup(chat.id) } }),
@@ -203,7 +230,8 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       if (streaming || groupBusy) return;
       setActiveGroupId(null);
       setActiveId(id);
-      setEditIndex(null);
+      // Der eigene Entwurf samt laufender Uploads bleibt beim Chatwechsel stehen (nie der Text einer bearbeiteten Nachricht).
+      endEdit();
       setArtifactSel(null);
       setSidebarOpen(false);
       if (!id || !config) {
@@ -220,9 +248,8 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       setPresetId(conv.presetId);
       setWebSearch(conv.webSearch ?? true);
       setMailConnected(Boolean(conv.connections?.includes("mailbox")));
-      composerRef.current?.setAttachments([]);
     },
-    [config, conversations, streaming, groupBusy],
+    [config, conversations, streaming, groupBusy, endEdit],
   );
 
   // Vorlage wählen; ein empfohlenes Modell wird dabei übernommen (sofern verfügbar).
@@ -444,7 +471,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       fallbackModel: state.fallbackModel,
       mails: state.mails!.read.length || state.mails!.sent.length ? state.mails : undefined,
     };
-    await appendMessages(conv.id, [assistant]);
+    await appendMessages(conv.id, [assistant]).catch((err: unknown) => storageFailed(err, "Die Antwort konnte nicht gespeichert werden."));
     setStreaming(null);
     abortRef.current = null;
   };
@@ -466,20 +493,35 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     if (!config || !model || streaming || busyRef.current) return;
     busyRef.current = true;
     try {
-      await sendNow(rawText, attachments, config, model);
+      const ran = await withChatLock(active?.id, () => sendNow(rawText, attachments, config, model));
+      // Nicht gesendet (Antwort in einem anderen Tab): die Anhänge zurück ins Eingabefeld, der Text steht noch da.
+      if (!ran) composerRef.current?.setAttachments(attachments);
     } finally {
       busyRef.current = false;
     }
+  };
+
+  /** Eine Antwort pro Chat zur selben Zeit – auch über mehrere Tabs desselben Browsers hinweg (Web Locks). */
+  const withChatLock = async (id: string | undefined, run: () => Promise<void>): Promise<boolean> => {
+    if (!id || typeof navigator === "undefined" || !navigator.locks) {
+      await run();
+      return true;
+    }
+    return navigator.locks.request(`freebie-chat:${account.key}:${id}`, { ifAvailable: true }, async (lock) => {
+      if (!lock) {
+        showToast("In einem anderen Tab läuft gerade eine Antwort in diesem Chat. Bitte warte, bis sie fertig ist.");
+        return false;
+      }
+      await run();
+      return true;
+    });
   };
 
   const sendNow = async (rawText: string, attachments: Attachment[], config: PublicConfig, model: PublicModel) => {
     const now = Date.now();
     let baseMessages = active?.messages ?? [];
     const allAttachments = attachments;
-    if (editIndex !== null && active) {
-      baseMessages = baseMessages.slice(0, editIndex);
-      setEditIndex(null);
-    }
+    if (editIndex !== null && active) baseMessages = baseMessages.slice(0, editIndex);
     const userMsg: ChatMessage = {
       id: uuid(),
       role: "user",
@@ -506,14 +548,24 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       connections: mailConnected ? ["mailbox"] : [],
       messages: [...baseMessages, userMsg],
     } as Conversation;
-    if (active && editIndex === null) {
-      // Normaler Fall: nur anhängen (ein parallel gesetzter Titel bleibt erhalten).
-      await appendMessages(active.id, [userMsg], { modelId: model.id, effort, webSearch, connections: mailConnected ? ["mailbox"] : [] });
-    } else {
-      await saveConversation(conv);
+    try {
+      if (active && editIndex === null) {
+        // Normaler Fall: nur anhängen (ein parallel gesetzter Titel bleibt erhalten).
+        await appendMessages(active.id, [userMsg], { modelId: model.id, effort, webSearch, connections: mailConnected ? ["mailbox"] : [] });
+      } else {
+        await saveConversation(conv);
+      }
+    } catch (err) {
+      // Text und Anhänge bleiben im Eingabefeld, das Bearbeiten läuft weiter.
+      storageFailed(err, "Die Nachricht wurde nicht gesendet.");
+      composerRef.current?.setAttachments(attachments);
+      return;
     }
+    setEditIndex(null);
     setActiveId(conv.id);
-    setText("");
+    // Nach dem Senden einer bearbeiteten Nachricht steht der eigene Entwurf wieder im Eingabefeld.
+    if (draftRef.current !== null) endEdit();
+    else setText("");
     const isFirst = baseMessages.length === 0;
     await runAssistant(conv, false);
     if (isFirst && !active) generateTitle(conv.id, rawText || allAttachments.map((a) => a.name).join(", "));
@@ -523,7 +575,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     if (!active || streaming || busyRef.current) return;
     busyRef.current = true;
     try {
-      await regenerateNow(active);
+      await withChatLock(active.id, () => regenerateNow(active));
     } finally {
       busyRef.current = false;
     }
@@ -544,29 +596,53 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     // Mit dem Modell der ursprünglichen Antwort, solange es noch verfügbar ist.
     const original = previous?.modelId && config?.models.some((m) => m.id === previous.modelId) ? previous.modelId : undefined;
     const conv = { ...active, modelId: original ?? (modelId || active.modelId), messages: msgs };
-    await saveConversation(conv);
+    try {
+      await saveConversation(conv);
+    } catch (err) {
+      storageFailed(err, "Neu generieren hat nicht geklappt.");
+      return;
+    }
     await runAssistant(conv, true);
   };
 
   const startEdit = (index: number) => {
     const m = messages[index];
     if (!m || streaming) return;
+    // Der eigene Entwurf (Text und Anhänge, auch laufende Uploads) wird beiseitegelegt, nicht überschrieben.
+    if (draftRef.current === null) {
+      draftRef.current = text;
+      composerRef.current?.stashDraft();
+    }
     setEditIndex(index);
     setText(m.text);
     composerRef.current?.setAttachments(m.attachments ?? []);
     composerRef.current?.focus();
   };
 
+  /**
+   * Füllt das Eingabefeld (Beispiel, „Mit Freebie besprechen“) – ein selbst geschriebener Entwurf wird nicht
+   * überschrieben. Ein unverändert übernommenes Beispiel darf ein anderes ersetzen.
+   */
+  const filledRef = useRef<string | null>(null);
+  const fillComposer = (value: string, current = text) => {
+    const apply = () => {
+      filledRef.current = value;
+      setText(value);
+      composerRef.current?.focus();
+    };
+    if (!current.trim() || current === value || current === filledRef.current) return apply();
+    showToast({ text: "Im Eingabefeld steht schon dein Entwurf – er bleibt stehen.", action: { label: "Ersetzen", onClick: apply } });
+  };
+
   const resetToNewChat = () => {
     setActiveId(null);
     setActiveGroupId(null);
-    setEditIndex(null);
+    // Der eigene Entwurf samt Anhängen bleibt stehen – wer ihn in einem neuen Chat stellen will, verliert ihn nicht.
+    endEdit();
     setArtifactSel(null);
     setPresetId(null);
     setWebSearch(true);
     setMailConnected(false);
-    setText("");
-    composerRef.current?.setAttachments([]);
     setSidebarOpen(false);
     const def = config?.models.find((m) => m.id === modelId) ?? config?.models.find((m) => m.isDefault);
     if (def) setEffort(def.defaultEffort);
@@ -585,10 +661,11 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
       showToast("Bitte warte, bis Freebie mit der aktuellen Antwort fertig ist.");
       return;
     }
+    const draft = draftRef.current ?? text;
     resetToNewChat();
     setMailConnected(true);
     const from = mail.from === "kursleitung" ? "der Kursleitung" : mail.from;
-    setText(`Fasse die E-Mail „${mail.subject || "(Kein Betreff)"}“ von ${from} zusammen und schlag mir eine Antwort vor.`);
+    fillComposer(`Fasse die E-Mail „${mail.subject || "(Kein Betreff)"}“ von ${from} zusammen und schlag mir eine Antwort vor.`, draft);
   };
   const openMailRef = (ref: MailRef) => openMail(ref.id, ref.folder);
 
@@ -618,6 +695,29 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     await db.conversations.delete(id);
     if (id === activeId) resetToNewChat();
   };
+
+  // Dateien ablegen: im Chat werden sie angehängt; daneben (Seitenleiste, Artefakt-Panel, Posteingang) öffnet der
+  // Browser sie sonst anstelle von Freebie – eine laufende Antwort ginge verloren.
+  const dropBlocked = !config ? "Freebie lädt noch." : config.paused ? "Freebie macht gerade Pause – Dateien können nicht angehängt werden." : !model ? "Gerade ist kein Modell verfügbar." : null;
+  const privateChatVisible = view === "chat" && !activeGroupId;
+  useEffect(() => {
+    const hasFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+    const onDragOver = (e: DragEvent) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const onDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      if (privateChatVisible && !dropBlocked) composerRef.current?.addFiles(Array.from(e.dataTransfer?.files ?? []));
+      else showToast(dropBlocked ?? "Zum Anhängen die Dateien bitte in den Chat ziehen.");
+    };
+    window.addEventListener("dragover", onDragOver);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragover", onDragOver);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, [privateChatVisible, dropBlocked, showToast]);
 
   const presetName = config?.presets.find((p) => p.id === (active?.presetId ?? presetId))?.name;
   const artifactVersions = artifactSel ? artifacts.get(artifactSel.id) : undefined;
@@ -730,19 +830,22 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
         hidden={view === "mail" || Boolean(activeGroupId)}
         className="relative flex min-w-0 flex-1 flex-col bg-bg bg-hero print:block print:bg-white"
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes("Files") && config && !config.paused && model) {
-            e.preventDefault();
-            setDragging(true);
-          }
+          // Dateien immer annehmen (sonst öffnet der Browser sie anstelle von Freebie), Text wie gewohnt ins Feld.
+          if (!e.dataTransfer.types.includes("Files")) return;
+          e.preventDefault();
+          if (!dropBlocked) setDragging(true);
         }}
         onDragLeave={(e) => {
           // Erst schließen, wenn die Maus den Bereich wirklich verlässt (nicht beim Wechsel auf ein Kindelement).
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
         }}
         onDrop={(e) => {
+          if (!e.dataTransfer.types.includes("Files")) return;
           e.preventDefault();
+          e.stopPropagation();
           setDragging(false);
-          composerRef.current?.addFiles(Array.from(e.dataTransfer.files));
+          if (dropBlocked) showToast(dropBlocked);
+          else composerRef.current?.addFiles(Array.from(e.dataTransfer.files));
         }}
       >
         <header className="flex h-14 shrink-0 items-center gap-1 px-2 sm:px-4 print:hidden">
@@ -844,64 +947,63 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
                 presets={config.presets}
                 presetId={presetId}
                 onPreset={choosePreset}
-                onExample={(t) => {
-                  setText(t);
-                  composerRef.current?.focus();
-                }}
+                onExample={(t) => fillComposer(t)}
               />
             )
           ) : (
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
-              {messages.map((m, i) =>
-                m.role === "user" ? (
-                  <Fragment key={m.id}>
-                    {mailEnabled && connectionChanges.has(m.id) && (
-                      <div role="note" className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-xs text-muted">
-                        <Mail className="h-3.5 w-3.5" />
-                        {connectionChanges.get(m.id) ? "Posteingang verbunden" : "Posteingang getrennt"}
-                      </div>
-                    )}
-                    <UserMessage message={m} onEdit={!streaming ? () => startEdit(i) : undefined} />
-                  </Fragment>
-                ) : (
+            <ChatErrorBoundary key={active?.id ?? "neu"} fallback={<BrokenChat conversation={active} onDelete={(id) => void deleteConversation(id)} />}>
+              <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
+                {messages.map((m, i) =>
+                  m.role === "user" ? (
+                    <Fragment key={m.id}>
+                      {mailEnabled && connectionChanges.has(m.id) && (
+                        <div role="note" className="flex items-center gap-1.5 self-center rounded-full bg-surface-2 px-3 py-1 text-xs text-muted">
+                          <Mail className="h-3.5 w-3.5" />
+                          {connectionChanges.get(m.id) ? "Posteingang verbunden" : "Posteingang getrennt"}
+                        </div>
+                      )}
+                      <UserMessage message={m} onEdit={!streaming ? () => startEdit(i) : undefined} />
+                    </Fragment>
+                  ) : (
+                    <AssistantMessage
+                      key={m.id}
+                      message={m}
+                      modelName={modelName(m.modelId)}
+                      isLast={i === messages.length - 1 && !streamingHere}
+                      showCacheBadge={config?.features.showCacheBadge ?? true}
+                      showCost={config?.features.showCost ?? false}
+                      onRegenerate={m.stopReason === "image-mode" ? undefined : regenerate}
+                      artifactsEnabled={artifactsEnabled}
+                      onOpenArtifact={openArtifact}
+                      onOpenMail={mailEnabled ? openMailRef : undefined}
+                    />
+                  ),
+                )}
+                {missingAnswer && (
                   <AssistantMessage
-                    key={m.id}
-                    message={m}
-                    modelName={modelName(m.modelId)}
-                    isLast={i === messages.length - 1 && !streamingHere}
-                    showCacheBadge={config?.features.showCacheBadge ?? true}
-                    showCost={config?.features.showCost ?? false}
-                    onRegenerate={m.stopReason === "image-mode" ? undefined : regenerate}
+                    message={missingAnswer}
+                    modelName={modelName(missingAnswer.modelId)}
+                    isLast
+                    showCacheBadge={false}
+                    showCost={false}
+                    onRegenerate={regenerate}
+                    artifactsEnabled={artifactsEnabled}
+                    onOpenArtifact={openArtifact}
+                  />
+                )}
+                {streamingHere && (
+                  <AssistantMessage
+                    streaming={streamingHere}
+                    isLast
+                    showCacheBadge={false}
+                    showCost={false}
                     artifactsEnabled={artifactsEnabled}
                     onOpenArtifact={openArtifact}
                     onOpenMail={mailEnabled ? openMailRef : undefined}
                   />
-                ),
-              )}
-              {missingAnswer && (
-                <AssistantMessage
-                  message={missingAnswer}
-                  modelName={modelName(missingAnswer.modelId)}
-                  isLast
-                  showCacheBadge={false}
-                  showCost={false}
-                  onRegenerate={regenerate}
-                  artifactsEnabled={artifactsEnabled}
-                  onOpenArtifact={openArtifact}
-                />
-              )}
-              {streamingHere && (
-                <AssistantMessage
-                  streaming={streamingHere}
-                  isLast
-                  showCacheBadge={false}
-                  showCost={false}
-                  artifactsEnabled={artifactsEnabled}
-                  onOpenArtifact={openArtifact}
-                  onOpenMail={mailEnabled ? openMailRef : undefined}
-                />
-              )}
-            </div>
+                )}
+              </div>
+            </ChatErrorBoundary>
           )}
         </div>
 
@@ -912,11 +1014,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
               <button
                 type="button"
                 className="font-medium underline"
-                onClick={() => {
-                  setEditIndex(null);
-                  setText("");
-                  composerRef.current?.setAttachments([]);
-                }}
+                onClick={endEdit}
               >
                 Abbrechen
               </button>
@@ -1035,6 +1133,35 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
             />
           )}
         </>
+      )}
+    </div>
+  );
+}
+
+/** Hinweis statt weißer Seite, wenn sich ein (z. B. beschädigt importierter) Chat nicht anzeigen lässt. */
+function BrokenChat({ conversation, onDelete }: { conversation: Conversation | null; onDelete: (id: string) => void }) {
+  return (
+    <div role="alert" className="mx-auto mt-10 max-w-xl rounded-2xl border border-danger/30 bg-danger-soft px-5 py-4 text-sm text-danger">
+      <p className="flex items-start gap-2 font-medium">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" /> Dieser Chat kann nicht angezeigt werden – vermutlich stammt er aus einer beschädigten Import-Datei.
+      </p>
+      {conversation && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => downloadText(JSON.stringify({ app: "freebie", version: 1, conversations: [conversation] }, null, 2), `${safeName(conversation.title)}.json`, "application/json")}
+            className="rounded-full border border-danger/40 px-3 py-1 font-medium hover:bg-danger/10"
+          >
+            Als Datei sichern
+          </button>
+          <button
+            type="button"
+            onClick={() => confirm(`Chat „${conversation.title || "Neuer Chat"}“ löschen?`) && onDelete(conversation.id)}
+            className="rounded-full border border-danger/40 px-3 py-1 font-medium hover:bg-danger/10"
+          >
+            Chat löschen
+          </button>
+        </div>
       )}
     </div>
   );

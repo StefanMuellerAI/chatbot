@@ -2,7 +2,7 @@
 import { upload, uploadPresigned } from "@vercel/blob/client";
 import { categoryOf, safeFileName, type UploadCategory } from "@/lib/files/limits";
 import type { Attachment, PublicConfig } from "@/lib/shared/types";
-import { api, ApiError } from "./api";
+import { api, ApiError, statusMessage } from "./api";
 
 export type Progress = (fraction: number, label: string) => void;
 
@@ -66,7 +66,7 @@ export async function uploadFile(
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else {
-        let msg = `Upload fehlgeschlagen (${xhr.status})`;
+        let msg = `Upload fehlgeschlagen: ${statusMessage(xhr.status)}`;
         try {
           msg = (JSON.parse(xhr.responseText) as { error?: string }).error ?? msg;
         } catch {

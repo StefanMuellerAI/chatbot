@@ -21,6 +21,11 @@ export function VoiceButton({ onText, disabled }: { onText: (text: string) => vo
   // erste ließe das Mikrofon unbemerkt weiterlaufen.
   const startingRef = useRef(false);
   const startedAtRef = useRef(0);
+  // Das Transkript kommt erst nach der Aufnahme: an den Text, der dann im Feld steht – nicht an den vom Start.
+  const onTextRef = useRef(onText);
+  useEffect(() => {
+    onTextRef.current = onText;
+  }, [onText]);
 
   useEffect(() => () => cleanupRef.current(), []);
 
@@ -79,7 +84,7 @@ export function VoiceButton({ onText, disabled }: { onText: (text: string) => vo
           form.set("file", new File([blob], `diktat.${ext}`, { type: blob.type }));
           form.set("durationSec", String(Math.round(duration)));
           const res = await api<{ text: string }>("/api/transcribe/dictate", { method: "POST", body: form });
-          if (res.text) onText(res.text);
+          if (res.text) onTextRef.current(res.text);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Transkription fehlgeschlagen");
         } finally {

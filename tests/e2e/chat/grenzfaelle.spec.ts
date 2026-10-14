@@ -1,6 +1,8 @@
+import { readFileSync } from "node:fs";
 import type { APIRequestContext, Page } from "@playwright/test";
 import { createGuest, expect, inMinutes, test, uniq } from "../support/fixtures";
 import { attachments, chip, expectReady } from "../support/files";
+import { MailPage } from "../support/mail";
 import { ADMIN } from "../support/servers.mjs";
 
 // Grenzfälle und Fehlbedienung durch Teilnehmende (Plan: GRENZFAELLE-PLAN.md): Copy & Paste, Doppelklicks,
@@ -353,5 +355,326 @@ test.describe("H · Spracheingabe @nur-chromium", () => {
     await page.waitForTimeout(1500);
     await expect(chat.composer).toHaveValue(value);
     await expect(page.getByRole("button", { name: "Spracheingabe" })).toBeEnabled();
+  });
+});
+
+// ---------------------------------------------------------------- Phase 2: Eingabe, Entwurf, Reihenfolgen
+
+const nav = (page: Page) => page.getByRole("navigation", { name: "Chatverlauf" });
+const editBanner = (page: Page) => page.getByText("Du bearbeitest eine frühere Nachricht.");
+
+/** Hält Uploads an, bis der Test sie freigibt (zeigt laufende Uploads in Bedienfolgen). */
+async function holdUploads(page: Page) {
+  let release: () => void = () => {};
+  const released = new Promise<void>((r) => (release = r));
+  await page.route("/api/upload/local", async (route) => {
+    await released;
+    await route.continue().catch(() => {});
+  });
+  return release;
+}
+
+async function editFirstQuestion(page: Page, chat: { questions: ReturnType<Page["getByRole"]> }) {
+  await chat.questions.first().hover();
+  await chat.questions.first().getByRole("button", { name: "Bearbeiten" }).click();
+  await expect(editBanner(page)).toBeVisible();
+}
+
+test.describe("C · Eingabe auf dem iPad, Entwurf und Reihenfolgen", () => {
+  test("C19 iPad: Enter macht eine neue Zeile, gesendet wird mit dem Knopf oder Strg/Cmd+Enter @tablet @mobil", async ({ chat }) => {
+    const id = uniq();
+    await chat.composer.fill(`Zeile eins ${id}`);
+    await chat.composer.press("Enter");
+    await chat.composer.pressSequentially("Zeile zwei");
+    await expect(chat.composer).toHaveValue(`Zeile eins ${id}\nZeile zwei`);
+    await expect(chat.questions).toHaveCount(0);
+    await expect(chat.sendButton).toHaveAttribute("title", "Senden");
+    await chat.sendButton.click();
+    await chat.waitForAnswer(1);
+    await expect(chat.questions.last()).toHaveText(new RegExp(`Zeile eins ${id}\\s+Zeile zwei`));
+    // Mit angeschlossener Tastatur: Strg/Cmd+Enter sendet.
+    await chat.composer.fill(`Tastatur ${id}`);
+    await chat.composer.press("ControlOrMeta+Enter");
+    await chat.waitForAnswer(2);
+    await expect(chat.questions).toHaveCount(2);
+  });
+
+  test("C20 markierter Text lässt sich ins Eingabefeld ziehen", async ({ chat, page }) => {
+    const prevented = await chat.composer.evaluate((el) => {
+      const dt = new DataTransfer();
+      dt.setData("text/plain", "Gezogener Text");
+      const over = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt });
+      el.dispatchEvent(over);
+      const drop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt });
+      el.dispatchEvent(drop);
+      return { dragover: over.defaultPrevented, drop: drop.defaultPrevented };
+    });
+    // Freebie lässt das Einfügen dem Browser – nichts wird abgefangen oder angehängt.
+    expect(prevented).toEqual({ dragover: false, drop: false });
+    await expect(attachments(page)).toHaveCount(0);
+  });
+
+  test("C24 Entwurf mit laufendem Upload → „Bearbeiten“ → „Abbrechen“ bzw. Senden: Entwurf und Anhang sind wieder da", async ({ chat, page }) => {
+    const id = uniq();
+    await chat.ask(`Erste ${id}`);
+    const release = await holdUploads(page);
+    await chat.composer.fill(`Mein Entwurf ${id}`);
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "unterwegs.txt", mimeType: "text/plain", buffer: Buffer.from(`Unterwegs ${id}`) }]);
+    await expect(chip(page, "unterwegs.txt")).toContainText("%");
+
+    await editFirstQuestion(page, chat);
+    await expect(chat.composer).toHaveValue(`Erste ${id}`);
+    await expect(chip(page, "unterwegs.txt")).toHaveCount(0);
+    await page.getByRole("button", { name: "Abbrechen" }).click();
+    await expect(editBanner(page)).toBeHidden();
+    await expect(chat.composer).toHaveValue(`Mein Entwurf ${id}`);
+    await expect(chip(page, "unterwegs.txt")).toBeVisible();
+    // Der Upload lief weiter und wird fertig.
+    release();
+    await expectReady(page, "unterwegs.txt", /ca\. \d+ Tokens/);
+
+    // Bearbeitete Nachricht senden: danach steht der eigene Entwurf wieder da.
+    await editFirstQuestion(page, chat);
+    await chat.composer.fill(`Erste geändert ${id}`);
+    await chat.sendButton.click();
+    await chat.waitForAnswer(1);
+    await expect(chat.questions).toHaveText([new RegExp(`Erste geändert ${id}`)]);
+    await expect(chat.composer).toHaveValue(`Mein Entwurf ${id}`);
+    await expectReady(page, "unterwegs.txt", /ca\. \d+ Tokens/);
+  });
+
+  test("C25 Beispiel und „Mit Freebie besprechen“ überschreiben keinen eigenen Entwurf", async ({ chat, page }) => {
+    const draft = `Mein eigener Prompt ${uniq()}`;
+    const example = "Baue mir eine kleine Landingpage für ein Café in Leipzig.";
+    await chat.composer.fill(draft);
+    await page.getByRole("button", { name: example }).click();
+    await expect(chat.composer).toHaveValue(draft);
+    const toast = page.getByRole("status").filter({ hasText: "Im Eingabefeld steht schon dein Entwurf – er bleibt stehen." });
+    await expect(toast).toBeVisible();
+    await toast.getByRole("button", { name: "Ersetzen" }).click();
+    await expect(chat.composer).toHaveValue(example);
+
+    // „Mit Freebie besprechen“ im Posteingang: neuer Chat mit Verbindung, der Entwurf bleibt.
+    await chat.composer.fill(draft);
+    const mail = MailPage.of(chat);
+    await mail.open();
+    await mail.row(/Willkommen in deinem Posteingang/).click();
+    await mail.reader.getByRole("toolbar", { name: "Aktionen für diese E-Mail" }).getByRole("button", { name: "Mit Freebie besprechen" }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(chat.composer).toHaveValue(draft);
+    await page.getByRole("status").filter({ hasText: "er bleibt stehen" }).getByRole("button", { name: "Ersetzen" }).click();
+    await expect(chat.composer).toHaveValue(/^Fasse die E-Mail „Willkommen in deinem Posteingang“/);
+  });
+
+  test("C26 Bearbeiten → anderer Chat, „Neuer Chat“ oder Chat löschen: der eigene Entwurf kommt zurück, nie der alte Text", async ({ chat, page }) => {
+    const id = uniq();
+    await chat.ask(`Chat A ${id}`);
+    await chat.newChat();
+    await chat.ask(`Chat B ${id}`);
+    await chat.composer.fill(`Entwurf ${id}`);
+
+    await editFirstQuestion(page, chat);
+    await nav(page).getByRole("button", { name: `Chat A ${id}`, exact: true }).click();
+    await expect(editBanner(page)).toBeHidden();
+    await expect(chat.composer).toHaveValue(`Entwurf ${id}`);
+    await expect(chat.questions).toHaveText([new RegExp(`Chat A ${id}`)]);
+
+    await editFirstQuestion(page, chat);
+    await chat.newChat();
+    await expect(editBanner(page)).toBeHidden();
+    await expect(chat.composer).toHaveValue(`Entwurf ${id}`);
+
+    await nav(page).getByRole("button", { name: `Chat B ${id}`, exact: true }).click();
+    await editFirstQuestion(page, chat);
+    page.once("dialog", (d) => void d.accept());
+    await nav(page).getByRole("button", { name: `Chat „Chat B ${id}“ löschen` }).click();
+    await expect(editBanner(page)).toBeHidden();
+    await expect(chat.composer).toHaveValue(`Entwurf ${id}`);
+  });
+
+  test("C30 Fehlerseiten der Plattform ohne JSON: deutsche Meldung statt „Fehler 413“", async ({ chat, page }) => {
+    const html = "<html><body>An error occurred</body></html>";
+    for (const [status, message] of [
+      [413, "Die Anfrage ist zu groß. Bitte einen neuen Chat starten oder kleinere Dateien verwenden."],
+      [504, "Freebie hat zu lange gebraucht (Zeitüberschreitung). Bitte gleich nochmal versuchen."],
+      [502, "Freebie antwortet gerade nicht. Bitte gleich nochmal versuchen."],
+    ] as const) {
+      await page.route("/api/chat", (r) => r.fulfill({ status, contentType: "text/html", body: html }));
+      await chat.ask(`Fehlerseite ${status} ${uniq()}`);
+      await expect(chat.lastAnswer.getByRole("alert")).toHaveText(message);
+      await page.unroute("/api/chat");
+    }
+    await page.route("/api/upload/local", (r) => r.fulfill({ status: 413, contentType: "text/plain", body: "Request Entity Too Large" }));
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "gross.txt", mimeType: "text/plain", buffer: Buffer.from("x") }]);
+    await expect(chip(page, "gross.txt")).toContainText("Upload fehlgeschlagen: Die Anfrage ist zu groß.");
+    await page.route("/api/images", (r) => r.fulfill({ status: 504, contentType: "text/html", body: html }));
+    await page.getByRole("button", { name: "Bild-Modus" }).click();
+    const dialog = page.getByRole("dialog", { name: "Bild-Modus" });
+    await dialog.getByLabel("Bildbeschreibung").fill("Ein Leuchtturm");
+    await dialog.getByRole("button", { name: "Bild erzeugen" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText("Freebie hat zu lange gebraucht (Zeitüberschreitung). Bitte gleich nochmal versuchen.");
+  });
+});
+
+test.describe("H · Spracheingabe beim Tippen @nur-chromium", () => {
+  test("H06 während des Diktats getippter Text bleibt, das Transkript wird angehängt", async ({ chat, page }) => {
+    await chat.composer.fill("Alt");
+    await page.getByRole("button", { name: "Spracheingabe" }).click();
+    const stop = page.getByRole("button", { name: "Aufnahme beenden" });
+    await expect(stop).toContainText(/0:0[2-9]/, { timeout: 10_000 });
+    await chat.composer.fill("Neu getippt");
+    await stop.click();
+    await expect(chat.composer).toHaveValue(/^Neu getippt \[Testmodus\] Transkript von diktat\./, { timeout: 20_000 });
+  });
+});
+
+test.describe("F · Dateien neben die Ablagefläche", () => {
+  test("F17 Datei auf die Seitenleiste fallen gelassen: Freebie bleibt offen und hängt sie an", async ({ chat, page }) => {
+    const prevented = await page.evaluate(() => {
+      const transfer = () => {
+        const dt = new DataTransfer();
+        dt.items.add(new File(["Daneben abgelegt"], "daneben.txt", { type: "text/plain" }));
+        return dt;
+      };
+      const aside = document.querySelector("aside")!;
+      const over = new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: transfer() });
+      aside.dispatchEvent(over);
+      const drop = new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer() });
+      aside.dispatchEvent(drop);
+      return { dragover: over.defaultPrevented, drop: drop.defaultPrevented };
+    });
+    // Ohne preventDefault würde der Browser die Datei anstelle von Freebie öffnen.
+    expect(prevented).toEqual({ dragover: true, drop: true });
+    await expectReady(page, "daneben.txt", /ca\. \d+ Tokens/);
+    void chat;
+  });
+});
+
+test.describe("E · Import, Speicher und Tabs", () => {
+  test("E11 Import mit kaputten Feldern: Ungültiges fällt weg, der Chat bleibt nutzbar", async ({ chat, page }) => {
+    const id = uniq();
+    const json = JSON.stringify({
+      conversations: [
+        {
+          id: `kaputt-${id}`,
+          title: `Kaputt ${id}`,
+          messages: [
+            { role: "user", text: "Frage", attachments: [null, { name: 5 }, { name: "ohne-pruefsumme.txt", kind: "document", storageKey: "uploads/x/y.txt" }], effort: "extrem", webSearch: "ja" },
+            { role: "assistant", text: "Antwort", citations: "x", images: "y", native: "z", usage: 5, thinking: 7, fromCache: "nein" },
+          ],
+        },
+      ],
+    });
+    page.once("dialog", (d) => void d.accept());
+    await page.getByLabel("Export-Datei für den Import").setInputFiles({ name: "kaputt.json", mimeType: "application/json", buffer: Buffer.from(json) });
+    await nav(page).getByRole("button", { name: `Kaputt ${id}`, exact: true }).click();
+    await expect(chat.questions).toHaveText([/Frage/]);
+    await expect(chat.answers).toHaveCount(1);
+    // Der Server nimmt den bereinigten Verlauf an.
+    const answer = await chat.ask(`Weiter im importierten Chat ${id}`);
+    await expect(answer).toContainText("Testmodus");
+    await expect(answer.getByRole("alert")).toHaveCount(0);
+  });
+
+  test("E11 ein Chat, der sich nicht anzeigen lässt, zeigt einen Hinweis statt einer weißen Seite", async ({ chat, page }) => {
+    const id = uniq();
+    // Unter Umgehung des Imports direkt in die Browser-Datenbank geschrieben (wie aus einer älteren Version).
+    await page.evaluate(
+      ({ db, id }) =>
+        new Promise<void>((resolve, reject) => {
+          const open = indexedDB.open(db);
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const tx = open.result.transaction("conversations", "readwrite");
+            const now = Date.now();
+            tx.objectStore("conversations").put({
+              id: `defekt-${id}`,
+              title: `Defekt ${id}`,
+              modelId: "claude-sonnet-5-5",
+              presetId: null,
+              createdAt: now,
+              updatedAt: now,
+              messages: [
+                { id: "u", role: "user", text: "Frage", createdAt: now },
+                { id: "a", role: "assistant", text: "Antwort", createdAt: now, citations: "kaputt" },
+              ],
+            });
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+          };
+        }),
+      { db: `freebie-g-${chat.guest!.id}`, id },
+    );
+    await page.reload();
+    await nav(page).getByRole("button", { name: `Defekt ${id}`, exact: true }).click();
+    const alert = page.getByRole("alert").filter({ hasText: "Dieser Chat kann nicht angezeigt werden" });
+    await expect(alert).toBeVisible();
+    await expect(chat.composer).toBeVisible();
+    page.once("dialog", (d) => void d.accept());
+    await alert.getByRole("button", { name: "Chat löschen" }).click();
+    await expect(nav(page).getByRole("button", { name: `Defekt ${id}`, exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Hallo, ich bin Freebie." })).toBeVisible();
+  });
+
+  test("E12 älteren Export erneut importieren: Chats mit gleicher ID werden überschrieben (so gewollt)", async ({ chat, page }, testInfo) => {
+    const id = uniq();
+    await chat.ask(`Stand eins ${id}`);
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Alle Chats exportieren" }).click();
+    const path = testInfo.outputPath("alt.json");
+    await (await download).saveAs(path);
+    await chat.ask(`Stand zwei ${id}`);
+    await expect(chat.questions).toHaveCount(2);
+    const message = new Promise<string>((resolve) =>
+      page.once("dialog", (d) => {
+        resolve(d.message());
+        void d.accept();
+      }),
+    );
+    await page.getByLabel("Export-Datei für den Import").setInputFiles({ name: "alt.json", mimeType: "application/json", buffer: readFileSync(path) });
+    expect(await message).toBe("1 Chat importiert.");
+    await expect(chat.questions).toHaveCount(1);
+  });
+
+  test("E15 zwei Tabs mit demselben Chat: während einer Antwort sendet der andere Tab nicht dazwischen", async ({ chat, page, context }) => {
+    const id = uniq();
+    await chat.ask(`Start ${id}`);
+    const second = await context.newPage();
+    await second.goto("/");
+    await nav(second).getByRole("button", { name: new RegExp(`^Start ${id}`) }).click();
+    const secondComposer = second.getByRole("textbox", { name: "Nachricht" });
+
+    await chat.send(`#langsam Tab eins ${id}`);
+    await expect(chat.stopButton).toBeVisible();
+    await secondComposer.fill(`Tab zwei ${id}`);
+    await second.getByRole("button", { name: "Senden", exact: true }).click();
+    await expect(second.getByRole("status").filter({ hasText: "In einem anderen Tab läuft gerade eine Antwort in diesem Chat." })).toBeVisible();
+    await expect(secondComposer).toHaveValue(`Tab zwei ${id}`);
+
+    await chat.waitForAnswer(2);
+    await second.getByRole("button", { name: "Senden", exact: true }).click();
+    await chat.waitForAnswer(3);
+    await page.reload();
+    await nav(page).getByRole("button", { name: new RegExp(`^Start ${id}`) }).click();
+    const order = await page.locator("article").evaluateAll((els) => els.map((e) => (e.getAttribute("aria-label") === "Deine Nachricht" ? "F" : "A")).join(""));
+    expect(order).toBe("FAFAFA");
+    await second.close();
+  });
+
+  test("E16 Browser-Speicher voll: klare Meldung, Text und Anhang bleiben im Eingabefeld", async ({ chat, page }) => {
+    await page.getByLabel("Dateien zum Anhängen").setInputFiles([{ name: "bleibt.txt", mimeType: "text/plain", buffer: Buffer.from(`Bleibt ${uniq()}`) }]);
+    await expectReady(page, "bleibt.txt", /ca\. \d+ Tokens/);
+    await page.evaluate(() => {
+      IDBObjectStore.prototype.put = function () {
+        throw new DOMException("Speicher voll", "QuotaExceededError");
+      };
+    });
+    const text = `Speicher voll ${uniq()}`;
+    await chat.composer.fill(text);
+    await chat.sendButton.click();
+    await expect(page.getByRole("status").filter({ hasText: "Die Nachricht wurde nicht gesendet. Der Speicher dieses Browsers ist voll" })).toBeVisible();
+    await expect(chat.composer).toHaveValue(text);
+    await expect(chip(page, "bleibt.txt")).toBeVisible();
+    await expect(chat.questions).toHaveCount(0);
   });
 });

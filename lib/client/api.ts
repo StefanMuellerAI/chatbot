@@ -13,6 +13,18 @@ export class ApiError extends Error {
 export const NETWORK_ERROR = "Keine Verbindung zu Freebie. Bitte prüfe die Internetverbindung und versuche es erneut.";
 export const STREAM_BROKEN = "Die Verbindung ist während der Antwort abgebrochen. Bitte „Neu generieren“ verwenden.";
 
+/**
+ * Meldung für Antworten ohne eigene Fehlermeldung – vor allem Fehlerseiten der Plattform (Vercel antwortet bei zu
+ * großen Anfragen oder Zeitüberschreitungen mit HTML statt JSON).
+ */
+export function statusMessage(status: number): string {
+  if (status === 413) return "Die Anfrage ist zu groß. Bitte einen neuen Chat starten oder kleinere Dateien verwenden.";
+  if (status === 408 || status === 504) return "Freebie hat zu lange gebraucht (Zeitüberschreitung). Bitte gleich nochmal versuchen.";
+  if (status === 429) return "Gerade sind sehr viele Anfragen unterwegs. Bitte kurz warten und nochmal versuchen.";
+  if (status >= 500) return "Freebie antwortet gerade nicht. Bitte gleich nochmal versuchen.";
+  return `Unerwartete Antwort von Freebie (Fehler ${status}). Bitte nochmal versuchen.`;
+}
+
 /** fetch mit deutscher Meldung, wenn das Netz fehlt (statt „Failed to fetch“). */
 async function request(url: string, init: RequestInit): Promise<Response> {
   try {
@@ -40,7 +52,7 @@ export async function api<T>(url: string, init?: RequestInit & { json?: unknown;
   });
   if (!res.ok) {
     handleUnauthorized(res.status, admin);
-    let message = `Fehler ${res.status}`;
+    let message = statusMessage(res.status);
     try {
       const data = (await res.json()) as { error?: string };
       if (data.error) message = data.error;
@@ -79,7 +91,7 @@ export async function streamChat(
 export async function readEventStream(res: Response, onEvent: (event: StreamEvent) => void, signal: AbortSignal): Promise<void> {
   if (!res.ok || !res.body) {
     handleUnauthorized(res.status);
-    let message = `Fehler ${res.status}`;
+    let message = statusMessage(res.status);
     try {
       const data = (await res.json()) as { error?: string };
       if (data.error) message = data.error;

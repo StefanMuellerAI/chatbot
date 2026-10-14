@@ -4,9 +4,10 @@ Stand: 13. Oktober 2026 · Grundlage: `main` mit Fundus und Posteingang (286 E2E
 aller Chat-Tests und des Chat-Codes, dazu Sonden gegen den Produktions-Build im Mock-Modus (temporäre
 Playwright-Tests, nicht eingecheckt)
 
-**Umsetzung:** Phase 1 ist erledigt (14. Oktober 2026): Fehler 1–8, 10 und 20 sind behoben, je mit Test
-(A13/A14, C16/C17, C21/C22, F13–F15, H05, T19–T21 in der TESTPLAN.md, dort Fehler 45–53). Die Entscheidungen
-stehen in Abschnitt 7.
+**Umsetzung:** Phase 1 und 2 sind erledigt (14. Oktober 2026): Fehler 1–15 und 17–20 sind behoben, je mit Test
+(Phase 1: A13/A14, C16/C17, C21/C22, F13–F15, H05, T19–T21; Phase 2: C19/C20, C24–C26, C30, E11, E12, E15, E16,
+F17, H06 – in der TESTPLAN.md, dort Fehler 45–61). Offen ist Phase 3 (dauerhafte Absicherung) und Phase 4 (echte
+Geräte). Die Entscheidungen stehen in Abschnitt 7.
 
 ## 1. Ziel
 
@@ -61,7 +62,8 @@ funktionieren ebenfalls – ihnen fehlt nur ein Test.
 
 ### 3.1 Bestätigt (Sonde gegen den Produktions-Build, auf dem aktuellen `main` wiederholt)
 
-Behoben in Phase 1: 1–8, 10 und 20. Kein Fehler: 16 – Überschreiben ist so gewollt (Entscheidung 4).
+Behoben in Phase 1: 1–8, 10 und 20; in Phase 2: 9, 11–15, 17–19. Kein Fehler: 16 – Überschreiben ist so gewollt
+(Entscheidung 4).
 
 Schwere: **hoch** = trifft in Schulungen realistisch, Teilnehmende kommen nicht weiter oder es entstehen
 Datenverlust bzw. doppelte Kosten · **mittel** = verwirrend, mit Umweg lösbar · **niedrig** = selten.
@@ -126,29 +128,29 @@ W06 ist inzwischen von den Gruppenchats belegt; Zufallstest und lange Chats hei�
 | C16 | Einfügen aus Word, Excel, PowerPoint und PDF-Reader (Text + HTML + Bild in der Zwischenablage) | Text steht im Eingabefeld, kein Bild-Anhang | **✔ erledigt** |
 | C17 | Einfügen eines Screenshots bzw. eines Bildes von einer Webseite (Bild ohne Text) | wird angehängt | **✔ erledigt** |
 | C18 | Text mit Steuerzeichen, Nullbyte, geschützten Leerzeichen, Emoji, arabischer Schrift senden; danach „Kopieren“ | keine Fehlermeldung, Modell bekommt den Text, Kopieren liefert ihn exakt zurück | ⚠️ |
-| C19 | Enter mit Hardware-Tastatur, mit Bildschirmtastatur (iPad, Handy) und mit Wortvorschlägen | wie in Entscheidung 2 festgelegt | ⚠️ |
-| C20 | Markierten Text per Drag & Drop ins Eingabefeld ziehen | Text wird eingefügt | ❌ 12 |
+| C19 | Enter mit Hardware-Tastatur, mit Bildschirmtastatur (iPad, Handy) und mit Wortvorschlägen | wie in Entscheidung 2 festgelegt | **✔ erledigt** |
+| C20 | Markierten Text per Drag & Drop ins Eingabefeld ziehen | Text wird eingefügt | **✔ erledigt** |
 | C21 | Doppelklick und Doppel-Enter auf „Senden“ – im neuen und im laufenden Chat, auch mit CPU-Drosselung (altes iPad) | genau eine Frage, ein Chat, eine Anfrage | **✔ erledigt** |
 | C22 | Doppelklick „Neu generieren“ (auch beim Hinweis „Antwort fehlt“) | genau eine neue Antwort | **✔ erledigt** |
 | C23 | Doppelklick auf „Bild erzeugen“, „Stoppen“, Kopieren, „Chats exportieren“, „Abmelden“, Senden im Posteingang | jeweils genau eine Wirkung | ✅ (Bild-Modus per Sonde, Posteingang nach Code) |
-| C24 | Entwurf mit Anhang (auch Upload läuft) → „Bearbeiten“ an früherer Nachricht → „Abbrechen“ | Entwurf und Anhänge sind wieder da, der Upload läuft weiter | ❌ 13 |
-| C25 | Entwurf → Beispiel-Knopf, Vorlage oder „Mit Freebie besprechen“ im Posteingang | Entwurf bleibt erhalten (Entscheidung 3) | ❌ 13 |
-| C26 | Bearbeiten-Modus → anderen Chat wählen, „Neuer Chat“, Chat löschen | im anderen Chat steht nicht der alte Nachrichtentext, Hinweisleiste weg, eigener Entwurf zurück | ❌ 14 |
+| C24 | Entwurf mit Anhang (auch Upload läuft) → „Bearbeiten“ an früherer Nachricht → „Abbrechen“ | Entwurf und Anhänge sind wieder da, der Upload läuft weiter | **✔ erledigt** |
+| C25 | Entwurf → Beispiel-Knopf, Vorlage oder „Mit Freebie besprechen“ im Posteingang | Entwurf bleibt erhalten (Entscheidung 3) | **✔ erledigt** |
+| C26 | Bearbeiten-Modus → anderen Chat wählen, „Neuer Chat“, Chat löschen | im anderen Chat steht nicht der alte Nachrichtentext, Hinweisleiste weg, eigener Entwurf zurück | **✔ erledigt** |
 | C27 | Antwort läuft → anderen Chat in der Leiste, Bild-Modus, Bearbeiten, Import, Abmelden, Zurück-Geste | gesperrt bzw. sauber beendet; beim Verlassen eine Warnung (Entscheidung 6) | ✅ teilweise (E01, E06, D10, W02) |
 | C28 | Nach einer Fehlermeldung einfach weiterschreiben statt „Neu generieren“; nach „Stoppen“ sofort neu senden | gültiger Verlauf; die Anfrage an den Anbieter ist gültig (Fake-API prüft die Rollenfolge) | ⚠️ |
 | C29 | Nur einen Anhang senden, ohne Text bzw. nur mit Leerzeichen | Antwort kommt | ✅ |
-| C30 | HTTP-Fehler ohne JSON (413, 502, 503, 504 als HTML-Seite) bei Chat, Upload, Bild, Titel, Transkription, Diktat | deutsche Meldung mit nächstem Schritt („Chat ist zu groß – bitte neuen Chat starten“, „Freebie antwortet gerade nicht – gleich nochmal versuchen“) | ❌ 17 |
+| C30 | HTTP-Fehler ohne JSON (413, 502, 503, 504 als HTML-Seite) bei Chat, Upload, Bild, Titel, Transkription, Diktat | deutsche Meldung mit nächstem Schritt („Chat ist zu groß – bitte neuen Chat starten“, „Freebie antwortet gerade nicht – gleich nochmal versuchen“) | **✔ erledigt** |
 
 ### E · Verlauf, Import und Export
 
 | ID | Szenario | Erwartete Wirkung | Heute |
 |---|---|---|---|
-| E11 | Import mit Feldern vom falschen Typ (`attachments`, `citations`, `images`, `native`, `usage`), fremden Feldern, sehr großer Datei | Ungültiges wird verworfen, nichts stürzt ab; im Notfall „Dieser Chat kann nicht angezeigt werden“ statt weißer Seite | ❌ 15 |
-| E12 | Älteren Export erneut importieren (gleiche Chat-IDs) | Chats mit gleicher ID werden überschrieben (Entscheidung 4) | ✅ |
+| E11 | Import mit Feldern vom falschen Typ (`attachments`, `citations`, `images`, `native`, `usage`), fremden Feldern, sehr großer Datei | Ungültiges wird verworfen, nichts stürzt ab; im Notfall „Dieser Chat kann nicht angezeigt werden“ statt weißer Seite | **✔ erledigt** |
+| E12 | Älteren Export erneut importieren (gleiche Chat-IDs) | Chats mit gleicher ID werden überschrieben (Entscheidung 4) | **✔ erledigt** |
 | E13 | Falsche Datei gewählt (PDF, Bild, leer, Markdown-Export) | verständliche Meldung | ✅ teilweise (E08) |
 | E14 | Export aus der Ablauf-Warnung und aus der Seitenleiste auf iPad/Safari | Datei vollständig | ⚠️ (Gerät) |
-| E15 | Zwei Tabs mit demselben Chat senden gleichzeitig | Verlauf bleibt geordnet (Sperre oder Hinweis, Entscheidung 7) | ❌ 19 |
-| E16 | Browser-Speicher voll bzw. IndexedDB nicht verfügbar | klare Meldung, Eingabe bleibt erhalten | ❌ 18 |
+| E15 | Zwei Tabs mit demselben Chat senden gleichzeitig | Verlauf bleibt geordnet (Sperre oder Hinweis, Entscheidung 7) | **✔ erledigt** |
+| E16 | Browser-Speicher voll bzw. IndexedDB nicht verfügbar | klare Meldung, Eingabe bleibt erhalten | **✔ erledigt** |
 
 ### F · Dateien aus dem echten Leben
 
@@ -160,7 +162,7 @@ W06 ist inzwischen von den Gruppenchats belegt; Zufallstest und lange Chats hei�
 | F14 | CSV aus deutschem Excel (Windows-1252, Semikolon, Dezimalkomma, Datum), UTF-16-Text, UTF-8 mit BOM | Umlaute, Zahlen und Daten kommen korrekt beim Modell an | **✔ erledigt** |
 | F15 | Text mit Nullbytes und Steuerzeichen (Logdatei, PDF mit ungewöhnlicher Schrift) | wird ausgelesen oder klare Meldung, nie „interner Fehler“ | **✔ erledigt** |
 | F16 | Typische falsche Formate: .doc, .ppt, .odt, .pages, .heic, .msg, .zip, Ordner, Datei ohne Endung | Meldung mit Tipp („Bitte als .docx speichern“, „Bitte als JPG exportieren“) | ⚠️ |
-| F17 | Datei auf Seitenleiste, Artefakt-Panel, Posteingang oder Dialog fallen lassen, auch bei „Pause“ | Freebie bleibt offen; Datei wird angehängt bzw. Hinweis | ❌ 11 |
+| F17 | Datei auf Seitenleiste, Artefakt-Panel, Posteingang oder Dialog fallen lassen, auch bei „Pause“ | Freebie bleibt offen; Datei wird angehängt bzw. Hinweis | **✔ erledigt** |
 | F18 | Netz bricht während Upload bzw. Transkription ab | klare Meldung, erneut anhängen möglich, nichts hängt | ⚠️ |
 
 ### H · Spracheingabe
@@ -168,7 +170,7 @@ W06 ist inzwischen von den Gruppenchats belegt; Zufallstest und lange Chats hei�
 | ID | Szenario | Erwartete Wirkung | Heute |
 |---|---|---|---|
 | H05 | Doppelklick aufs Mikrofon; Klick, während die Berechtigungsabfrage offen ist | genau eine Aufnahme; nach „Stopp“ ist kein Mikrofon-Stream mehr aktiv | **✔ erledigt** |
-| H06 | Diktat läuft bzw. transkribiert → tippen, Text löschen, senden, Chat wechseln | Getipptes bleibt, Transkript wird angehängt (nie ersetzt) | ❌ 9 |
+| H06 | Diktat läuft bzw. transkribiert → tippen, Text löschen, senden, Chat wechseln | Getipptes bleibt, Transkript wird angehängt (nie ersetzt) | **✔ erledigt** |
 
 ### T · Schulungsraum
 
@@ -246,7 +248,8 @@ würde `npm run test:coverage` rot). Danach gilt die bekannte Regel: keine Katal
 
 Jede Behebung mit dem Test, der sie absichert. Dateien sind Startpunkte, keine abschließende Liste. Umgesetzt
 (Phase 1): 1–8 und 10, dazu 20 – „Stoppen“ ignoriert den zweiten Klick eines Doppelklicks
-(`components/chat/Composer.tsx`, Test C21).
+(`components/chat/Composer.tsx`, Test C21). Umgesetzt (Phase 2): 9, 11–15, 17–19; zu 13/14 kam hinzu, dass auch
+„Neuer Chat“ den Entwurf stehen lässt und ein unverändert übernommenes Beispiel ein anderes ersetzen darf.
 
 | # | Vorschlag | Dateien | Test |
 |---|---|---|---|
@@ -272,11 +275,13 @@ Am 14. Oktober 2026 entschieden:
 
 1. **Gast-Passwörter tolerant vergleichen** (Leerzeichen, unsichtbare Zeichen und Groß-/Kleinschreibung egal; das
    Admin-Passwort bleibt exakt) – *ja, umgesetzt*
-2. **Enter macht eine neue Zeile**, gesendet wird mit dem Knopf – *entschieden; noch offen, ob das auch am
-   Rechner mit Hardware-Tastatur gilt oder nur auf iPad und Handy (Empfehlung war: nur auf Touch-Geräten)*
+2. **Enter macht auf dem iPad eine neue Zeile**, gesendet wird mit dem Knopf (mit angeschlossener Tastatur auch
+   Strg/Cmd+Enter); am Rechner bleibt Enter = Senden – *entschieden, umgesetzt. Erkannt werden Geräte, die nur per
+   Finger bedient werden – das schließt Handys und Android-Tablets mit ein*
 3. **Entwurf schützen:** Beispiel, Vorlage und „Mit Freebie besprechen“ füllen nur ein leeres Feld; „Bearbeiten“
-   merkt sich den Entwurf; beim Chatwechsel bleibt der eigene Entwurf samt laufender Uploads stehen – *ja*
-4. **Import bei gleicher Chat-ID:** überschreiben (wie bisher) – *entschieden; Befund 16 ist damit kein Fehler*
+   merkt sich den Entwurf; beim Chatwechsel bleibt der eigene Entwurf samt laufender Uploads stehen – *ja,
+   umgesetzt: steht schon ein eigener Entwurf da, bleibt er stehen und ein Hinweis bietet „Ersetzen“ an*
+4. **Import bei gleicher Chat-ID:** überschreiben (wie bisher) – *entschieden; Befund 16 ist damit kein Fehler, E12 hält es fest*
 
 Noch nicht ausdrücklich entschieden – 5 und 8 sind als Fehlerbehebung nach Empfehlung in Phase 1 umgesetzt und
 lassen sich leicht zurücknehmen:
@@ -293,7 +298,7 @@ lassen sich leicht zurücknehmen:
 | Phase | Inhalt | Umfang |
 |---|---|---|
 | 1 · Vor der nächsten Schulung | Fehler mit Wirkung im Raum: 1, 2, 3, 4, 5, 7, 8, 10 und 6, je mit Test (A13, A14, C16, C17, C21, C22, H05, F13–F15, T19–T21) | **erledigt** (14. Oktober 2026) |
-| 2 · Reihenfolgen und Robustheit | 9, 11–15, 17–19 mit Tests (C20, C24–C26, C30, E11, E15, E16, F17, H06); Enter macht eine neue Zeile (C19, Entscheidung 2); E12 hält das Überschreiben fest | M |
+| 2 · Reihenfolgen und Robustheit | 9, 11–15, 17–19 mit Tests (C20, C24–C26, C30, E11, E15, E16, F17, H06); Enter macht eine neue Zeile (C19, Entscheidung 2); E12 hält das Überschreiben fest | **erledigt** (14. Oktober 2026) |
 | 3 · Dauerhafte Absicherung | Testhelfer, Testdaten, Unit-Tests, Zufallstest W07 mit Nacht-Workflow; übrige ⚠️-Zeilen (A15, A16, C18, C23, C27–C29, E13, F11, F12, F16, F18, W08, Z18) | L |
 | 4 · Echte Geräte | manuelle Abnahme aus TESTPLAN Abschnitt 9 erweitern: Einfügen aus Office (Windows/Edge, Mac/Safari), Enter auf iPad und Android, HEIC aus Fotos und Dateien-App, 5-Minuten-Diktat in Safari, Export auf dem iPad, Passwort-Manager am Schulungsrechner (C16, C19, F16, E14, T22) | S |
 

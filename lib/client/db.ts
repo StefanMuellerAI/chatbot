@@ -1,6 +1,8 @@
 "use client";
 import Dexie, { type EntityTable } from "dexie";
-import type { ChatMessage, ConnectionId, Effort, MailRef } from "@/lib/shared/types";
+import type { Attachment, ChatMessage, Citation, ConnectionId, Effort, GeneratedImage, MailRef } from "@/lib/shared/types";
+import { MAX_ATTACHMENTS } from "@/lib/files/limits";
+import { LIBRARY_ID } from "@/lib/library/types";
 import { groupChatsForExport } from "./groupchat";
 
 export interface Conversation {
@@ -169,7 +171,8 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function normalizeConversation(v: unknown): Conversation | null {
+/** Importierter Chat in der Form, die Anzeige und Server erwarten (exportiert für die Unit-Tests). */
+export function normalizeConversation(v: unknown): Conversation | null {
   if (!isRecord(v) || typeof v.id !== "string" || !v.id || !Array.isArray(v.messages)) return null;
   const now = Date.now();
   const messages = v.messages
@@ -177,12 +180,21 @@ function normalizeConversation(v: unknown): Conversation | null {
     .map((m) => {
       const msg: Record<string, unknown> = {
         ...m,
-        id: typeof m.id === "string" && m.id ? m.id : crypto.randomUUID(),
+        id: typeof m.id === "string" && m.id && m.id.length <= 100 ? m.id : crypto.randomUUID(),
         role: m.role,
         text: typeof m.text === "string" ? m.text : "",
         createdAt: typeof m.createdAt === "number" ? m.createdAt : now,
       };
-      // Verbindungen und Mail-Karten nur in gültiger Form übernehmen – sonst stürzt die Anzeige ab.
+      // Felder nur in gültiger Form übernehmen – sonst stürzt die Anzeige ab oder der Server lehnt den Chat ab.
+      if ("attachments" in m) msg.attachments = listOf(m.attachments, attachmentOf)?.slice(0, MAX_ATTACHMENTS);
+      if ("citations" in m) msg.citations = listOf(m.citations, citationOf);
+      if ("images" in m) msg.images = listOf(m.images, imageOf);
+      if ("native" in m) msg.native = isRecord(m.native) && PROVIDERS.includes(m.native.provider as string) && typeof m.native.model === "string" && Array.isArray(m.native.items) ? m.native : undefined;
+      if ("usage" in m) msg.usage = isRecord(m.usage) && USAGE_KEYS.every((k) => typeof (m.usage as Record<string, unknown>)[k] === "number") ? m.usage : undefined;
+      for (const key of ["thinking", "error", "stopReason", "fallbackModel"]) if (key in m && typeof m[key] !== "string") msg[key] = undefined;
+      for (const key of ["modelId", "contextDate"]) if (key in m && (typeof m[key] !== "string" || (m[key] as string).length > 100)) msg[key] = undefined;
+      for (const key of ["webSearch", "fromCache"]) if (key in m && typeof m[key] !== "boolean") msg[key] = undefined;
+      if ("effort" in m && !EFFORTS.includes(m.effort as Effort)) msg.effort = undefined;
       if ("connections" in m) msg.connections = connectionList(m.connections);
       if ("author" in m) msg.author = typeof m.author === "string" && m.author ? m.author.slice(0, 60) : undefined;
       if ("mails" in m) msg.mails = isRecord(m.mails) ? { read: mailRefs(m.mails.read), sent: mailRefs(m.mails.sent) } : undefined;
@@ -191,10 +203,12 @@ function normalizeConversation(v: unknown): Conversation | null {
   const updatedAt = typeof v.updatedAt === "number" ? v.updatedAt : now;
   return {
     ...(v as unknown as Conversation),
+    // Der Server nimmt IDs bis 100 Zeichen an.
+    id: v.id.slice(0, 100),
     connections: "connections" in v ? connectionList(v.connections) : undefined,
     title: typeof v.title === "string" && v.title.trim() ? v.title : "Importierter Chat",
     modelId: typeof v.modelId === "string" ? v.modelId : "",
-    presetId: typeof v.presetId === "string" ? v.presetId : null,
+    presetId: typeof v.presetId === "string" ? v.presetId.slice(0, 100) : null,
     createdAt: typeof v.createdAt === "number" ? v.createdAt : updatedAt,
     updatedAt,
     messages,
@@ -202,6 +216,44 @@ function normalizeConversation(v: unknown): Conversation | null {
 }
 
 const CONNECTIONS: readonly ConnectionId[] = ["mailbox"];
+const EFFORTS: readonly Effort[] = ["low", "medium", "high", "max"];
+const PROVIDERS = ["anthropic", "openai", "mock"];
+const USAGE_KEYS = ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens"];
+
+/** Gültige Einträge einer Liste; ohne gültige Einträge fällt das Feld weg. */
+function listOf<T>(v: unknown, of: (x: unknown) => T | null): T[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v.map(of).filter((x): x is T => x !== null);
+  return out.length ? out : undefined;
+}
+
+/** Anhang in der Form, die der Server prüft (lib/shared/schemas.ts) – sonst wäre der ganze Chat nicht mehr nutzbar. */
+function attachmentOf(a: unknown): Attachment | null {
+  if (!isRecord(a) || typeof a.name !== "string" || typeof a.storageKey !== "string") return null;
+  if (a.kind !== "image" && a.kind !== "document" && a.kind !== "transcript") return null;
+  if (typeof a.sha256 !== "string" || !/^[a-f0-9]{64}$/.test(a.sha256)) return null;
+  return {
+    id: typeof a.id === "string" && a.id ? a.id.slice(0, 100) : crypto.randomUUID(),
+    kind: a.kind,
+    name: a.name.slice(0, 300),
+    mime: typeof a.mime === "string" ? a.mime.slice(0, 200) : "",
+    size: typeof a.size === "number" && a.size >= 0 ? a.size : 0,
+    sha256: a.sha256,
+    storageKey: a.storageKey.slice(0, 300),
+    tokenEstimate: typeof a.tokenEstimate === "number" ? a.tokenEstimate : undefined,
+    preview: typeof a.preview === "string" ? a.preview.slice(0, 2000) : undefined,
+    native: typeof a.native === "boolean" ? a.native : undefined,
+    libraryId: typeof a.libraryId === "string" && LIBRARY_ID.test(a.libraryId) ? a.libraryId : undefined,
+  };
+}
+
+function citationOf(c: unknown): Citation | null {
+  return isRecord(c) && typeof c.url === "string" && typeof c.title === "string" ? { url: c.url, title: c.title } : null;
+}
+
+function imageOf(i: unknown): GeneratedImage | null {
+  return isRecord(i) && typeof i.id === "string" && typeof i.url === "string" ? { id: i.id, url: i.url, prompt: typeof i.prompt === "string" ? i.prompt : "" } : null;
+}
 
 function connectionList(v: unknown): ConnectionId[] {
   return Array.isArray(v) ? CONNECTIONS.filter((c) => v.includes(c)) : [];
