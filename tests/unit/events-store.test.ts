@@ -62,7 +62,8 @@ describe("Termine, Gruppen und Gäste", () => {
 
   it("neues Passwort, Gast löschen und nachlegen", async () => {
     const { id, groupId, guests } = await eventWithGuests(2);
-    const fresh = await resetGuestPassword(guests[0].id);
+    const { password: fresh, username } = await resetGuestPassword(guests[0].id);
+    expect(username).toBe(guests[0].username);
     expect(fresh).not.toBe(guests[0].password);
     expect((await checkGuestLogin(guests[0].username, guests[0].password!)).ok).toBe(false);
     expect((await checkGuestLogin(guests[0].username, fresh)).ok).toBe(true);

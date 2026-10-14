@@ -84,7 +84,4 @@ export function generatePassword(): string {
   }
 }
 
-/** Benutzername so, wie er verglichen wird (Groß-/Kleinschreibung und Leerzeichen egal). */
-export function normalizeUsername(input: string): string {
-  return input.trim().toLowerCase().replace(/\s+/g, "");
-}
+export { normalizeGuestPassword, normalizeUsername } from "@/lib/shared/login-input";

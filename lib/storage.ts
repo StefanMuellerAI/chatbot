@@ -5,6 +5,7 @@ import { del, get, put } from "@vercel/blob";
 import { inArray, lt } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db/client";
 import { HttpError } from "@/lib/errors";
+import { safeFileName } from "@/lib/files/limits";
 
 export type StorageMode = "blob" | "local";
 
@@ -57,10 +58,8 @@ export function assertSafeKey(key: string): void {
   }
 }
 
-export function sanitizeFileName(name: string): string {
-  const base = name.normalize("NFKD").replace(/[^\w.-]+/g, "_").replace(/_+/g, "_");
-  return base.replace(/^[._]+/, "").slice(-100) || "datei";
-}
+/** Gleiche Bereinigung wie im Browser. */
+export const sanitizeFileName = safeFileName;
 
 export async function putFile(
   key: string,

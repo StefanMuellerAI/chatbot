@@ -159,6 +159,12 @@ export async function consumeLoginAttempt(request: Request, username: string, ad
   return refund;
 }
 
+/** Hebt die Sperre eines Benutzernamens auf (z. B. nach „Passwort neu erzeugen“ durch die Kursleitung). */
+export async function clearLoginAttempts(username: string): Promise<void> {
+  const db = await getDb();
+  await db.delete(schema.loginAttempts).where(eq(schema.loginAttempts.ipHash, hashId(`name:${username}`)));
+}
+
 /** Auf Vercel setzt die Plattform x-forwarded-for selbst (von außen nicht fälschbar). */
 function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");

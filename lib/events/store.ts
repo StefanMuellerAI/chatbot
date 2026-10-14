@@ -8,7 +8,7 @@ import { getDb, schema } from "@/lib/db/client";
 import { HttpError } from "@/lib/errors";
 import { deleteEventGroupChats, purgeGroupChats } from "@/lib/groupchat/store";
 import { deleteEventMails, purgeMail } from "@/lib/mail/store";
-import { generatePassword, generateUsername, normalizeUsername } from "./credentials";
+import { generatePassword, generateUsername, normalizeGuestPassword, normalizeUsername } from "./credentials";
 import { EARLY_LOGIN_MS, effectiveEnd, eventStatus, guestAccess, validateEventTimes, type EventStatus, type EventTimes } from "./window";
 
 /** Höchstzahl neuer Gäste je Vorgang (beliebig viele über mehrere Vorgänge). */
@@ -121,12 +121,14 @@ export async function checkGuestLogin(rawUsername: string, password: string): Pr
     .where(eq(schema.guests.username, username))
     .limit(1);
   const row = rows[0];
+  // Kopierte Leerzeichen oder ein großer Anfangsbuchstabe sind kein Fehlversuch (Gast-Passwörter: nur a–z und 2–9).
+  const candidate = normalizeGuestPassword(password);
   if (!row) {
     dummyHash ??= hashPassword("freebie-platzhalter");
-    await verifyHashedPassword(password, await dummyHash);
+    await verifyHashedPassword(candidate, await dummyHash);
     return { ok: false, reason: "falsch" };
   }
-  if (password.length > 200 || !(await verifyHashedPassword(password, row.guest.passwordHash))) return { ok: false, reason: "falsch" };
+  if (password.length > 200 || !(await verifyHashedPassword(candidate, row.guest.passwordHash))) return { ok: false, reason: "falsch" };
   const access = guestAccess(times(row.event));
   if (!access.ok) {
     return access.reason === "zu-frueh" ? { ok: false, reason: "zu-frueh", opensAt: access.opensAt, startsAt: row.event.startsAt } : { ok: false, reason: "vorbei" };
@@ -296,8 +298,11 @@ export async function deleteGuest(guestId: string): Promise<void> {
   invalidateGuestCache();
 }
 
-/** Neues Passwort; das alte gilt sofort nicht mehr (bestehende Sitzung bleibt bestehen). */
-export async function resetGuestPassword(guestId: string): Promise<string> {
+/**
+ * Neues Passwort; das alte gilt sofort nicht mehr (bestehende Sitzung bleibt bestehen). Liefert auch den
+ * Benutzernamen, damit die Login-Bremse für ihn zurückgesetzt werden kann.
+ */
+export async function resetGuestPassword(guestId: string): Promise<{ password: string; username: string }> {
   const guest = await getGuestRow(guestId);
   await assertEditable(guest.eventId);
   const password = generatePassword();
@@ -306,7 +311,7 @@ export async function resetGuestPassword(guestId: string): Promise<string> {
     .update(schema.guests)
     .set({ passwordHash: await hashPassword(password), passwordEnc: seal(password) })
     .where(eq(schema.guests.id, guestId));
-  return password;
+  return { password, username: guest.username };
 }
 
 // ---------------------------------------------------------------- Ansicht und Statistik

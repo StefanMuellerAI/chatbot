@@ -8,7 +8,7 @@ import { appendMessages, db, saveConversation, selectAccount, type Conversation 
 import { conversationToMarkdown, downloadText, safeName } from "@/lib/client/export";
 import { streamChat } from "@/lib/client/api";
 import { formatContextDate } from "@/lib/shared/date";
-import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, MailRef, PublicConfig, StreamEvent } from "@/lib/shared/types";
+import type { AccountInfo, Attachment, ChatMessage, Effort, GeneratedImage, MailRef, PublicConfig, PublicModel, StreamEvent } from "@/lib/shared/types";
 import { newDraft, type ComposeDraft } from "@/lib/client/mail";
 import { mailName, type MailFolder } from "@/lib/shared/mail";
 import type { GroupChatSummary } from "@/lib/shared/groupchat";
@@ -458,8 +458,21 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
     }
   };
 
+  // Sperrt Senden und „Neu generieren“ sofort beim ersten Klick – der Zustand „streaming“ kommt erst nach dem
+  // Speichern im Browser, ein Doppelklick wäre sonst zwei Anfragen (zwei Chats bzw. zwei Antworten).
+  const busyRef = useRef(false);
+
   const send = async (rawText: string, attachments: Attachment[]) => {
-    if (!config || !model || streaming) return;
+    if (!config || !model || streaming || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await sendNow(rawText, attachments, config, model);
+    } finally {
+      busyRef.current = false;
+    }
+  };
+
+  const sendNow = async (rawText: string, attachments: Attachment[], config: PublicConfig, model: PublicModel) => {
     const now = Date.now();
     let baseMessages = active?.messages ?? [];
     const allAttachments = attachments;
@@ -507,7 +520,16 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
   };
 
   const regenerate = async () => {
-    if (!active || streaming) return;
+    if (!active || streaming || busyRef.current) return;
+    busyRef.current = true;
+    try {
+      await regenerateNow(active);
+    } finally {
+      busyRef.current = false;
+    }
+  };
+
+  const regenerateNow = async (active: Conversation) => {
     const msgs = [...active.messages];
     const lastAnswer = msgs[msgs.length - 1];
     // Eine Antwort, die Mails verschickt hat, würde sie beim Neu-Generieren womöglich noch einmal senden.

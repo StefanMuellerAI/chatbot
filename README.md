@@ -58,7 +58,8 @@ Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
 - **Kursleitung:** ein Zugang aus `ADMIN_USERNAME`/`ADMIN_PASSWORD` für Chat und Admin-Bereich (Sitzung 12 Stunden).
 - **Gäste:** Im Admin-Bereich unter **Termine** legt die Kursleitung Termine (höchstens 24 Stunden) mit beliebig
   vielen Gruppen und Gästen an. Jeder Gast bekommt einen einfachen Benutzernamen (z. B. `fuchs27`) und ein einfaches
-  Passwort (z. B. `sonne482`). Gäste kommen nur in den Chat, ab 30 Minuten vor Beginn.
+  Passwort (z. B. `sonne482`). Gäste kommen nur in den Chat, ab 30 Minuten vor Beginn. Groß-/Kleinschreibung und
+  mitkopierte Leerzeichen spielen keine Rolle; Name und Passwort lassen sich auch zusammen einfügen.
 - **Ablauf:** Zum Termin-Ende verfallen die Gast-Zugänge sofort. Zehn Minuten vorher erscheint im Chat ein Hinweis
   mit Export-Knopf; danach werden die Gast-Chats vom Gerät gelöscht. Kosten und Anfragen bleiben 90 Tage in der
   Statistik („Nach Termin“ in der Übersicht).

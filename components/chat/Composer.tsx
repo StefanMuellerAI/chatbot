@@ -320,7 +320,10 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
         }}
         onPaste={(e) => {
           const files = Array.from(e.clipboardData.files);
-          if (files.length) {
+          // Word, Excel und PowerPoint legen zum Text ein Bild der Auswahl in die Zwischenablage – dann gilt der
+          // Text. Ein Screenshot, ein kopiertes Bild oder eine kopierte Datei (höchstens mit Dateinamen als Text)
+          // wird angehängt.
+          if (files.length && !isFormattedText(e.clipboardData)) {
             e.preventDefault();
             addFiles(files);
           }
@@ -388,7 +391,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
         {streaming ? (
           <button
             type="button"
-            onClick={onStop}
+            // „Stoppen“ erscheint an der Stelle von „Senden“: der zweite Klick eines Doppelklicks auf „Senden“ soll die
+            // eben gestartete Antwort nicht gleich wieder abbrechen.
+            onClick={(e) => e.detail < 2 && onStop()}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-text text-bg hover:opacity-90"
             aria-label="Antwort stoppen"
             title="Stoppen"
@@ -424,6 +429,12 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
     </div>
   );
 });
+
+/** Formatierter Text aus Office, LibreOffice oder einer Webseite (Text plus HTML bzw. RTF). */
+function isFormattedText(data: DataTransfer): boolean {
+  const formatted = data.types.includes("text/html") || data.types.includes("text/rtf");
+  return formatted && data.getData("text/plain").trim().length > 0;
+}
 
 /** Verständliche Meldung für fehlgeschlagene Uploads (auch Fehler des Blob-SDKs). */
 function uploadErrorMessage(err: unknown): string {

@@ -114,6 +114,8 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | A10 | „Abmelden“ (Gast: mit Rückfrage, Chats werden vom Gerät gelöscht, der Posteingang wird geleert) | zurück zum Login, Cookie weg |
 | A11 | Kursleitung meldet alle ab, während jemand chattet | nächste Aktion führt sauber zum Login (ohne „abgelaufen“); nach erneuter Anmeldung sind die Chats des Kontos wieder da |
 | A12 | „Alle abmelden“ bei mehreren Admin-Sitzungen | andere Admin-Sitzungen enden, die eigene bleibt |
+| A13 | Gast-Passwort mit kopierten Leerzeichen, Tab, geschütztem Leerzeichen, Großbuchstaben (iPad) oder unsichtbaren Zeichen, ebenso im Namen | Anmeldung klappt, kein Fehlversuch gezählt; das Admin-Passwort bleibt exakt |
+| A14 | Benutzername und Passwort zusammen eingefügt (Kärtchen, CSV-Zeile, „Benutzername: … Passwort: …“) | beide Felder gefüllt, Anmeldung klappt; steht der Name schon da, wird ein eingefügtes Passwort nie zerlegt |
 
 ### B · Hinweis „Spielumgebung“
 
@@ -142,6 +144,10 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | C13 | Sehr lange Eingabe (200.000 Zeichen) bzw. über dem Limit | wird komprimiert gesendet bzw. klare Meldung statt „Ungültige Anfrage.“ |
 | C14 | Markdown-Export und Drucken | Dateiname und Inhalt (inkl. Anhänge, Quellen, Fehler); Druckansicht ohne Bedienelemente |
 | C15 | HTML/Script in Frage und Antwort, `javascript:`-Links | als Text dargestellt, nichts wird ausgeführt |
+| C16 | Einfügen aus Word, Excel und PowerPoint (Text, HTML und Bild in der Zwischenablage) | der Text steht im Eingabefeld, kein Bild-Anhang (auch mit der echten Zwischenablage in Chromium) |
+| C17 | Screenshot, Bild von einer Webseite, kopierte Datei einfügen | wird angehängt |
+| C21 | Doppelklick und Doppel-Enter auf „Senden“ (neuer und laufender Chat); langsamer Doppelklick, dessen zweiter Klick schon „Stoppen“ trifft | genau eine Frage, ein Chat, eine Anfrage; die Antwort läuft weiter |
+| C22 | Doppelklick auf „Neu generieren“ | genau eine neue Antwort, eine Anfrage |
 
 ### D · Modelle und Denktiefe
 
@@ -187,6 +193,9 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | F08 | Uploads bzw. Transkription im Admin aus | Meldung im Chat **und** Sperre in der API |
 | F09 | Anhänge im weiteren Gespräch | bleiben Teil des Verlaufs, erscheinen in Nachricht und Export |
 | F10 | Eingabeleiste mit Anhängen, breit und schmal | Senden-Button bleibt rechts in der Werkzeugzeile; die Token-Summe steht bei den Anhängen |
+| F13 | Dateinamen ohne lateinische Buchstaben („Отчет.txt“, „📊.csv“), Endung in Großbuchstaben, sehr lange Namen | werden verarbeitet, der Originalname bleibt sichtbar |
+| F14 | CSV aus deutschem Excel (Windows-1252, Semikolon, Dezimalkomma, Datum), UTF-16- und UTF-8-Text mit BOM | Umlaute, Zahlen und Daten kommen unverändert beim Modell an |
+| F15 | Text mit Nullbytes und Steuerzeichen; Datei nur aus Nullbytes | wird ohne diese Zeichen ausgelesen bzw. „kein lesbarer Text“ – nie „interner Fehler“ |
 
 ### G · Audio-Transkription
 
@@ -207,6 +216,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | H02 | Mikrofon verweigert | Meldung, per Klick schließbar |
 | H03 | Zu lange Aufnahme | automatischer Stopp nach 10 Minuten bzw. Meldung |
 | H04 | Funktion aus bzw. Pause | Button fehlt bzw. gesperrt |
+| H05 | Doppelklick aufs Mikrofon | eine Aufnahme; nach „Stopp“ ist kein Mikrofon-Stream mehr aktiv, später kommt kein Text nach |
 
 ### I · Bilder
 
@@ -349,6 +359,9 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | T16 | Übersicht „Nach Termin“ | Gast-Anfragen und Sitzungen je Termin und (aufgeklappt) je Gruppe; Summen nach Rolle; gelöschte Gruppen und Termine bleiben in der Statistik |
 | T17 | Aufräumjob nach dem Termin-Ende | löscht die Gast-Zugänge, der Termin bleibt in der Statistik |
 | T18 | API der Termine | 401 ohne Sitzung, 403 für Gäste, 400 mit deutscher Meldung, 404 für unbekannte IDs |
+| T19 | Frühstarter: 25 Gäste hinter einer IP melden sich vor der Freigabe mehrfach mit richtigen Daten an | „Dein Termin beginnt …“, keine Sperre; zum Beginn kommen alle hinein |
+| T20 | Gast nach 10 Fehlversuchen gesperrt, die Kursleitung erzeugt ein neues Passwort | Anmeldung mit dem neuen Passwort sofort möglich, das alte gilt nicht |
+| T21 | 25 Gäste hinter einer IP mit Copy-&-Paste-Resten im Passwort und je einem echten Tippfehler | keine Raumsperre |
 
 ### U · API-Robustheit (ohne Browser, alle Routen)
 
@@ -577,6 +590,20 @@ Alle behoben, jeweils mit Regressionstest (Stand 9. Oktober 2026). Live wirksam 
 | 43 | Hinweise oben im Chat (z. B. „… hat dich in „…“ eingeladen“) wurden auf dem Handy auf halbe Breite abgeschnitten statt umzubrechen | GC16 |
 | 44 | Die Zahl im Reiter des Fundus-Dialogs war durch Transparenz zu blass (Kontrast 3,6 : 1); in der CI seit dem Fundus-Ausbau rot, lokal unauffällig | Y19 |
 
+**Grenzfälle der Teilnehmenden, Phase 1** (14. Oktober 2026, Plan: [GRENZFAELLE-PLAN.md](GRENZFAELLE-PLAN.md))
+
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 45 | Gast-Passwort mit kopiertem Leerzeichen oder großem Anfangsbuchstaben (iPad) abgelehnt – und als Fehlversuch gezählt | A13, T21, Unit `eingaben.test.ts` |
+| 46 | Login-Bremse: Anmeldungen mit richtigem Passwort vor der Freigabe zählten als Fehlversuche; „Passwort neu erzeugen“ hob eine Sperre nicht auf | T19, T20 |
+| 47 | Doppelklick auf „Senden“ legte zwei Chats an bzw. stellte die Frage zweimal (doppelte Kosten); beim langsamen Doppelklick brach der zweite Klick als „Stoppen“ die Antwort ab | C21 |
+| 48 | Doppelklick auf „Neu generieren“ erzeugte zwei Antworten | C22 |
+| 49 | Einfügen aus Word, Excel oder PowerPoint: der Text verschwand, stattdessen hing ein Bild der Auswahl an | C16 |
+| 50 | Dateinamen ohne lateinische Buchstaben vor der Endung: „Dieses Dateiformat wird nicht unterstützt.“ | F13, Unit `dateinamen.test.ts` |
+| 51 | CSV aus deutschem Excel (Windows-1252): das Modell sah „M�ller“; UTF-16-Text und Nullbytes führten zu „interner Fehler“ | F14, F15, Unit `kodierung.test.ts` |
+| 52 | Doppelklick aufs Mikrofon: die zweite Aufnahme lief nach „Stopp“ unbemerkt weiter und fügte Minuten später Text ein | H05 |
+| 53 | Zugangsdaten vom Kärtchen oder aus der CSV in ein Feld eingefügt: beide landeten im Namensfeld | A14 |
+
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
@@ -616,9 +643,11 @@ liegt bei dir.
 | 8 · Zugänge | Bereich T (Termine, Gruppen, Gast-Zugänge), A/O/S angepasst | erledigt |
 | 9 · Posteingang | Bereich Z, Q22/Q23, V07, W05, X09; V05, A10, E08, N01 und U01 angepasst (`POSTEINGANG-PLAN.md`) | erledigt |
 | 10 · Gruppenchats | Bereich GC, Q24, V08, W06, X10; A10, E04/E06, E08, M03, N01/N03, Z10, U01–U03 und V05 angepasst; zweistellige Kürzel (`GRUPPENCHAT-PLAN.md`) | erledigt |
+| 11 · Grenzfälle, Phase 1 | A13/A14, C16/C17, C21/C22, F13–F15, H05, T19–T21; Fehler 45–53 (`GRENZFAELLE-PLAN.md`) | erledigt |
 
-Ergebnis: 316 E2E-Tests in 30 Dateien (plus 10 Live-Smoke-Tests) und 153 Unit-Tests; die komplette Suite läuft lokal
-in gut 11 Minuten (3 Worker). Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den
+Ergebnis: 331 E2E-Tests in 31 Dateien (plus 10 Live-Smoke-Tests) und 165 Unit-Tests; die komplette Suite läuft lokal
+in gut 10 Minuten (3 Worker). Nach Phase 1 der Grenzfälle (14. Oktober 2026) war sie vollständig grün, die 14 neuen
+Tests auch dreimal hintereinander. Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den
 Gruppenchats) war vollständig grün. Beim dreifachen Lauf vor den Gruppenchats (858 Läufe) scheiterte nur T13 zweimal an
 einer Reihenfolge-Abhängigkeit (das Postfach der Kursleitung teilen sich alle Chat-Tests); im Test behoben und in genau
 dieser Reihenfolge nachgeprüft. In der CI laufen zusätzlich die Chat-Tests in WebKit und Firefox.

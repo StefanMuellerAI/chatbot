@@ -58,9 +58,14 @@ export async function extractText(data: Buffer, name: string, mime: string): Pro
     console.warn("extract failed", name, err);
     throw new HttpError(422, "Die Datei konnte nicht gelesen werden. Ist sie beschädigt oder passwortgeschützt?");
   }
+  // Nullbytes und Steuerzeichen (aus Logdateien, manchen PDF-Schriften) – Postgres lehnt Nullbytes ab, das Modell
+  // braucht keines davon. Zeilenumbruch und Tabulator bleiben.
+  text = text.replace(CONTROL_CHARS, "");
   if (!text.trim()) throw new HttpError(422, "In der Datei wurde kein lesbarer Text gefunden (z. B. ein eingescanntes PDF).");
   return text;
 }
+
+const CONTROL_CHARS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
 
 async function extractByKind(data: Buffer, name: string, mime: string): Promise<string> {
   const kind = detectKind(name, mime);
@@ -85,9 +90,47 @@ async function extractByKind(data: Buffer, name: string, mime: string): Promise<
   }
 }
 
-function decodeText(data: Buffer): string {
-  const text = new TextDecoder("utf-8", { fatal: false }).decode(data);
-  return text.replace(/\r\n/g, "\n").trim();
+/**
+ * Text in der Kodierung, in der er gespeichert wurde: UTF-8 (mit oder ohne BOM), UTF-16 (Excel „Unicode-Text“,
+ * mit BOM oder erkennbar an den Nullbytes) oder Windows-1252 (CSV aus deutschem Excel, ältere Textdateien).
+ */
+export function decodeText(data: Uint8Array): string {
+  return decodeBytes(data).replace(/\r\n?/g, "\n").trim();
+}
+
+function decodeBytes(data: Uint8Array): string {
+  if (data[0] === 0xff && data[1] === 0xfe) return new TextDecoder("utf-16le").decode(data.subarray(2));
+  if (data[0] === 0xfe && data[1] === 0xff) return new TextDecoder("utf-16be").decode(data.subarray(2));
+  const utf16 = utf16WithoutBom(data);
+  if (utf16) return new TextDecoder(utf16).decode(data);
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(data);
+  } catch {
+    return decodeWindows1252(data);
+  }
+}
+
+/** Zeichen 0x80–0x9F in Windows-1252 (Nodes TextDecoder behandelt „windows-1252“ wie Latin-1, ohne €, „ und “). */
+const CP1252 = "€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ";
+
+function decodeWindows1252(data: Uint8Array): string {
+  return new TextDecoder("latin1").decode(data).replace(/[\u0080-\u009f]/g, (c) => CP1252[c.charCodeAt(0) - 0x80]);
+}
+
+/** UTF-16 ohne BOM: bei lateinischem Text ist fast jedes zweite Byte null. */
+function utf16WithoutBom(data: Uint8Array): "utf-16le" | "utf-16be" | null {
+  const n = Math.min(data.length, 512) & ~1;
+  if (n < 4) return null;
+  let even = 0;
+  let odd = 0;
+  for (let i = 0; i < n; i += 2) {
+    if (data[i] === 0) even++;
+    if (data[i + 1] === 0) odd++;
+  }
+  const pairs = n / 2;
+  if (odd > pairs * 0.4 && even < pairs * 0.05) return "utf-16le";
+  if (even > pairs * 0.4 && odd < pairs * 0.05) return "utf-16be";
+  return null;
 }
 
 async function extractPdf(data: Buffer): Promise<string> {

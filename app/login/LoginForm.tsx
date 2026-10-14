@@ -3,6 +3,7 @@ import { ArrowRight, Loader2, Lock, User } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { forgetExpiredGuest, forgetOtherGuests } from "@/lib/client/db";
+import { credentialPair } from "@/lib/shared/login-input";
 
 export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?: boolean; accessExpired?: boolean }) {
   const router = useRouter();
@@ -22,6 +23,17 @@ export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?
   const adoptPassword = useCallback((el: HTMLInputElement | null) => {
     if (el?.value) setPassword(el.value);
   }, []);
+
+  // Beide Angaben auf einmal eingefügt (Kärtchen, CSV-Zeile, Mail): auf die zwei Felder verteilen. Im
+  // Passwortfeld nur, solange noch kein Benutzername dasteht – ein echtes Passwort wird nie zerlegt.
+  const pastePair = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (e.currentTarget.type === "password" && username.trim()) return;
+    const pair = credentialPair(e.clipboardData.getData("text/plain"));
+    if (!pair) return;
+    e.preventDefault();
+    setUsername(pair.username);
+    setPassword(pair.password);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +69,7 @@ export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?
           type="text"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          onPaste={pastePair}
           placeholder="Benutzername"
           autoFocus
           autoComplete="username"
@@ -74,6 +87,7 @@ export function LoginForm({ toAdmin = false, accessExpired = false }: { toAdmin?
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onPaste={pastePair}
           placeholder="Passwort"
           autoComplete="current-password"
           className={input}

@@ -6,19 +6,28 @@ import { DIRECT_UPLOAD_LIMIT } from "@/lib/files/limits";
 import { cn } from "@/components/ui/cn";
 
 const MAX_SECONDS = 10 * 60;
+/** Ein „Stopp“ so kurz nach dem Start ist der zweite Klick eines Doppelklicks, kein Wunsch zu stoppen. */
+const MIN_RECORDING_MS = 600;
 
 /** Spracheingabe: Aufnahme im Browser, Transkription auf dem Server, Text ins Eingabefeld. */
 export function VoiceButton({ onText, disabled }: { onText: (text: string) => void; disabled?: boolean }) {
-  const [state, setState] = useState<"idle" | "recording" | "transcribing">("idle");
+  const [state, setState] = useState<"idle" | "starting" | "recording" | "transcribing">("idle");
   const [seconds, setSeconds] = useState(0);
   const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
+  // Sofort gesetzt, nicht erst mit dem nächsten Rendern: ein Doppelklick startet sonst zwei Aufnahmen, und die
+  // erste ließe das Mikrofon unbemerkt weiterlaufen.
+  const startingRef = useRef(false);
+  const startedAtRef = useRef(0);
 
   useEffect(() => () => cleanupRef.current(), []);
 
   const start = async () => {
+    if (startingRef.current || recorderRef.current?.state === "recording") return;
+    startingRef.current = true;
+    setState("starting");
     setError(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -79,30 +88,36 @@ export function VoiceButton({ onText, disabled }: { onText: (text: string) => vo
         }
       };
       recorderRef.current = recorder;
+      startedAtRef.current = Date.now();
       recorder.start(1000);
       setState("recording");
     } catch {
       setError("Kein Zugriff auf das Mikrofon. Bitte im Browser erlauben.");
       setState("idle");
+    } finally {
+      startingRef.current = false;
     }
   };
 
-  const stop = () => recorderRef.current?.state === "recording" && recorderRef.current.stop();
+  const stop = () => {
+    if (Date.now() - startedAtRef.current < MIN_RECORDING_MS) return;
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+  };
 
   return (
     <div className="relative">
       <button
         type="button"
         onClick={state === "recording" ? stop : start}
-        disabled={state === "transcribing" || (disabled && state === "idle")}
+        disabled={state === "transcribing" || state === "starting" || (disabled && state === "idle")}
         title={state === "recording" ? "Aufnahme beenden" : "Spracheingabe"}
-        aria-label={state === "recording" ? "Aufnahme beenden" : state === "transcribing" ? "Transkribiere …" : "Spracheingabe"}
+        aria-label={state === "recording" ? "Aufnahme beenden" : state === "transcribing" ? "Transkribiere …" : state === "starting" ? "Mikrofon wird gestartet …" : "Spracheingabe"}
         className={cn(
           "inline-flex h-9 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors disabled:opacity-40",
           state === "recording" ? "bg-danger-soft text-danger" : "text-muted hover:bg-surface-2 hover:text-text",
         )}
       >
-        {state === "transcribing" ? (
+        {state === "transcribing" || state === "starting" ? (
           <Loader2 className="h-4.5 w-4.5 animate-spin" />
         ) : state === "recording" ? (
           <Square className="h-3.5 w-3.5 fill-current" />

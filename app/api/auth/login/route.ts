@@ -37,6 +37,8 @@ export async function POST(request: Request) {
       await purgeExpiredGuests();
       const result = await checkGuestLogin(username, password.slice(0, MAX_INPUT + 1));
       if (!result.ok) {
+        // Richtiges Passwort, nur zur falschen Zeit: kein Fehlversuch (sonst sperren sich Frühstarter selbst aus).
+        if (result.reason !== "falsch") await refundAttempt();
         if (result.reason === "zu-frueh") throw new HttpError(403, `Dein Termin beginnt am ${formatStart(result.startsAt)}. Die Anmeldung ist ab 30 Minuten vorher möglich.`);
         if (result.reason === "vorbei") throw new HttpError(403, "Dein Zugang ist abgelaufen.");
         throw new HttpError(401, WRONG);

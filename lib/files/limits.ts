@@ -37,8 +37,12 @@ export const ACCEPT_ATTRIBUTE = [...IMAGE_EXTENSIONS, ...AUDIO_EXTENSIONS, ...DO
   .map((e) => `.${e}`)
   .join(",");
 
-/** Gleiche Bereinigung wie auf dem Server (lib/storage.ts). */
+/** Dateiname für Speicherpfade (Browser und Server, lib/storage.ts nutzt dieselbe Funktion). */
 export function safeFileName(name: string): string {
   const base = name.normalize("NFKD").replace(/[^\w.-]+/g, "_").replace(/_+/g, "_");
-  return base.replace(/^[._]+/, "").slice(-100) || "datei";
+  const safe = base.replace(/^[._]+/, "").slice(-100) || "datei";
+  // Namen ohne lateinische Buchstaben vor der Endung („Отчет.pdf“, „📊.csv“) verlören sonst die Endung – und
+  // damit den Dateityp, den Upload und Verarbeitung aus dem Pfad lesen.
+  const ext = /\.([a-z0-9]{1,10})$/i.exec(name)?.[1];
+  return ext && !safe.toLowerCase().endsWith(`.${ext.toLowerCase()}`) ? `datei.${ext}` : safe;
 }
