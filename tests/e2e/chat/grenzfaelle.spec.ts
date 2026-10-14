@@ -737,7 +737,7 @@ test.describe("C · Eingaben, Doppelklicks und Reihenfolgen (Phase 3)", () => {
     await expect(nav(page).getByRole("button", { name: new RegExp(`^Erster ${id}`) })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Bild-Modus" })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Chats importieren" })).toBeDisabled();
-    await chat.questions.first().hover();
+    // Der Knopf fehlt während der Antwort ganz (ohne Hover prüfbar – die Seite scrollt mit der Antwort mit).
     await expect(chat.questions.first().getByRole("button", { name: "Bearbeiten" })).toHaveCount(0);
 
     // Abmelden mitten in der Antwort: keine Fehler, nichts wird danach noch gespeichert oder nachgeladen.
@@ -810,9 +810,11 @@ test.describe("C · Eingaben, Doppelklicks und Reihenfolgen (Phase 3)", () => {
     // ihn noch und speichern „Verbindung abgebrochen“. Beides ist ein Hinweis an der Antwort.
     const torn = /^(Die Antwort fehlt – die Seite wurde während der Antwort neu geladen|Die Verbindung ist während der Antwort abgebrochen\.)/;
     await expect(chat.lastAnswer.getByRole("alert")).toHaveText(torn);
+    // Kam vor dem Abriss schon Text an (Safari, Firefox), geht dieser Teil der Antwort mit – sonst nur die zwei Fragen.
+    const partial = /^Die Verbindung/.test(await chat.lastAnswer.getByRole("alert").innerText());
     const answer = await chat.ask(`Weiter ${id}`);
     await expect(answer.getByRole("alert")).toHaveCount(0);
-    expect(await chat.diagnosis(answer, "Nachrichten im Verlauf")).toBe("2");
+    expect(await chat.diagnosis(answer, "Nachrichten im Verlauf")).toBe(partial ? "3" : "2");
     expect(await messageOrder(page)).toBe("FAFA");
     await expect(chat.answers.first().getByRole("alert")).toHaveText(torn);
     // Bleibt auch nach dem Neuladen so.
