@@ -56,12 +56,97 @@ const TEXTS = [
 const FILES = ["notiz.txt", "notiz.txt", "tabelle.csv", "alt.doc", "ohneendung"];
 const EXAMPLE = "Baue mir eine kleine Landingpage für ein Café in Leipzig.";
 
+/** Werte für die Prompt-Maske – aus dem echten Leben, ohne „{{“ (die Invariante prüft, dass keiner stehen bleibt). */
+const VALUES = ["den Rat", "Frau Özdemir-Weiß", "$& und $1", "Zeile\nmit Umbruch", "👨‍👩‍👧 Familie", "مرحبا", "a\\b", "  Leerzeichen  ", "x".repeat(250)];
+const PROMPTS = ["prompt-absage", "prompt-mailverlauf", "prompt-buergeranfrage", "prompt-verstaendlichkeit", "prompt-protokoll-aufgaben"];
+
+/** Fundus öffnen, Reiter „Prompts“, Prompt wählen; liefert die Maske (oder null bei einem Prompt ohne Platzhalter). */
+async function openPrompt(page: Page, id: string): Promise<Locator | null> {
+  await page.getByRole("button", { name: "Fundus öffnen" }).click(QUICK);
+  const fundus = page.getByRole("dialog", { name: "Fundus" });
+  await fundus.getByRole("tab", { name: /^Prompts/ }).click(QUICK);
+  await fundus.getByRole("listbox", { name: "Prompts" }).locator(`[data-id="${id}"]`).click(QUICK);
+  await fundus.getByRole("button", { name: /^(Ausfüllen und einfügen|Einfügen)$/ }).click(QUICK);
+  const mask = page.getByRole("dialog", { name: "Prompt ausfüllen" });
+  return id === "prompt-protokoll-aufgaben" ? null : mask;
+}
+
+/** Offene Dialoge (Maske, Fundus) schließen, damit der nächste Schritt freie Bahn hat. */
+async function closeDialogs(page: Page) {
+  for (let i = 0; i < 3 && (await page.locator("dialog[open]").count()) > 0; i++) await page.keyboard.press("Escape");
+}
+
 const usable = async (l: Locator) => (await l.isVisible()) && (await l.isEnabled());
 const nav = (page: Page) => page.getByRole("navigation", { name: "Chatverlauf" });
 // Klicks auf Elemente, die gerade verschwinden (Antwort fertig, Liste neu sortiert), gelten als übersprungen.
 const QUICK = { timeout: 3_000 };
 
 const ACTIONS: Action[] = [
+  {
+    name: "Prompt ausfüllen und einfügen",
+    weight: 2,
+    when: ({ page }) => usable(page.getByRole("button", { name: "Fundus öffnen" })),
+    run: async ({ page, chat, pick }) => {
+      const id = pick(PROMPTS);
+      try {
+        const mask = await openPrompt(page, id);
+        if (!mask) return;
+        await expect(mask).toBeVisible();
+        const fields = mask.locator("[data-platzhalter]");
+        const names: string[] = [];
+        for (let i = 0; i < (await fields.count()); i++) {
+          const field = fields.nth(i);
+          names.push(await mask.locator(`label[for="${await field.getAttribute("id")}"]`).innerText());
+          if ((await field.evaluate((el) => el.tagName)) === "SELECT") await field.selectOption({ index: 1 });
+          else await field.fill(pick(VALUES));
+        }
+        const button = mask.getByRole("button", { name: pick(["Einfügen", "Anfügen", "Ersetzen"]), exact: true });
+        if (!(await button.isVisible())) await mask.getByRole("button", { name: /^(Einfügen|Anfügen)$/ }).click(QUICK);
+        else await button.click(QUICK);
+        await expect(mask).toBeHidden();
+        // Invariante: kein Platzhalter des ausgefüllten Prompts bleibt im Eingabefeld stehen.
+        const value = await chat.composer.inputValue();
+        expect(value).not.toMatch(/\{\{[^{}]+\}\}/);
+      } finally {
+        await closeDialogs(page);
+      }
+    },
+  },
+  {
+    name: "Maske abbrechen",
+    weight: 1,
+    when: ({ page }) => usable(page.getByRole("button", { name: "Fundus öffnen" })),
+    run: async ({ page, chat, pick }) => {
+      const before = await chat.composer.inputValue();
+      try {
+        const mask = await openPrompt(page, pick(PROMPTS.slice(0, 4)));
+        await mask!.locator("[data-platzhalter]").first().fill(pick(VALUES));
+        await mask!.getByRole("button", { name: "Abbrechen", exact: true }).click(QUICK);
+        await expect(mask!).toBeHidden();
+      } finally {
+        await closeDialogs(page);
+      }
+      expect(await chat.composer.inputValue()).toBe(before);
+    },
+  },
+  {
+    name: "Fundus-Dokument anhängen",
+    weight: 1,
+    when: ({ page }) => usable(page.getByRole("button", { name: "Fundus öffnen" })),
+    run: async ({ page, pick }) => {
+      try {
+        await page.getByRole("button", { name: "Fundus öffnen" }).click(QUICK);
+        const fundus = page.getByRole("dialog", { name: "Fundus" });
+        await fundus.getByRole("tab", { name: /^Dokumente/ }).click(QUICK);
+        const id = pick(["fb-beschlussvorlage-kita-nordstadt", "fb-budgetueberwachung-th51", "fb-buergeramt-2030"]);
+        await fundus.getByRole("listbox", { name: "Dokumente" }).locator(`[data-id="${id}"]`).click(QUICK);
+        const attach = fundus.getByRole("region", { name: "Vorschau" }).getByRole("button", { name: "Anhängen", exact: true });
+        if (await attach.isEnabled()) await attach.click(QUICK);
+      } finally {
+        await closeDialogs(page);
+      }
+    },
+  },
   {
     name: "tippen",
     weight: 4,

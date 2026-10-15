@@ -1,6 +1,6 @@
 "use client";
 import { X } from "lucide-react";
-import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { cn } from "./cn";
 
 export function Dialog({
@@ -29,6 +29,14 @@ export function Dialog({
     if (open && !el.open) el.showModal();
     if (!open && el.open) el.close();
   }, [open]);
+  // Wird der Dialog entfernt statt geschlossen (Aufrufer blendet ihn aus), vorher schließen: so kehrt der Fokus
+  // zum auslösenden Element zurück.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    return () => {
+      if (el?.open) el.close();
+    };
+  }, []);
   return (
     <dialog
       ref={ref}

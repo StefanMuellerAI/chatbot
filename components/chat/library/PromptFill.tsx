@@ -50,7 +50,7 @@ export function PromptText({ text, placeholders, values, className }: { text: st
             {value}
           </span>
         ) : (
-          <mark key={i} data-role="platzhalter" className="rounded bg-primary-soft px-1 font-medium text-primary">
+          <mark key={i} data-role="platzhalter" className="rounded bg-primary-soft px-1 font-medium text-text ring-1 ring-primary/50 ring-inset">
             {p?.label ?? s.name}
           </mark>
         );
@@ -132,9 +132,10 @@ function PromptForm({
   const fields = useRef<(HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null)[]>([]);
 
   useEffect(() => {
-    // Fokus aufs erste leere Feld (sonst aufs erste), nicht auf „Schließen“.
+    // Fokus aufs erste leere Feld (sonst aufs erste), nicht auf „Schließen“ – erst nachdem der Dialog offen ist.
     const first = prompt.placeholders.findIndex((p) => !cleanValue(values[p.key] ?? "", p.type));
-    fields.current[Math.max(0, first)]?.focus();
+    const timer = setTimeout(() => fields.current[Math.max(0, first)]?.focus(), 0);
+    return () => clearTimeout(timer);
     // Nur beim Öffnen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

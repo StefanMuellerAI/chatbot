@@ -97,7 +97,7 @@ export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "prim
     neutral: "bg-surface-3 text-text",
     primary: "bg-primary-soft text-primary",
     warning: "bg-warning-soft text-warning",
-    muted: "bg-surface-3 text-muted",
+    muted: "border border-border text-text",
   };
   return <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", styles[tone])}>{children}</span>;
 }

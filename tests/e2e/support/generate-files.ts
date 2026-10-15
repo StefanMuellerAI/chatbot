@@ -9,7 +9,7 @@ import { strToU8, zipSync } from "fflate";
 import * as XLSX from "xlsx";
 
 export const FIXTURE_DIR = path.resolve(".data/e2e/fixtures");
-const VERSION = "4";
+const VERSION = "5";
 
 export function fixture(name: string): string {
   return path.join(FIXTURE_DIR, name);
@@ -97,7 +97,127 @@ export async function generateFiles() {
   ffmpeg("-f", "lavfi", "-i", "color=c=blue:s=64x64:d=2", "-an", fixture("nur-video.mp4"));
   write("kaputt.mp3", randomBytes(4096));
 
+  // ── Fundus pflegen: E-Mail-Verlauf, Prüffälle ────────────────────────
+  const amt = "Bürgeramt Musterhausen <buergeramt@stadt-musterhausen.example>";
+  const jan = "Jan Petersen <j.petersen@stadt-musterhausen.example>";
+  write(
+    "verlauf-1.eml",
+    eml({
+      from: jan,
+      to: amt,
+      subject: "=?UTF-8?Q?=C3=96ffnungszeiten_B=C3=BCrgeramt_im_Dezember?=",
+      date: "Mon, 01 Dec 2025 09:00:00 +0100",
+      id: "verlauf-1@stadt-musterhausen.example",
+      body: "Hallo,\nwie sind die Öffnungszeiten an Heiligabend? Kennwort: NORDLICHT.\n\nJan Petersen",
+    }),
+  );
+  write(
+    "verlauf-2.eml",
+    eml({
+      from: amt,
+      to: jan,
+      subject: "AW: Öffnungszeiten Bürgeramt im Dezember",
+      date: "Tue, 02 Dec 2025 10:30:00 +0100",
+      id: "verlauf-2@stadt-musterhausen.example",
+      inReplyTo: "verlauf-1@stadt-musterhausen.example",
+      body: "Guten Tag Herr Petersen,\nan Heiligabend ist das Bürgeramt geschlossen. Kennwort: TANNENZAPFEN.\n\nIhr Bürgeramt",
+    }),
+  );
+  write(
+    "verlauf-3.eml",
+    eml({
+      from: jan,
+      to: "Anna Schmidt <a.schmidt@stadt-musterhausen.example>",
+      cc: amt,
+      subject: "WG: AW: Öffnungszeiten Bürgeramt im Dezember",
+      date: "Wed, 03 Dec 2025 08:15:00 +0100",
+      id: "verlauf-3@stadt-musterhausen.example",
+      inReplyTo: "verlauf-2@stadt-musterhausen.example",
+      body: "Hallo Anna,\nzur Info – der Dienstplan hängt an. Kennwort: SCHNEEFLOCKE.\n\nJan",
+      attachments: [
+        { name: "Dienstplan Dezember.docx", type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", data: docxWith(["Dienstplan Dezember", "Heiligabend geschlossen. Kennwort: LEBKUCHEN."]) },
+        { name: "Lageplan.dwg", type: "application/octet-stream", data: Buffer.from("AC1032 Zeichnung") },
+      ],
+    }),
+  );
+  write("ohne-datum.eml", eml({ from: jan, to: amt, subject: "Nachtrag ohne Datum", id: "ohne-datum@stadt-musterhausen.example", body: "Noch eine Frage zum Parken." }));
+  write(
+    "doppelt.eml",
+    eml({ from: jan, to: amt, subject: "Öffnungszeiten (nochmal gesendet)", date: "Mon, 01 Dec 2025 09:05:00 +0100", id: "verlauf-1@stadt-musterhausen.example", body: "Doppelt." }),
+  );
+  write("kaputt.eml", "Das ist keine E-Mail.\nNur ein bisschen Text ohne Kopfzeilen.\n");
+  write("echte-daten.docx", docxWith(["Kontaktliste", "Max Mustermann, max.mustermann@gmail.com", "IBAN DE89 3704 0044 0532 0130 00"]));
+  write("nur-bild.docx", docxWith([]));
+
   writeFileSync(marker, new Date().toISOString());
+}
+
+/** Word-Datei mit den gegebenen Absätzen (leer: kein lesbarer Text, wie ein Dokument nur mit Bild). */
+export function docxWith(paragraphs: string[]): Buffer {
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const body = paragraphs.length ? paragraphs.map((t) => `<w:p><w:r><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`).join("") : "<w:p/>";
+  return Buffer.from(
+    zipSync({
+      "[Content_Types].xml": strToU8(
+        '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+      ),
+      "_rels/.rels": strToU8(
+        '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+      ),
+      "word/document.xml": strToU8(`<?xml version="1.0" encoding="UTF-8"?><w:document ${W}><w:body>${body}</w:body></w:document>`),
+    }),
+  );
+}
+
+export interface MailSpec {
+  from: string;
+  to: string;
+  cc?: string;
+  subject: string;
+  date?: string;
+  id?: string;
+  inReplyTo?: string;
+  body: string;
+  attachments?: { name: string; data: Buffer; type: string }[];
+}
+
+/** Einfache .eml-Datei (RFC 5322), optional mit Anhängen. */
+export function eml(m: MailSpec): Buffer {
+  const head = [
+    `From: ${m.from}`,
+    `To: ${m.to}`,
+    ...(m.cc ? [`Cc: ${m.cc}`] : []),
+    `Subject: ${m.subject}`,
+    ...(m.date ? [`Date: ${m.date}`] : []),
+    ...(m.id ? [`Message-ID: <${m.id}>`] : []),
+    ...(m.inReplyTo ? [`In-Reply-To: <${m.inReplyTo}>`] : []),
+    "MIME-Version: 1.0",
+  ];
+  if (!m.attachments?.length) return Buffer.from([...head, "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: 8bit", "", m.body, ""].join("\r\n"));
+  const b = "grenze-123";
+  return Buffer.from(
+    [
+      ...head,
+      `Content-Type: multipart/mixed; boundary="${b}"`,
+      "",
+      `--${b}`,
+      "Content-Type: text/plain; charset=utf-8",
+      "Content-Transfer-Encoding: 8bit",
+      "",
+      m.body,
+      ...m.attachments.flatMap((a) => [
+        `--${b}`,
+        `Content-Type: ${a.type}; name="${a.name}"`,
+        `Content-Disposition: attachment; filename="${a.name}"`,
+        "Content-Transfer-Encoding: base64",
+        "",
+        a.data.toString("base64").replace(/.{76}/g, "$&\r\n"),
+      ]),
+      `--${b}--`,
+      "",
+    ].join("\r\n"),
+  );
 }
 
 /** Minimales, gültiges PDF mit einer Textzeile pro Seite. */

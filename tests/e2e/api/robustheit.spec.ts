@@ -68,6 +68,26 @@ const ADMIN_ROUTES: [Method, string][] = [
   ["POST", "/api/admin/security"],
   ["GET", "/api/admin/settings"],
   ["PUT", "/api/admin/settings"],
+  ["GET", "/api/admin/fundus"],
+  ["POST", "/api/admin/fundus/token"],
+  ["POST", "/api/admin/fundus/local"],
+  ["POST", "/api/admin/fundus/check"],
+  ["POST", "/api/admin/fundus/documents"],
+  ["PUT", "/api/admin/fundus/documents"],
+  ["DELETE", "/api/admin/fundus/documents?id=x"],
+  ["POST", "/api/admin/fundus/threads"],
+  ["PUT", "/api/admin/fundus/threads"],
+  ["DELETE", "/api/admin/fundus/threads?id=x"],
+  ["POST", "/api/admin/fundus/prompts"],
+  ["PUT", "/api/admin/fundus/prompts"],
+  ["PATCH" as Method, "/api/admin/fundus/prompts"],
+  ["DELETE", "/api/admin/fundus/prompts?id=x"],
+  ["POST", "/api/admin/fundus/categories"],
+  ["PUT", "/api/admin/fundus/categories"],
+  ["DELETE", "/api/admin/fundus/categories?id=x"],
+  ["PUT", "/api/admin/fundus/hidden"],
+  ["GET", "/api/admin/fundus/preview?id=x"],
+  ["GET", "/api/admin/fundus/file?id=x"],
 ];
 
 async function client(baseURL: string, ip: string, login?: "user" | "admin"): Promise<APIRequestContext> {
@@ -179,6 +199,17 @@ test.describe("U · API-Robustheit", () => {
       [admin, "GET", "/api/admin/events/end"],
       [admin, "GET", "/api/admin/events/guests"],
       [admin, "PATCH" as Method, "/api/admin/events"],
+      [admin, "POST", "/api/admin/fundus"],
+      [admin, "GET", "/api/admin/fundus/token"],
+      [admin, "GET", "/api/admin/fundus/local"],
+      [admin, "GET", "/api/admin/fundus/check"],
+      [admin, "GET", "/api/admin/fundus/documents"],
+      [admin, "PATCH" as Method, "/api/admin/fundus/threads"],
+      [admin, "GET", "/api/admin/fundus/prompts"],
+      [admin, "PATCH" as Method, "/api/admin/fundus/categories"],
+      [admin, "POST", "/api/admin/fundus/hidden"],
+      [admin, "POST", "/api/admin/fundus/preview"],
+      [admin, "DELETE", "/api/admin/fundus/file"],
     ];
     for (const [ctx, method, url] of wrong) {
       expect((await call(ctx, method, url)).status(), `${method} ${url}`).toBe(405);
@@ -216,6 +247,18 @@ test.describe("U · API-Robustheit", () => {
       [admin, "PUT", "/api/admin/events/groups"],
       [admin, "POST", "/api/admin/events/guests"],
       [admin, "POST", "/api/admin/events/guests/password"],
+      [admin, "POST", "/api/admin/fundus/token"],
+      [admin, "POST", "/api/admin/fundus/check"],
+      [admin, "POST", "/api/admin/fundus/documents"],
+      [admin, "PUT", "/api/admin/fundus/documents"],
+      [admin, "POST", "/api/admin/fundus/threads"],
+      [admin, "PUT", "/api/admin/fundus/threads"],
+      [admin, "POST", "/api/admin/fundus/prompts"],
+      [admin, "PUT", "/api/admin/fundus/prompts"],
+      [admin, "PATCH" as Method, "/api/admin/fundus/prompts"],
+      [admin, "POST", "/api/admin/fundus/categories"],
+      [admin, "PUT", "/api/admin/fundus/categories"],
+      [admin, "PUT", "/api/admin/fundus/hidden"],
     ];
     for (const [ctx, method, url] of routes) {
       const broken = await call(ctx, method, url, { headers: { "content-type": "application/json" }, data: "{kaputt" });
@@ -339,6 +382,16 @@ test.describe("U · API-Robustheit", () => {
     await expectGermanError(await api.post("/api/upload/local", { multipart: { key: `library/${doc.id}/x.docx`, file: payload("notiz.txt") } }), 400);
     await expectGermanError(await api.post("/api/files/process", { data: { key: `library/${doc.id}/x.docx`, name: "x.docx" } }), 400);
     await expectGermanError(await api.get(`/api/files/library/${doc.id}/x.docx`), 400, "Ungültiger Dateipfad.");
+    // Eigene Dateien der Kursleitung (fundus/) gibt es für Gäste nur über /api/library/[id]/file.
+    const own = "fundus/0f8fad5b-d9cb-469f-a165-70867728950e/bericht.pdf";
+    await expectGermanError(await api.get(`/api/files/${own}`), 400, "Ungültiger Dateipfad.");
+    await expectGermanError(await api.post("/api/upload/local", { multipart: { key: own, file: payload("notiz.txt") } }), 400);
+    await expectGermanError(await api.post("/api/files/process", { data: { key: own, name: "bericht.pdf" } }), 400);
+    // Der Katalog bringt Kategorien und Prompts mit; Prompts haben aufgelöste Platzhalter.
+    const full = (await (await api.get("/api/library")).json()) as { categories: { id: string }[]; prompts: { categoryId: string; placeholders: { key: string; label: string }[] }[] };
+    expect(full.categories.length).toBeGreaterThan(0);
+    expect(full.prompts.every((p) => full.categories.some((c) => c.id === p.categoryId))).toBe(true);
+    expect(full.prompts.flatMap((p) => p.placeholders).every((x) => x.key && x.label)).toBe(true);
     await api.dispose();
   });
 

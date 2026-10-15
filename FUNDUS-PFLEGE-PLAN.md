@@ -1,7 +1,8 @@
 # Plan: Fundus pflegen – eigene Dateien, E-Mail-Verläufe und Prompts mit Platzhaltern
 
-Stand: 14. Oktober 2026, **Entwurf** · Entscheidungen getroffen (Abschnitt 16) · klickbarer Entwurf, Abnahme offen:
-[Artifact](https://claude.ai/artifact/2KpNsh6ULpm3ocyMu36AU2) · Grundlage: aktueller Code
+Stand: 15. Oktober 2026, **umgesetzt** (Phasen 1–4, Stand und Abweichungen in Abschnitt 13) · Entscheidungen in
+Abschnitt 16 · klickbarer Entwurf: [Artifact](https://claude.ai/artifact/2KpNsh6ULpm3ocyMu36AU2) · Grundlage: Code vom
+14. Oktober 2026
 (Fundus in `library/`, `lib/library`, `components/chat/library`; Admin in `components/admin`, `app/api/admin`; Ablage in
 `lib/storage.ts`; Extraktion in `lib/files`), Fundus aus [FUNDUS-PLAN.md](FUNDUS-PLAN.md), Grenzfälle aus
 [GRENZFAELLE-PLAN.md](GRENZFAELLE-PLAN.md), E2E-Suite aus [TESTPLAN.md](TESTPLAN.md), Handbuch unter
@@ -591,11 +592,34 @@ Vorschau-Cache (1 Stunde im Browser) stimmig.
 
 | Phase | Inhalt | Tests |
 |---|---|---|
-| 0 · Abnahme | Entscheidungen getroffen (Abschnitt 16); klickbarer Entwurf von Admin-Reiter, Reiter „Prompts“ und Maske liegt vor ([Artifact](https://claude.ai/artifact/2KpNsh6ULpm3ocyMu36AU2)), Abnahme offen | – |
+| 0 · Abnahme | Entscheidungen getroffen (Abschnitt 16); klickbarer Entwurf von Admin-Reiter, Reiter „Prompts“ und Maske ([Artifact](https://claude.ai/artifact/2KpNsh6ULpm3ocyMu36AU2)) abgenommen | – |
 | 1 · Grundlage | Platzhalter-Logik, Tabellen, Startbestand, Store mit Grenzen und Revision, Ablage `fundus/` mit Frist, Prüfen und Vorschau, Admin-API, Katalog zusammenführen, `libraryText`, Pfad-Trennung, Tracing-Fix | Unit-Tests; FP16, FP17, Y21, U01–U03 |
 | 2 · Admin | Reiter „Fundus“ mit Unterreitern, Upload- und Prüfdialog, Verläufe, Prompt-Dialog mit Platzhalter-Tabelle und Probe-Maske, Kategorien, Ausblenden | FP01–FP15, FP18, FP19, O01 |
 | 3 · Chat | Reiter „Prompts“, Filter, Vorschau, Maske, Ersetzen/Anfügen, Gruppenchat, eigene Dateien und Verläufe im Chat, PDF-Typ, Revalidierung | PR01–PR13, Y22–Y26, Q21, V09 |
 | 4 · Abschluss | Doku inkl. beider Handbücher, Belastung, Zufallstest, Live-Smoke, Stabilitätslauf (3 ×), CI in drei Browsern | W07, W09, X08, X11 |
+
+**Stand der Umsetzung (15. Oktober 2026):** Phasen 1–4 erledigt. 233 Unit-Tests (55 neu) und 413 E2E-Tests in 35
+Dateien (41 neu, dazu X11 im Live-Smoke); die Abdeckungsprüfung kennt alle 20 neuen Routen und 21 neuen Bedienelemente.
+Abweichungen vom Plan:
+
+- **Hinweise auf echte Daten** stehen in `lib/fundus/hints.ts` (echte Mail-Domains, gültige IBANs, Telefonnummern
+  außerhalb der Fiktions-Bereiche). `fictionProblems()` bleibt im Build, weil der Wächter dort strengere,
+  fundusspezifische Regeln hat.
+- **Zusätzliche Admin-Routen:** `GET /api/admin/fundus/preview` und `GET /api/admin/fundus/file` (Vorschau und Download
+  auch für ausgeblendete und inaktive Einträge); Reihenfolge und Aktiv-Schalter der Prompts über
+  `PATCH /api/admin/fundus/prompts`.
+- **Maske mit Entwurf:** Knöpfe „Abbrechen · Ersetzen · Anfügen“, „Anfügen“ ist der Hauptknopf – `Enter` im letzten
+  Feld und `Strg`/`Cmd`+`Enter` hängen an und überschreiben nie still einen Entwurf. Ein angefügter Text gilt weiter
+  als Entwurf (er enthält den eigenen Text).
+- **Benennung:** `parsePlaceholders` heißt `parsePrompt` (liefert Abschnitte, Platzhalter und Warnungen).
+- **Tests:** FP15 und FP17 laufen zusammen auf einem eigenen Neustart-Server; dass abgelaufene, vorgemerkte Uploads
+  gelöscht werden, prüft ein Unit-Test (die Frist ist ein Tag). „Zu groß (413)“ prüft FP16 über die API, weil der
+  Browser die Grenze schon vor dem Hochladen meldet. Y26 stellt den abgelaufenen Datei-Cache wie Y18 mit einer
+  unbekannten Prüfsumme nach (die Aufbewahrungsfrist ist mindestens ein Tag). W09 läuft im Projekt `admin`, V09 in
+  `provider-serial` (beide ändern den Fundus). W07 hängt ein mitgeliefertes Fundus-Dokument an (im parallelen Projekt
+  gibt es keine eigenen Einträge).
+- **Nebenbei behoben:** Dialoge, die beim Schließen entfernt statt geschlossen werden, geben den Fokus jetzt an den
+  auslösenden Knopf zurück (Fehler 73 im Testplan).
 
 **Wie schnell?**
 

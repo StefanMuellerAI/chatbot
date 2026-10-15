@@ -995,7 +995,7 @@ function PromptsPanel({
         <div role="group" aria-label="Kategorien" className={cn("flex flex-wrap gap-1", !filtersOpen && "max-md:hidden")}>
           {catalog.categories.map((c) => (
             <Chip key={c.id} active={filter.categories.includes(c.id)} onClick={() => onFilter({ ...filter, categories: toggleIn(filter.categories, c.id) })}>
-              {c.name} <span className="opacity-70">({counts.get(c.id) ?? 0})</span>
+              {c.name} <span>({counts.get(c.id) ?? 0})</span>
             </Chip>
           ))}
         </div>

@@ -23,7 +23,7 @@ test.describe("O · Admin: Zugang und Übersicht", () => {
     await page.getByLabel("Passwort").press("Enter");
     await expect(page).toHaveURL(/\/admin$/);
     await expect(page.getByRole("tablist", { name: "Admin-Bereiche" })).toBeVisible();
-    for (const tab of ["Übersicht", "Termine", "Modelle", "Einstellungen", "Vorlagen", "Sicherheit"]) {
+    for (const tab of ["Übersicht", "Termine", "Modelle", "Einstellungen", "Vorlagen", "Fundus", "Sicherheit"]) {
       await expect(page.getByRole("tab", { name: tab })).toBeVisible();
     }
     await expect(page.getByRole("tab", { name: "Übersicht" })).toHaveAttribute("aria-selected", "true");

@@ -9,7 +9,9 @@ export async function POST(request: Request) {
   try {
     await requireAdmin();
     if (storageMode() !== "local") throw new HttpError(400, "Bitte den Direkt-Upload verwenden.");
-    const form = await request.formData();
+    const form = await request.formData().catch(() => {
+      throw new HttpError(400, "Keine Datei erhalten.");
+    });
     const key = String(form.get("key") ?? "");
     const file = form.get("file");
     if (!(file instanceof File)) throw new HttpError(400, "Keine Datei erhalten.");
