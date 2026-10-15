@@ -3,6 +3,10 @@ import { fundusError } from "@/lib/fundus/api";
 import { fundusRevision, listCategories, listHidden, listOwnItems, listPrompts } from "@/lib/fundus/store";
 import { getCatalog } from "@/lib/library/catalog";
 import { getSettings } from "@/lib/settings";
+import type { LibraryDocType, LibraryTag } from "@/lib/library/types";
+import type { FundusOverview } from "@/lib/shared/fundus";
+import type { PlaceholderSettings } from "@/lib/shared/placeholders";
+import { blobUploadMode, storageMode } from "@/lib/storage";
 
 /** Alles für den Admin-Reiter „Fundus“: eigene und mitgelieferte Einträge, Kategorien, Prompts (auch inaktive). */
 export async function GET() {
@@ -28,14 +32,14 @@ export async function GET() {
           id: d.id,
           source: "eigen" as const,
           title: d.title,
-          type: d.docType,
+          type: d.docType as LibraryDocType,
           org: "Eigene Inhalte",
           date: d.date,
           tokens: d.tokens,
-          fileName: d.fileName,
+          fileName: d.fileName ?? "",
           summary: d.summary,
-          tags: d.tags,
-          keywords: d.keywords,
+          tags: d.tags as LibraryTag[],
+          keywords: d.keywords as string[],
           enabled: d.enabled,
           threadId: d.threadId,
           threadTitle: d.threadId ? (threadTitle.get(d.threadId) ?? null) : null,
@@ -71,8 +75,8 @@ export async function GET() {
           mails: mails.length,
           attachments: own.items.filter((i) => i.threadId === t.id).length,
           summary: t.summary,
-          tags: t.tags,
-          keywords: t.keywords,
+          tags: t.tags as LibraryTag[],
+          keywords: t.keywords as string[],
           enabled: t.enabled,
           hidden: false,
         };
@@ -95,6 +99,8 @@ export async function GET() {
     return Response.json({
       revision,
       libraryEnabled: settings.features.library,
+      storage: storageMode(),
+      blobUpload: blobUploadMode(),
       documents,
       threads,
       categories,
@@ -104,11 +110,11 @@ export async function GET() {
         title: p.title,
         description: p.description,
         text: p.text,
-        placeholders: p.placeholders,
+        placeholders: p.placeholders as PlaceholderSettings,
         enabled: p.enabled,
         sortOrder: p.sortOrder,
       })),
-    });
+    } satisfies FundusOverview);
   } catch (err) {
     return fundusError(err);
   }

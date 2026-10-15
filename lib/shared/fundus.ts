@@ -1,6 +1,7 @@
 // Gemeinsame Regeln für die Pflege des Fundus im Admin (Browser und Server).
 import type { LibraryDocType, LibraryTag } from "@/lib/library/types";
 import { unsupportedMessage } from "@/lib/files/limits";
+import type { PlaceholderSettings } from "./placeholders";
 
 export const FUNDUS_LIMITS = {
   documents: 500,
@@ -65,4 +66,72 @@ export function stripReplyPrefixes(subject: string): string {
 export function titleFromFileName(name: string): string {
   const base = name.replace(/\.[a-z0-9]{1,10}$/i, "").replace(/[_]+/g, " ").replace(/\s+/g, " ").trim();
   return (base || "Dokument").slice(0, FUNDUS_LIMITS.title);
+}
+
+// ---------------------------------------------------------------- Antwort von GET /api/admin/fundus
+
+export type FundusSource = "eigen" | "fundus";
+
+export interface AdminFundusDocument {
+  id: string;
+  source: FundusSource;
+  title: string;
+  type: LibraryDocType;
+  org: string;
+  date: string;
+  tokens: number;
+  fileName: string;
+  summary: string;
+  tags: LibraryTag[];
+  keywords: string[];
+  enabled: boolean;
+  /** Anhang eines eigenen Verlaufs (lässt sich nur mit dem Verlauf löschen). */
+  threadId: string | null;
+  threadTitle: string | null;
+  hidden: boolean;
+}
+
+export interface AdminFundusThread {
+  id: string;
+  source: FundusSource;
+  title: string;
+  org: string;
+  date: string;
+  mails: number;
+  attachments: number;
+  summary: string;
+  tags: LibraryTag[];
+  keywords: string[];
+  enabled: boolean;
+  hidden: boolean;
+}
+
+export interface AdminPromptCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  prompts: number;
+  activePrompts: number;
+}
+
+export interface AdminPrompt {
+  id: string;
+  categoryId: string;
+  title: string;
+  description: string;
+  text: string;
+  placeholders: PlaceholderSettings;
+  enabled: boolean;
+  sortOrder: number;
+}
+
+export interface FundusOverview {
+  revision: number;
+  libraryEnabled: boolean;
+  storage: "blob" | "local";
+  blobUpload: "token" | "presigned" | null;
+  documents: AdminFundusDocument[];
+  threads: AdminFundusThread[];
+  categories: AdminPromptCategory[];
+  prompts: AdminPrompt[];
 }

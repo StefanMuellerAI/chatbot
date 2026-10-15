@@ -33,9 +33,19 @@ export async function prepareImage(file: File): Promise<File> {
   return new File([blob], name, { type });
 }
 
-export function uploadKeyFor(name: string): string {
-  return `uploads/${crypto.randomUUID()}/${safeFileName(name)}`;
+export function uploadKeyFor(name: string, prefix: UploadDestination["prefix"] = "uploads"): string {
+  return `${prefix}/${crypto.randomUUID()}/${safeFileName(name)}`;
 }
+
+/** Wohin eine Datei geht: Uploads im Chat oder eigene Dateien der Kursleitung im Fundus. */
+export interface UploadDestination {
+  prefix: "uploads" | "fundus";
+  tokenUrl: string;
+  localUrl: string;
+}
+
+const CHAT_UPLOAD: UploadDestination = { prefix: "uploads", tokenUrl: "/api/upload/token", localUrl: "/api/upload/local" };
+export const FUNDUS_UPLOAD: UploadDestination = { prefix: "fundus", tokenUrl: "/api/admin/fundus/token", localUrl: "/api/admin/fundus/local" };
 
 /** Lädt eine Datei hoch: auf Vercel direkt in Blob, lokal über den Server. */
 export async function uploadFile(
@@ -43,13 +53,14 @@ export async function uploadFile(
   target: Pick<PublicConfig, "storage" | "blobUpload">,
   onProgress?: Progress,
   signal?: AbortSignal,
+  destination: UploadDestination = CHAT_UPLOAD,
 ): Promise<string> {
-  const key = uploadKeyFor(file.name);
+  const key = uploadKeyFor(file.name, destination.prefix);
   if (target.storage === "blob") {
     const put = target.blobUpload === "presigned" ? uploadPresigned : upload;
     await put(key, file, {
       access: "private",
-      handleUploadUrl: "/api/upload/token",
+      handleUploadUrl: destination.tokenUrl,
       contentType: file.type || undefined,
       multipart: file.size > 8 * 1024 * 1024,
       abortSignal: signal,
@@ -62,7 +73,7 @@ export async function uploadFile(
   form.set("file", file);
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/upload/local");
+    xhr.open("POST", destination.localUrl);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress?.(e.loaded / e.total, "Lade hoch …");
     };

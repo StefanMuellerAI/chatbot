@@ -498,7 +498,8 @@ export function formatMailDate(iso: string): string {
   return mailDate.format(new Date(iso));
 }
 
-export function MailCard({ mail, attached, onAttach }: { mail: MailPreview; attached: boolean; onAttach: () => void }) {
+/** Eine Mail des Verlaufs; ohne `onAttach` (Vorschau im Admin) ohne Knopf zum Anhängen. */
+export function MailCard({ mail, attached = false, onAttach }: { mail: MailPreview; attached?: boolean; onAttach?: () => void }) {
   const [body, signature] = splitSignature(mail.body);
   const people = (list: MailPreview["to"]) => list.map((p) => `${p.name} <${p.email}>`).join("; ");
   return (
@@ -538,17 +539,19 @@ export function MailCard({ mail, attached, onAttach }: { mail: MailPreview; atta
       )}
       <div className="mt-3 text-sm leading-relaxed whitespace-pre-wrap">{body}</div>
       {signature && <div className="mt-3 border-t border-border pt-2 text-xs whitespace-pre-wrap text-muted">{signature}</div>}
-      <div className="mt-3 flex justify-end">
-        <button
-          type="button"
-          onClick={onAttach}
-          disabled={attached}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border px-3 text-sm hover:bg-surface-2 disabled:opacity-50"
-        >
-          <Paperclip className="h-3.5 w-3.5" aria-hidden />
-          {attached ? "Bereits angehängt" : "Diese E-Mail anhängen"}
-        </button>
-      </div>
+      {onAttach && (
+        <div className="mt-3 flex justify-end">
+          <button
+            type="button"
+            onClick={onAttach}
+            disabled={attached}
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border px-3 text-sm hover:bg-surface-2 disabled:opacity-50"
+          >
+            <Paperclip className="h-3.5 w-3.5" aria-hidden />
+            {attached ? "Bereits angehängt" : "Diese E-Mail anhängen"}
+          </button>
+        </div>
+      )}
     </article>
   );
 }
