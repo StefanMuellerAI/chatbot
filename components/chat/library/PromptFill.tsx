@@ -134,7 +134,11 @@ function PromptForm({
   useEffect(() => {
     // Fokus aufs erste leere Feld (sonst aufs erste), nicht auf „Schließen“ – erst nachdem der Dialog offen ist.
     const first = prompt.placeholders.findIndex((p) => !cleanValue(values[p.key] ?? "", p.type));
-    const timer = setTimeout(() => fields.current[Math.max(0, first)]?.focus(), 0);
+    const timer = setTimeout(() => {
+      // Wer schon in einem Feld ist (schnell geklickt oder getippt), behält seinen Fokus.
+      if (fields.current.some((f) => f && f === document.activeElement)) return;
+      fields.current[Math.max(0, first)]?.focus();
+    }, 0);
     return () => clearTimeout(timer);
     // Nur beim Öffnen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
