@@ -103,6 +103,19 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   const [fillPrompt, setFillPrompt] = useState<FillablePrompt | null>(null);
   // Zuletzt eingefügter Prompt: steht er unverändert im Feld, ist er kein eigener Entwurf.
   const [inserted, setInserted] = useState<string | null>(null);
+  const focusEndRef = useRef(false);
+  // Nach dem Einfügen eines Prompts: Fokus ins Eingabefeld, Cursor ans Ende – im selben Durchlauf, in dem die Dialoge
+  // schließen (deren Effekte laufen vorher und geben den Fokus zurück). Ohne Verzögerung, damit sofortiges
+  // Weitertippen nicht mit dem Setzen des Cursors kollidiert.
+  useEffect(() => {
+    if (!focusEndRef.current) return;
+    focusEndRef.current = false;
+    const el = textareaRef.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+    el.scrollTop = el.scrollHeight;
+  });
   const features = config.features;
   const touchKeyboard = useTouchKeyboard();
 
@@ -292,14 +305,7 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   const insertText = (value: string, mode: InsertMode = "replace") => {
     setInserted(mode === "replace" ? value : null);
     onTextChange(value);
-    // Nach dem Schließen der Dialoge: Fokus ins Eingabefeld, Cursor ans Ende.
-    setTimeout(() => {
-      const el = textareaRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
-      el.scrollTop = el.scrollHeight;
-    }, 60);
+    focusEndRef.current = true;
   };
   const choosePrompt = (prompt: LibraryPrompt, category: string) => {
     if (prompt.placeholders.length) {
