@@ -51,12 +51,23 @@ function localRoot(): string {
   return process.env.FREEBIE_FILES_DIR || (process.env.VERCEL ? "/tmp/freebie-files" : "./.data/files");
 }
 
-/** Erlaubt nur sichere Schlüssel wie "uploads/<uuid>/name.pdf". */
+/**
+ * Erlaubt nur sichere Schlüssel wie "uploads/<uuid>/name.pdf". `fundus/` gehört der Kursleitung (eigene Inhalte des
+ * Fundus); Gäste erreichen diese Dateien nur über /api/library/[id]/file, nie über die Upload- und Datei-Routen.
+ */
 export function assertSafeKey(key: string): void {
-  if (!/^(uploads|images|audio)\/[a-zA-Z0-9-]{8,64}\/[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,119}$/.test(key)) {
+  if (!/^(uploads|images|audio|fundus)\/[a-zA-Z0-9-]{8,64}\/[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,119}$/.test(key)) {
     throw new HttpError(400, "Ungültiger Dateipfad.");
   }
 }
+
+/** Schlüssel, die Teilnehmende selbst hochladen oder erzeugen (nicht der Fundus der Kursleitung). */
+export function isUserKey(key: string): boolean {
+  return /^(uploads|images|audio)\//.test(key);
+}
+
+/** Frist für gespeicherte eigene Fundus-Dateien: praktisch nie (der Aufräumjob löscht nur `expiresAt < jetzt`). */
+export const KEEP_FOREVER = new Date("9999-12-31T00:00:00.000Z");
 
 /** Gleiche Bereinigung wie im Browser. */
 export const sanitizeFileName = safeFileName;
@@ -66,7 +77,7 @@ export async function putFile(
   data: Buffer,
   contentType: string,
   kind: string,
-  retentionDays: number,
+  retentionDays: number | "forever",
 ): Promise<void> {
   assertSafeKey(key);
   if (storageMode() === "blob") {
@@ -90,10 +101,10 @@ export async function registerFile(
   kind: string,
   mime: string,
   size: number,
-  retentionDays: number,
+  retentionDays: number | "forever",
 ): Promise<void> {
   const db = await getDb();
-  const expiresAt = new Date(Date.now() + retentionDays * 86_400_000);
+  const expiresAt = retentionDays === "forever" ? KEEP_FOREVER : new Date(Date.now() + retentionDays * 86_400_000);
   await db
     .insert(schema.storedFiles)
     .values({ key, kind, mime, size, expiresAt })

@@ -1,6 +1,8 @@
 // Fundus: erfundene Beispieldateien und E-Mails. Typen für Browser, Server und Generator.
+import type { Placeholder } from "@/lib/shared/placeholders";
 
-export type LibraryFileType = "word" | "excel" | "powerpoint" | "mail";
+// PDF gibt es nur bei eigenen Inhalten der Kursleitung (der mitgelieferte Fundus erzeugt Word, Excel und PowerPoint).
+export type LibraryFileType = "word" | "excel" | "powerpoint" | "pdf" | "mail";
 export type LibraryDocType = Exclude<LibraryFileType, "mail">;
 
 /** Merkmale für Übungen (in der Liste filterbar). Die Länge wird aus der Token-Schätzung abgeleitet. */
@@ -21,6 +23,7 @@ export const LEVEL_LABELS = {
   land: "Land",
   bund: "Bund",
   it: "IT-Dienstleister",
+  eigen: "Kursleitung",
 } as const;
 export type OrgLevel = keyof typeof LEVEL_LABELS;
 
@@ -100,6 +103,33 @@ export interface LibraryCatalog {
   threads: LibraryThread[];
 }
 
+/** Verwaltung der eigenen Inhalte der Kursleitung (ohne Einheiten). */
+export const OWN_ORG_ID = "eigen";
+export const OWN_ORG: LibraryOrg = { id: OWN_ORG_ID, name: "Eigene Inhalte", short: "Eigene Inhalte", level: "eigen", color: "#4a2ee6", units: [] };
+
+export interface PromptCategory {
+  id: string;
+  name: string;
+}
+
+/** Prompt mit Platzhaltern (Text und Einstellungen der Platzhalter, siehe lib/shared/placeholders.ts). */
+export interface LibraryPrompt {
+  id: string;
+  categoryId: string;
+  title: string;
+  description: string;
+  text: string;
+  placeholders: Placeholder[];
+}
+
+/** Katalog, wie ihn der Chat bekommt: mitgelieferter Fundus, eigene Inhalte, Kategorien und Prompts. */
+export interface FundusCatalog extends LibraryCatalog {
+  categories: PromptCategory[];
+  prompts: LibraryPrompt[];
+  /** IDs eigener Dokumente und Verläufe (zum Kennzeichnen in der Liste). */
+  own: string[];
+}
+
 // ---------------------------------------------------------------- Inhalte und Vorschau
 
 /** Text mit **fett** als einziger Auszeichnung. */
@@ -167,19 +197,22 @@ export type LibraryPreview =
   | { type: "word"; brand: Brand; kind: string; meta: [string, string][]; recipient?: string[]; subject?: string; blocks: Block[] }
   | { type: "excel"; sheets: SheetPreview[] }
   | { type: "powerpoint"; brand: Brand; slides: Slide[] }
-  | { type: "thread"; subject: string; mails: MailPreview[] };
+  | { type: "thread"; subject: string; mails: MailPreview[] }
+  /** Eigene Word- und PDF-Dateien: ausgelesener Text (Markdown, ohne HTML). */
+  | { type: "text"; format: "word" | "pdf"; markdown: string; truncated: boolean };
 
 /** Endung je Dateityp. */
-export const LIBRARY_EXTENSION: Record<LibraryFileType, string> = { word: "docx", excel: "xlsx", powerpoint: "pptx", mail: "eml" };
+export const LIBRARY_EXTENSION: Record<LibraryFileType, string> = { word: "docx", excel: "xlsx", powerpoint: "pptx", pdf: "pdf", mail: "eml" };
 
 export const LIBRARY_MIME: Record<LibraryFileType, string> = {
   word: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   excel: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   powerpoint: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  pdf: "application/pdf",
   mail: "message/rfc822",
 };
 
-export const LIBRARY_TYPE_LABEL: Record<LibraryFileType, string> = { word: "Word", excel: "Excel", powerpoint: "PowerPoint", mail: "E-Mail" };
+export const LIBRARY_TYPE_LABEL: Record<LibraryFileType, string> = { word: "Word", excel: "Excel", powerpoint: "PowerPoint", pdf: "PDF", mail: "E-Mail" };
 
 /** Länge eines Inhalts anhand der Token-Schätzung. */
 export function lengthTag(tokens: number): LibraryTag {

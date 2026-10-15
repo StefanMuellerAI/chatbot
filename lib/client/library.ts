@@ -1,20 +1,30 @@
 "use client";
-import type { LibraryCatalog, LibraryPreview } from "@/lib/library/types";
+import type { FundusCatalog, LibraryPreview } from "@/lib/library/types";
 import type { Attachment } from "@/lib/shared/types";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 
-let catalogPromise: Promise<LibraryCatalog> | null = null;
+let current: FundusCatalog | null = null;
+let inflight: Promise<FundusCatalog> | null = null;
 const previews = new Map<string, Promise<LibraryPreview>>();
 
-/** Katalog einmal pro Sitzung laden; bei Fehlern beim nächsten Aufruf neu versuchen. */
-export function loadCatalog(): Promise<LibraryCatalog> {
-  catalogPromise ??= api<LibraryCatalog>("/api/library").catch((err: unknown) => {
-    catalogPromise = null;
-    throw err;
-  });
-  return catalogPromise;
+/**
+ * Katalog laden – bei jedem Öffnen des Fundus mit `If-None-Match` nachfragen: 304 ist billig, 200 bringt den neuen
+ * Stand (die Kursleitung kann den Fundus während des Kurses ändern). Bei Fehlern beim nächsten Aufruf neu versuchen.
+ */
+export function loadCatalog(): Promise<FundusCatalog> {
+  inflight ??= api<FundusCatalog>("/api/library", { cache: "no-store", headers: current ? { "If-None-Match": `"fundus-${current.version}"` } : undefined })
+    .then((catalog) => (current = catalog))
+    .catch((err: unknown) => {
+      if (err instanceof ApiError && err.status === 304 && current) return current;
+      throw err;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
 }
 
+/** Vorschauen ändern sich nie (eigene Dateien werden nicht ersetzt, nur gelöscht) – einmal pro Sitzung laden. */
 export function loadPreview(id: string): Promise<LibraryPreview> {
   if (!previews.has(id)) {
     previews.set(

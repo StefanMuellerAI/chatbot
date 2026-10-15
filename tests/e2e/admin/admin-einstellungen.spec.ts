@@ -55,7 +55,7 @@ test.describe("Q · Admin: Einstellungen", () => {
     await chat.ask(`Wieder da ${uniq()}`);
   });
 
-  test("Q21/Y01 Fundus aus: kein Datenbank-Symbol, API gesperrt; Upload aus, Fundus an: Symbol bleibt; Pause sperrt den Fundus", async ({ page, browser, baseURL, ip }) => {
+  test("Q21/Y01 Fundus aus: kein Datenbank-Symbol, keine Prompts, API gesperrt, Pflege im Admin geht; Upload aus, Fundus an: Symbol bleibt; Pause sperrt den Fundus", async ({ page, browser, baseURL, ip }) => {
     await openAdmin(page, "Einstellungen");
     await toggleAndSave(page, "Fundus", false);
     let chat = await openChat(browser, baseURL!, ip);
@@ -72,6 +72,12 @@ test.describe("Q · Admin: Einstellungen", () => {
       expect(res.status(), url).toBe(403);
       expect((await res.json()).error).toBe("Der Fundus ist deaktiviert.");
     }
+    // Ohne Fundus auch keine Prompts; die Pflege im Admin bleibt möglich (mit Hinweis).
+    await page.getByRole("tab", { name: "Fundus" }).click();
+    await expect(page.getByText("Der Fundus ist für Teilnehmende ausgeschaltet (Einstellungen › Funktionen) – pflegen geht trotzdem.")).toBeVisible();
+    await page.getByRole("tablist", { name: "Fundus-Bereiche" }).getByRole("tab", { name: /^Prompts/ }).click();
+    await expect(page.getByRole("button", { name: "Neuer Prompt" })).toBeEnabled();
+    await page.getByRole("tab", { name: "Einstellungen" }).click();
 
     // Nur der Fundus, keine eigenen Dateien: die Büroklammer verschwindet, das Datenbank-Symbol bleibt.
     await toggleAndSave(page, "Fundus", true);

@@ -1,5 +1,5 @@
 "use client";
-import { ArrowLeft, BarChart3, CalendarDays, Cpu, Loader2, LogOut, Settings, Shield, Sparkles } from "lucide-react";
+import { ArrowLeft, BarChart3, CalendarDays, Cpu, Database, Loader2, LogOut, Settings, Shield, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { OverviewData } from "@/lib/admin";
@@ -10,13 +10,14 @@ import { Button } from "@/components/ui/Button";
 import { Logo } from "@/components/ui/Logo";
 import { cn } from "@/components/ui/cn";
 import { EventsTab } from "./EventsTab";
+import { FundusTab } from "./fundus/FundusTab";
 import { ModelsTab } from "./ModelsTab";
 import { OverviewTab } from "./OverviewTab";
 import { PresetsTab } from "./PresetsTab";
 import { SecurityTab } from "./SecurityTab";
 import { SettingsTab, type AdminSettings } from "./SettingsTab";
 
-type Tab = "overview" | "events" | "models" | "settings" | "presets" | "security";
+type Tab = "overview" | "events" | "models" | "settings" | "presets" | "fundus" | "security";
 
 const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "overview", label: "Übersicht", icon: BarChart3 },
@@ -24,6 +25,7 @@ const TABS: { id: Tab; label: string; icon: React.ComponentType<{ className?: st
   { id: "models", label: "Modelle", icon: Cpu },
   { id: "settings", label: "Einstellungen", icon: Settings },
   { id: "presets", label: "Vorlagen", icon: Sparkles },
+  { id: "fundus", label: "Fundus", icon: Database },
   { id: "security", label: "Sicherheit", icon: Shield },
 ];
 
@@ -151,6 +153,7 @@ export function AdminApp() {
         {tab === "models" && <ModelsTab models={data.models} reload={load} />}
         {tab === "settings" && <SettingsTab initial={data.settings} modelOptions={modelOptions} reload={load} />}
         {tab === "presets" && <PresetsTab presets={data.presets} models={modelOptions} reload={load} />}
+        {tab === "fundus" && <FundusTab />}
         {tab === "security" && <SecurityTab adminUsername={data.overview.status.adminUsername} reload={load} />}
       </main>
     </div>

@@ -163,8 +163,10 @@ Senden ────────────── POST /api/chat ─────
   - Auslesen: Das Auslesen wandert aus `/api/files/process` in eine gemeinsame Funktion. So gelten derselbe
     Datei-Cache, dieselbe Token-Schätzung und dieselben Meldungen.
   - Ergebnis: ein `Attachment` mit `kind: "document"` und `storageKey: "library/<id>/<dateiname>"`.
-- **Keine Kopie in den Speicher:** `getFile()` liefert `library/…`-Schlüssel nur lesend aus dem Bundle. Die
-  Upload-Routen lehnen dieses Präfix weiterhin ab (Test Y21).
+- **Keine Kopie in den Speicher:** `library/…`-Schlüssel kommen nie in den Speicher; `readLibraryFile` liest die Datei
+  direkt aus dem Bundle (`getFile()` und `/api/files` lehnen `library/` ab). Die Upload-Routen lehnen dieses Präfix
+  ebenfalls ab (Test Y21). Eigene Dateien der Kursleitung liegen dagegen unter `fundus/` im Speicher
+  ([FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md)).
 - **Fundus-Anhänge verfallen nicht:** Der Aufräumjob löscht ausgelesene Texte nach der Aufbewahrungsfrist. Fehlt der
   Text deshalb im Datei-Cache und ist `libraryId` gesetzt, liest `prepare.ts` die Datei neu aus. Es erscheint also
   nicht „nicht mehr verfügbar“.
@@ -382,9 +384,9 @@ Inhalt und nicht nur den Chip.
 ## 7. Bewusst nicht enthalten (später möglich)
 
 - Auswahl pro Termin oder Gruppe: Die Kursleitung stellt eine Teilmenge zusammen. Die Merkmale lassen Platz dafür.
-- Eigene Dateien der Kursleitung über den Admin-Bereich in den Fundus laden.
-- PDFs, Bilder und eingescannte Dokumente im Fundus. Die Technik ist vorbereitet, weil `getFile` `library/`-Schlüssel
-  liest.
+- ~~Eigene Dateien der Kursleitung über den Admin-Bereich in den Fundus laden.~~ Umgesetzt mit
+  [FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md): eigene Dokumente (auch PDF) und E-Mail-Verläufe, dazu Prompts.
+- Bilder und eingescannte Dokumente im Fundus (PDFs mit Textebene gehen als eigene Dokumente).
 - Outlook-`.msg`-Dateien.
 - Übungsideen je Datei mit „Als Frage übernehmen“.
 

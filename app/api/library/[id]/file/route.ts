@@ -2,7 +2,7 @@ import { errorResponse, requireUser } from "@/lib/auth/session";
 import { requireFeature } from "@/lib/guards";
 import { readLibraryFile } from "@/lib/library/catalog";
 
-/** Lädt die Originaldatei herunter (Word, Excel, PowerPoint oder E-Mail). */
+/** Lädt die Originaldatei herunter (Word, Excel, PowerPoint, PDF oder E-Mail). */
 export async function GET(_request: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     await requireUser();

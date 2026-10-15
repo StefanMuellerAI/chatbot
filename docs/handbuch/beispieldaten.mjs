@@ -1,5 +1,6 @@
 // Beispieldaten für die Screenshots des Handbuchs: Chats zum Importieren und Zahlen für die Admin-Übersicht.
 // Alle Inhalte sind erfunden; das Handbuch weist darauf hin.
+import { strToU8, zipSync } from "fflate";
 
 const MIN = 60_000;
 const DAY = 24 * 60 * MIN;
@@ -358,4 +359,63 @@ export function patchEvents(data, state) {
     }
   }
   return data;
+}
+
+// ---------------------------------------------------------------- Fundus pflegen: eigene Inhalte der Kursleitung
+
+/** Kleine Word-Datei mit den gegebenen Absätzen (für „Eigene Inhalte“ im Fundus). */
+export function ownDocx(paragraphs) {
+  const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const body = paragraphs.map((t) => `<w:p><w:r><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`).join("");
+  return Buffer.from(
+    zipSync({
+      "[Content_Types].xml": strToU8(
+        '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+      ),
+      "_rels/.rels": strToU8(
+        '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+      ),
+      "word/document.xml": strToU8(`<?xml version="1.0" encoding="UTF-8"?><w:document ${W}><w:body>${body}</w:body></w:document>`),
+    }),
+  );
+}
+
+export const OWN_DOC = {
+  name: "Dienstanweisung mobiles Arbeiten.docx",
+  title: "Dienstanweisung mobiles Arbeiten (Entwurf)",
+  summary: "Entwurf mit Regeln zu Erreichbarkeit, Ausstattung und Datenschutz – zum Zusammenfassen und Vereinfachen.",
+  keywords: ["Homeoffice", "Dienstanweisung"],
+  paragraphs: [
+    "Dienstanweisung mobiles Arbeiten – Entwurf (erfunden, Stadt Musterhausen)",
+    "1. Geltungsbereich: Die Regelung gilt für alle Beschäftigten der Kernverwaltung.",
+    "2. Erreichbarkeit: Kernzeit ist montags bis donnerstags von 9 bis 15 Uhr, freitags von 9 bis 12 Uhr.",
+    "3. Ausstattung: Dienstliche Geräte stellt die Stadt. Private Geräte sind nicht zugelassen.",
+    "4. Datenschutz: Akten mit personenbezogenen Daten werden nur über den gesicherten Zugang bearbeitet.",
+  ],
+};
+
+/**
+ * Drei Mails eines erfundenen Vorgangs – in falscher Reihenfolge, Freebie sortiert nach Datum. `variant` ändert die
+ * Nachrichten-IDs, damit derselbe Vorgang ein zweites Mal hochgeladen werden kann (sonst: Dublette).
+ */
+export function ownThreadMails(variant = "") {
+  const amt = "Ordnungsamt Musterhausen <ordnungsamt@stadt-musterhausen.example>";
+  const verein = "Lea Brandt <vorstand@heimatverein-musterhausen.example>";
+  const mail = (from, to, subject, date, id, body) =>
+    [`From: ${from}`, `To: ${to}`, `Subject: ${subject}`, `Date: ${date}`, `Message-ID: <${id}${variant}@stadt-musterhausen.example>`, "MIME-Version: 1.0", "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: 8bit", "", body, ""].join("\r\n");
+  return [
+    {
+      name: "2-AW-Sondernutzung.eml",
+      text: mail(amt, verein, "AW: Sondernutzung Marktplatz – Herbstfest", "Tue, 07 Oct 2025 11:20:00 +0200", "herbst-2", "Sehr geehrte Frau Brandt,\nbitte reichen Sie einen Lageplan und die Zahl der Stände bis 15. Oktober nach.\n\nMit freundlichen Grüßen\nOrdnungsamt"),
+    },
+    {
+      name: "1-Sondernutzung.eml",
+      text: mail(verein, amt, "Sondernutzung Marktplatz – Herbstfest", "Mon, 06 Oct 2025 09:05:00 +0200", "herbst-1", "Guten Tag,\nder Heimatverein möchte am 25. Oktober ein Herbstfest auf dem Marktplatz ausrichten. Was brauchen Sie von uns?\n\nLea Brandt"),
+    },
+    {
+      name: "3-AW-AW-Sondernutzung.eml",
+      text: mail(verein, amt, "AW: AW: Sondernutzung Marktplatz – Herbstfest", "Thu, 09 Oct 2025 16:45:00 +0200", "herbst-3", "Guten Tag,\nwir planen 18 Stände. Den Lageplan schicke ich morgen. Brauchen wir für die Musik eine extra Genehmigung?\n\nLea Brandt"),
+    },
+  ];
 }

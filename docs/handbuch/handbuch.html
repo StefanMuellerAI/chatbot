@@ -58,11 +58,12 @@
   </tbody>
 </table>
 
-<h2 id="k1-3"><span class="num">1.3</span>Ein Schulungstag in sechs Schritten</h2>
+<h2 id="k1-3"><span class="num">1.3</span>Ein Schulungstag in sieben Schritten</h2>
 <ol class="steps">
   <li><strong>Termin anlegen.</strong> Im Admin-Bereich unter <span class="ui">Termine</span> einen Termin mit Datum, Beginn und Ende anlegen (höchstens 24 Stunden). → Kapitel 3.3</li>
   <li><strong>Gruppen und Gäste erzeugen.</strong> Pro Gruppe die Anzahl der Gäste angeben – Freebie erzeugt sofort einfache Zugangsdaten.</li>
   <li><strong>Zugangsdaten verteilen.</strong> Kärtchen drucken und ausschneiden oder die Liste als CSV für Excel herunterladen.</li>
+  <li><strong>Fundus vorbereiten (optional).</strong> Unter <span class="ui">Fundus</span> eigene Übungsdateien und E-Mail-Verläufe hochladen, Prompts für die Übungen anlegen und unpassende mitgelieferte Einträge ausblenden. → Kapitel 3.7</li>
   <li><strong>Gäste melden sich an.</strong> Ab 30 Minuten vor Beginn mit Benutzername und Passwort auf freebie.stefanai.de. → Kapitel 2.1</li>
   <li><strong>Während der Schulung</strong> zeigt die Übersicht Anfragen und Kosten; bei Bedarf hilft der <span class="ui">Not-Aus</span> (alle pausieren) oder <span class="ui">Jetzt beenden</span>. Übungsaufgaben kann die Kursleitung per Rundmail in die Posteingänge schicken; für Gruppenübungen sammeln die Gäste Notizen in einem Gruppenchat und lassen sie mit <strong>@Freebie</strong> zusammenfassen. → Kapitel 2.13 und 2.15</li>
   <li><strong>Nach dem Termin</strong> verfallen alle Gast-Zugänge automatisch. Zehn Minuten vorher werden die Gäste gewarnt und können ihre Chats exportieren. Kosten und Anfragen bleiben 90 Tage in der Statistik.</li>
@@ -77,7 +78,7 @@
 <section class="part" id="teil-2">
   <div class="kicker">Teil 2</div>
   <h1>Der Chat</h1>
-  <p>Anmelden, Fragen stellen, Dateien, Fundus und Bilder, Artefakte, Chats verwalten – alles, was Gäste und Kursleitung im Chat tun können.</p>
+  <p>Anmelden, Fragen stellen, Dateien, Fundus mit Prompts und Bilder, Artefakte, Chats verwalten – alles, was Gäste und Kursleitung im Chat tun können.</p>
 </section>
 
 <h2 id="k2-1"><span class="num">2.1</span>Anmelden</h2>
@@ -145,6 +146,7 @@
 
 <h3>Vorlagen</h3>
 <p>Unter <span class="ui">Mit einer Vorlage starten</span> stehen Assistenten mit einer festen Rolle, z. B. <span class="ui">E-Mail-Profi</span>, <span class="ui">Excel-Erklärer</span>, <span class="ui">Präsentations-Coach</span>, <span class="ui">Webseiten-Baukasten</span> und <span class="ui">Ideen-Sparring</span>. Ein Klick wählt die Vorlage (die Kachel wird hervorgehoben), ein zweiter hebt die Wahl wieder auf. Hat die Vorlage ein empfohlenes Modell, stellt Freebie es automatisch ein. Die Vorlage gilt für den ganzen Chat und steht als farbiges Abzeichen neben dem Modellnamen. Welche Vorlagen es gibt, bestimmt die Kursleitung (Kapitel 3.6).</p>
+<p><strong>Nicht verwechseln:</strong> Eine <em>Vorlage</em> ist eine unsichtbare Rolle für den ganzen Chat. Ein <em>Prompt</em> aus dem Fundus ist dagegen sichtbarer Text, der ausgefüllt im Eingabefeld landet und sich vor dem Senden noch ändern lässt (Kapitel 2.9). Beides lässt sich kombinieren, z. B. Vorlage „E-Mail-Profi“ und Prompt „Bürgeranfrage freundlich beantworten“.</p>
 
 <h2 id="k2-5"><span class="num">2.5</span>Modell wählen</h2>
 <figure><img src="shots/c04-modelle.jpg"><figcaption><b>Modellauswahl</b> oben links – gruppiert nach Anbieter, mit Beschreibung und Kennzeichnung „Standard“.</figcaption></figure>
@@ -231,15 +233,15 @@
 <h3>Spracheingabe (Diktat)</h3>
 <p>Der <strong>Mikrofon-Knopf</strong> (<span class="ui">Spracheingabe</span>) nimmt gesprochenen Text auf. Beim ersten Mal fragt der Browser nach dem Mikrofon. Während der Aufnahme ist der Knopf rot und zeigt Pegel und Zeit; ein zweiter Klick beendet sie. Nach <span class="ui">Transkribiere …</span> steht der erkannte Text im Eingabefeld – zum Prüfen und Ergänzen, abgeschickt wird erst mit Enter. Eine Aufnahme dauert höchstens 10 Minuten.</p>
 
-<h2 id="k2-9"><span class="num">2.9</span>Der Fundus: Übungsdateien und E-Mails</h2>
+<h2 id="k2-9"><span class="num">2.9</span>Der Fundus: Übungsdateien, E-Mails und Prompts</h2>
 <figure><img src="shots/c27-fundus.jpg"><figcaption><b>Fundus</b>, Reiter „Dokumente“: zwei Dateien ausgewählt, rechts die Vorschau einer Beschlussvorlage (alles erfunden).</figcaption></figure>
 <p>Viele Teilnehmende möchten keine Unterlagen aus der eigenen Behörde hochladen – und oft sollen sie das auch nicht. Dafür gibt es den <strong>Fundus</strong>: erfundene, aber echt wirkende Word-, Excel- und PowerPoint-Dateien und E-Mail-Verläufe aus Verwaltungen, von der Gemeinde über Landkreis und Land bis zum Bund. Das <strong>Datenbank-Symbol</strong> direkt neben der Büroklammer (<span class="ui">Fundus öffnen</span>) öffnet ihn.</p>
 <ul>
-  <li><strong>Zwei Reiter:</strong> <span class="ui">Dokumente</span> und <span class="ui">E-Mails</span>. Die Zahl in Klammern zeigt, wie viele es jeweils gibt.</li>
-  <li><strong>Suchen und filtern:</strong> Das Suchfeld findet Titel, Stichwörter und Personen. Daneben grenzen <span class="ui">Verwaltung</span> und Organisationseinheit (Dezernat, Amt, Referat, Team) ein, dazu Dateityp (<span class="ui">Word</span>, <span class="ui">Excel</span>, <span class="ui">PowerPoint</span>) und Merkmale (Tabelle unten). <span class="ui">Filter zurücksetzen</span> hebt alles auf.</li>
+  <li><strong>Drei Reiter:</strong> <span class="ui">Dokumente</span>, <span class="ui">E-Mails</span> und <span class="ui">Prompts</span>. Die Zahl in Klammern zeigt, wie viele es jeweils gibt. Neben den mitgelieferten Einträgen stehen hier auch die <strong>eigenen Inhalte</strong> der Kursleitung (Verwaltung <span class="ui">Eigene Inhalte</span>, Kapitel 3.7).</li>
+  <li><strong>Suchen und filtern:</strong> Das Suchfeld findet Titel, Stichwörter und Personen. Daneben grenzen <span class="ui">Verwaltung</span> und Organisationseinheit (Dezernat, Amt, Referat, Team) ein, dazu Dateityp (<span class="ui">Word</span>, <span class="ui">Excel</span>, <span class="ui">PowerPoint</span>, bei eigenen Dateien auch <span class="ui">PDF</span>) und Merkmale (Tabelle unten). <span class="ui">Filter zurücksetzen</span> hebt alles auf.</li>
   <li><strong>Vorschau:</strong> Ein Klick auf einen Eintrag zeigt rechts, wer ihn wann in welcher Einheit verfasst hat, wie groß er ist (in Tokens) und wie er aussieht: Word als Seite mit Briefkopf, Excel als Tabelle mit Blattreitern, PowerPoint als Folien mit aufklappbaren Sprechernotizen.</li>
   <li><strong>Anhängen:</strong> <span class="ui">Anhängen</span> holt die Datei sofort ins Eingabefeld. Für mehrere Dateien die Kästchen vor den Einträgen anklicken (oder <span class="ui">Zur Auswahl</span>) und unten z. B. <span class="ui">2 Dateien anhängen</span>. Links daneben steht, wie viele Anhänge noch möglich sind – wie beim Hochladen höchstens 20 pro Nachricht.</li>
-  <li><span class="ui">Herunterladen</span> speichert die echte Datei (.docx, .xlsx, .pptx) zum Öffnen in Word, Excel oder PowerPoint.</li>
+  <li><span class="ui">Herunterladen</span> speichert die echte Datei (.docx, .xlsx, .pptx, .pdf) zum Öffnen in Word, Excel, PowerPoint oder im PDF-Programm.</li>
   <li><strong>Tastatur:</strong> Pfeiltasten wechseln den Eintrag, <span class="key">Leertaste</span> wählt ihn aus, <span class="key">Enter</span> hängt an.</li>
 </ul>
 <table class="plain">
@@ -283,8 +285,28 @@
     <li>E-Mail- und Webadressen enden auf <code>.example</code> – eine Antwort aus Outlook kann nie ankommen. Telefonnummern stammen aus den Bereichen, die die Bundesnetzagentur für Film und Fernsehen freihält. Postleitzahlen beginnen mit 00.</li>
   </ul>
 </div>
+<h3>Prompts mit Platzhaltern</h3>
+<figure><img src="shots/c38-fundus-prompts.jpg"><figcaption><b>Reiter „Prompts“:</b> nach Kategorien geordnet, rechts der Text mit hervorgehobenen Platzhaltern und die Felder der Maske.</figcaption></figure>
+<p>Im Reiter <span class="ui">Prompts</span> stehen fertige Arbeitsanweisungen, die die Kursleitung vorbereitet hat – geordnet nach Kategorien wie „Schreiben“, „Zusammenfassen“ oder „Einfache Sprache“. Die Kategorie-Knöpfe filtern (mehrere zugleich zeigen alle gewählten), das Suchfeld findet Titel, Beschreibung, Text und Felder. Rechts steht der Prompt mit seinen <strong>Platzhaltern</strong>: Stellen wie <code>{{Zielgruppe}}</code>, die vor dem Einfügen ausgefüllt werden.</p>
+<div class="pair">
+  <figure><img src="shots/c39-prompt-maske.jpg"><figcaption><b>Maske „Prompt ausfüllen“</b> mit Live-Vorschau; offene Felder sind hervorgehoben.</figcaption></figure>
+  <figure><img src="shots/c40-prompt-eingefuegt.jpg"><figcaption><b>Der fertige Text im Eingabefeld</b> – gesendet wird erst mit „Senden“.</figcaption></figure>
+</div>
+<ul>
+  <li><span class="ui">Ausfüllen und einfügen</span> (oder <span class="key">Enter</span> in der Liste) öffnet die <strong>Maske</strong>: ein Feld je Platzhalter, in der Reihenfolge im Text. <strong>Jedes Feld muss ausgefüllt werden</strong> – leere Felder zeigen „Bitte ausfüllen.“. Manche Felder sind vorausgefüllt oder bieten eine Auswahl; der graue Text im Feld ist ein Beispiel.</li>
+  <li>Die <strong>Vorschau</strong> unter den Feldern zeigt den Text, wie er eingefügt wird. <span class="ui">Einfügen</span> setzt ihn ins Eingabefeld; dort lässt er sich noch ändern, dann <span class="ui">Senden</span>. Abgeschickt wird nie automatisch.</li>
+  <li>Steht im Eingabefeld schon eigener Text, fragt die Maske: <span class="ui">Anfügen</span> setzt den Prompt darunter (mit Leerzeile), <span class="ui">Ersetzen</span> überschreibt den Text. Ein Prompt ohne Platzhalter kommt direkt ins Eingabefeld; einen eigenen Entwurf lässt Freebie dabei stehen und bietet <span class="ui">Ersetzen</span> an.</li>
+  <li>Tastatur: <span class="key">Enter</span> springt ins nächste Feld und fügt im letzten ein, <span class="key">Strg</span>/<span class="key">Cmd</span> + <span class="key">Enter</span> fügt sofort ein. In mehrzeiligen Feldern macht <span class="key">Enter</span> eine neue Zeile. <span class="key">Esc</span> schließt die Maske, ein zweites Mal den Fundus.</li>
+  <li>Die Werte bleiben beim erneuten Öffnen desselben Prompts erhalten, bis die Seite neu geladen wird. Gespeichert werden sie nirgends – nur als normale Nachricht im eigenen Chat, wenn man sie abschickt.</li>
+  <li>Eine passende Übungsdatei hängt man selbst aus dem Fundus dazu an (Reiter <span class="ui">Dokumente</span> oder <span class="ui">E-Mails</span>). Im <strong>Gruppenchat</strong> beginnt der eingefügte Text mit „@Freebie“, damit Freebie antwortet.</li>
+</ul>
+
+<h3>Eigene Inhalte der Kursleitung</h3>
+<p>Dokumente, E-Mail-Verläufe und Prompts kann die Kursleitung im Admin-Bereich selbst ergänzen (Kapitel 3.7). Eigene Dateien stehen unter der Verwaltung <span class="ui">Eigene Inhalte</span>, mit „Verfasst von: Kursleitung“; sonst verhalten sie sich wie die mitgelieferten. Ändert die Kursleitung den Fundus während des Kurses, sehen die Teilnehmenden den neuen Stand, sobald sie den Fundus erneut öffnen – ohne Neuladen. Eine schon ausgewählte, inzwischen entfernte Datei fällt mit dem Hinweis „1 Eintrag ist nicht mehr im Fundus.“ aus der Auswahl.</p>
+
 <h4>Ideen für Übungen</h4>
 <ul>
+  <li><strong>Prompt ausfüllen:</strong> „E-Mail-Verlauf zusammenfassen“ wählen, einen Verlauf aus dem Fundus anhängen und die Zielgruppe einsetzen – danach den eingefügten Text selbst noch verbessern.</li>
   <li><strong>Zusammenfassen:</strong> „Fasse die Beschlussvorlage zum Kita-Ausbau in fünf Sätzen für den Jugendhilfeausschuss zusammen.“</li>
   <li><strong>Abgleichen:</strong> Den Verlauf „Mitzeichnung Beschlussvorlage …“ samt Vorlage anhängen: „Was muss in der Vorlage nach den Rückmeldungen geändert werden?“ – die Mails nennen andere Kosten als die Vorlage.</li>
   <li><strong>Auswerten:</strong> Eine Excel-Tabelle mit dem Merkmal „Mit Zahlen“: „Wo weicht die Prognose am stärksten vom Ansatz ab? Zeig es als Diagramm.“</li>
@@ -449,7 +471,7 @@
 <div>
     <p>Auf kleinen Bildschirmen ist die Seitenleiste eingeklappt. Das Menü-Symbol oben links öffnet sie; das X, ein Tipp daneben oder die Wahl eines Chats schließt sie. Oben rechts gibt es einen eigenen Knopf für <span class="ui">Neuer Chat</span>.</p>
     <p>Knöpfe zeigen nur Symbole ohne Text (Websuche, Bild, Kopieren, Neu generieren). Kopieren und Bearbeiten an eigenen Nachrichten sind immer sichtbar. Artefakte füllen den ganzen Bildschirm. Fotos lassen sich direkt aus der Kamera anhängen.</p>
-    <p>Der Fundus füllt den ganzen Bildschirm. <span class="ui">Filter</span> klappt die Filter auf; nach einem Tipp auf einen Eintrag erscheint die Vorschau, <span class="ui">Zurück zur Liste</span> führt zurück.</p>
+    <p>Der Fundus füllt den ganzen Bildschirm. <span class="ui">Filter</span> (bei Prompts <span class="ui">Kategorien</span>) klappt die Filter auf; nach einem Tipp auf einen Eintrag erscheint die Vorschau, <span class="ui">Zurück zur Liste</span> führt zurück. Die Maske „Prompt ausfüllen“ füllt ebenfalls den ganzen Bildschirm.</p>
     <p>Den Posteingang öffnet das Menü. Liste und Mail erscheinen nacheinander (<span class="ui">Zurück zu „Posteingang“</span>); <span class="ui">Neue E-Mail</span> ist der runde Knopf unten rechts und öffnet das Formular im Vollbild.</p>
     <p>Gruppenchats öffnet ebenfalls das Menü. Oben rechts zeigt ein Personen-Knopf mit Zahl die Mitglieder; Start- und Mitglieder-Dialog füllen den ganzen Bildschirm.</p>
 </div>
@@ -458,12 +480,12 @@
 <section class="part" id="teil-3">
   <div class="kicker">Teil 3</div>
   <h1>Der Admin-Bereich</h1>
-  <p>Für die Kursleitung: Kosten im Blick behalten, Termine und Gast-Zugänge verwalten, Modelle, Einstellungen und Vorlagen pflegen.</p>
+  <p>Für die Kursleitung: Kosten im Blick behalten, Termine und Gast-Zugänge verwalten, Modelle, Einstellungen, Vorlagen und den Fundus pflegen.</p>
 </section>
 
 <h2 id="k3-1"><span class="num">3.1</span>Zugang und Aufbau</h2>
 <p>Die Kursleitung meldet sich auf der normalen Anmeldeseite mit dem Admin-Zugang an. Im Chat führt der Link <span class="ui">Admin</span> unten in der Seitenleiste ohne zweite Anmeldung in den Admin-Bereich; dort führt <span class="ui">Zum Chat</span> zurück. <span class="ui">Abmelden</span> beendet beides. Gäste haben keinen Zugriff – sie landen auf der Anmeldeseite.</p>
-<p>Oben stehen sechs Reiter: <span class="ui">Übersicht</span>, <span class="ui">Termine</span>, <span class="ui">Modelle</span>, <span class="ui">Einstellungen</span>, <span class="ui">Vorlagen</span>, <span class="ui">Sicherheit</span>. Jeder Wechsel lädt die Daten frisch.</p>
+<p>Oben stehen sieben Reiter: <span class="ui">Übersicht</span>, <span class="ui">Termine</span>, <span class="ui">Modelle</span>, <span class="ui">Einstellungen</span>, <span class="ui">Vorlagen</span>, <span class="ui">Fundus</span>, <span class="ui">Sicherheit</span>. Jeder Wechsel lädt die Daten frisch.</p>
 
 <h2 id="k3-2"><span class="num">3.2</span>Übersicht: Kosten und Systemstatus</h2>
 <figure class="tall"><img src="shots/a01-uebersicht.jpg"><figcaption><b>Übersicht</b> (Beispielzahlen).</figcaption></figure>
@@ -595,7 +617,7 @@
   <tbody>
     <tr><td>Websuche</td><td>Modelle dürfen im Web recherchieren (wird pro Suche abgerechnet)</td><td>an</td></tr>
     <tr><td>Datei-Upload</td><td>PDF, Word, Excel, PowerPoint, E-Mails (.eml), Text und Bilder anhängen</td><td>an</td></tr>
-    <tr><td>Fundus</td><td>Erfundene Übungsdateien und E-Mails zum Anhängen (Datenbank-Symbol, Kapitel 2.9) – unabhängig vom Datei-Upload. Upload aus und Fundus an heißt: Niemand kann eigene Unterlagen hochladen, geübt wird nur mit dem Fundus</td><td>an</td></tr>
+    <tr><td>Fundus</td><td>Erfundene Übungsdateien, E-Mails und Prompts zum Anhängen bzw. Ausfüllen (Datenbank-Symbol, Kapitel 2.9) – unabhängig vom Datei-Upload. Upload aus und Fundus an heißt: Niemand kann eigene Unterlagen hochladen, geübt wird nur mit dem Fundus. Ausgeschaltet fehlen auch die Prompts; den Fundus pflegen (Kapitel 3.7) geht trotzdem</td><td>an</td></tr>
     <tr><td>Audio-Transkription</td><td>MP3 &amp; Co. hochladen und transkribieren</td><td>an</td></tr>
     <tr><td>Spracheingabe</td><td>Mikrofon-Knopf im Eingabefeld</td><td>an</td></tr>
     <tr><td>Bildgenerierung</td><td>Bild-Modus und Bilder im Chat für alle Modelle</td><td>an</td></tr>
@@ -649,7 +671,90 @@
   </div>
 </div>
 
-<h2 id="k3-7"><span class="num">3.7</span>Sicherheit</h2>
+<h2 id="k3-7"><span class="num">3.7</span>Fundus pflegen</h2>
+<figure><img src="shots/a16-fundus-dokumente.jpg"><figcaption><b>Reiter „Fundus“</b> mit den Zahlen oben und den Unterreitern; eigene Einträge stehen vor den mitgelieferten (Beispieldaten).</figcaption></figure>
+<p>Im Reiter <span class="ui">Fundus</span> ergänzt die Kursleitung den Fundus um <strong>eigene Dokumente</strong>, <strong>E-Mail-Verläufe</strong> und <strong>Prompts</strong> und blendet mitgelieferte Einträge aus, die nicht zum Kurs passen. Oben stehen die Zahlen (eigene Dokumente, eigene Verläufe, Prompts, ausgeblendete Einträge), darunter vier Unterreiter: <span class="ui">Dokumente</span>, <span class="ui">E-Mail-Verläufe</span>, <span class="ui">Prompts</span>, <span class="ui">Kategorien</span>. Ist der Fundus in den Einstellungen ausgeschaltet, steht ein Hinweis da – pflegen geht trotzdem.</p>
+
+<h3>Aufbau der Listen</h3>
+<ul>
+  <li>Jede Zeile zeigt Typ, Titel, Verwaltung, Datum und Größe bzw. Zahl der Mails, dazu Kennzeichen: <span class="ui">eigen</span>, <span class="ui">mitgeliefert</span>, <span class="ui">ausgeblendet</span>, <span class="ui">inaktiv</span>, bei Anhängen eines Verlaufs <span class="ui">Anhang von „…“</span>.</li>
+  <li>Suchfeld und die Auswahl <span class="ui">Alle</span> / <span class="ui">Eigene</span> / <span class="ui">Mitgelieferte</span> / <span class="ui">Ausgeblendet</span> grenzen die Liste ein.</li>
+  <li><strong>Eigene Einträge:</strong> Vorschau (Auge), Herunterladen, Aktiv-Schalter, Bearbeiten (Stift) und Löschen (Papierkorb, mit Rückfrage). Bearbeiten ändert nur die Angaben – Titel, Datum, Merkmale, Stichwörter, Kurzbeschreibung. Die Datei selbst lässt sich nicht ersetzen: für eine neue Fassung neu hochladen und die alte löschen. Inaktive Einträge sehen Teilnehmende nicht; schon angehängt bleiben sie in deren Chats nutzbar.</li>
+  <li><strong>Mitgelieferte Einträge</strong> lassen sich nicht bearbeiten oder löschen, nur <span class="ui">Ausblenden</span> bzw. <span class="ui">Einblenden</span>. <span class="ui">Alle einblenden</span> holt alle auf einmal zurück.</li>
+</ul>
+
+<h3>Dokumente hochladen</h3>
+<div class="cols" style="grid-template-columns: 1fr 1fr; align-items: start">
+  <figure style="margin-top: 0"><img src="shots/a17-fundus-pruefen.jpg"><figcaption><b>Prüfschritt</b>: Typ, Größe in Tokens und Länge je Datei, Vorschau zum Aufklappen, gemeinsame Angaben und die Bestätigung. Die CSV-Datei wird mit Tipp abgelehnt.</figcaption></figure>
+  <ol class="steps" style="margin-top: 0">
+    <li><span class="ui">Dateien hochladen</span>, dann bis zu 20 Dateien auswählen oder in die Fläche ziehen. <strong>Formate:</strong> Word (.docx), Excel (.xlsx), PowerPoint (.pptx) und PDF mit Textebene, je höchstens 50 MB. Alte Formate (.doc, .xls, .ppt) und andere Dateien lehnt Freebie mit einem Tipp ab.</li>
+    <li>Freebie lädt jede Datei hoch und prüft sie: erkannter Typ, Größe in Tokens, Länge (kurz, mittel, lang), Vorschau. Fehler stehen direkt an der Datei – z. B. „kein lesbarer Text“ bei einem eingescannten PDF oder „Gibt es schon im Fundus als …“.</li>
+    <li>Angaben für alle Dateien setzen: Datum, Merkmale, Stichwörter, Kurzbeschreibung. Je Datei lassen sich Titel und – mit „Eigene Angaben für diese Datei“ – alle Angaben überschreiben. Die Verwaltung heißt immer „Eigene Inhalte“.</li>
+    <li>Bestätigen, dass die Dateien keine echten Daten enthalten, und <span class="ui">Speichern (n Dateien)</span>. Dateien mit Fehler bleiben mit Meldung stehen, die übrigen werden gespeichert.</li>
+  </ol>
+</div>
+<div class="box warn">
+  <span class="t">Keine echten Daten</span>
+  <p>Der Fundus ist eine Spielumgebung. Freebie warnt beim Hochladen vor echten Merkmalen – E-Mail-Adressen mit echter Domain, gültige IBANs, Telefonnummern – und speichert nur mit der Bestätigung „keine echten personenbezogenen oder vertraulichen Daten“. Eigene Inhalte bleiben gespeichert, bis die Kursleitung sie löscht, und gehen beim Anhängen an den KI-Anbieter (Kapitel 4.2 und 4.3).</p>
+</div>
+
+<h3>E-Mail-Verläufe hochladen</h3>
+<div class="cols" style="grid-template-columns: 1fr 1fr; align-items: start">
+  <div>
+    <ul style="margin-top: 0">
+      <li>Die Mails eines Vorgangs als <strong>.eml-Dateien</strong> sichern – in Outlook die Mail öffnen und über <span class="ui">Datei › Speichern unter</span> als „Outlook-Nachricht (.eml)“ speichern oder aus der Liste in einen Ordner ziehen. Outlook-Nachrichten im Format .msg gehen nicht.</li>
+      <li><span class="ui">Verlauf hochladen</span> und bis zu 50 Mails auswählen (zusammen höchstens 100 MB). Freebie <strong>sortiert nach Datum</strong>; eine Mail ohne Datum bleibt an ihrer Stelle, mit Hinweis.</li>
+      <li>Der Titel kommt aus dem Betreff der ersten Mail ohne „AW:“, „WG:“, „Re:“ oder „Fwd:“ und lässt sich ändern. Darunter stehen die Beteiligten.</li>
+      <li>Anhänge im Format Word, Excel, PowerPoint oder PDF werden <strong>Dokumente des Verlaufs</strong> („Anhänge mitnehmen“ funktioniert wie bei den mitgelieferten). Andere Anhänge nennt die Mail nur. Doppelte Mails (gleiche Nachrichten-ID) übernimmt Freebie nicht.</li>
+      <li>Angaben setzen, bestätigen, <span class="ui">Verlauf speichern</span>. Ein Verlauf lässt sich nur als Ganzes löschen – seine Anhänge gehen mit.</li>
+    </ul>
+  </div>
+  <figure style="margin-top: 0"><img src="shots/a18-fundus-verlauf.jpg"><figcaption><b>Verlauf hochladen:</b> drei Mails, nach Datum sortiert, mit Titelvorschlag.</figcaption></figure>
+</div>
+
+<h3>Prompts anlegen</h3>
+<div class="cols" style="grid-template-columns: 1fr 1fr; align-items: start">
+  <figure style="margin-top: 0"><img src="shots/a19-prompt-dialog.jpg"><figcaption><b>Prompt bearbeiten</b> mit der Platzhalter-Tabelle.</figcaption></figure>
+  <div>
+    <p style="margin-top: 0">Im Unterreiter <span class="ui">Prompts</span> stehen alle Prompts nach Kategorie, mit „nach oben/unten“, Aktiv-Schalter, Bearbeiten und Löschen. <span class="ui">Neuer Prompt</span> öffnet den Dialog: Titel, Kategorie (auch <span class="ui">Neue Kategorie …</span>), Kurzbeschreibung und Text.</p>
+    <ul class="small">
+      <li>Platzhalter stehen in doppelten geschweiften Klammern: <code>{{Zielgruppe}}</code>. Sobald einer im Text steht, erscheint darunter seine Zeile.</li>
+      <li>Je Platzhalter: <span class="ui">Beschriftung</span> (sonst der Name), <span class="ui">Hinweis</span> (grauer Beispieltext im Feld), <span class="ui">Art</span> (einzeilig, mehrzeilig, Auswahl mit 2–20 Werten) und <span class="ui">Standardwert</span> (vorausgefüllt, änderbar).</li>
+      <li><strong>Jeder Platzhalter muss ausgefüllt werden</strong> – optionale Felder gibt es nicht. Ein Prompt ohne Platzhalter kommt ohne Maske ins Eingabefeld.</li>
+      <li><span class="ui">So sieht es im Chat aus</span> zeigt die Maske zum Ausprobieren; das Ergebnis erscheint im Dialog, nicht im Chat.</li>
+      <li>Grenzen: 8.000 Zeichen Text, 20 Platzhalter, 500 Prompts. Neue Prompts landen am Ende ihrer Kategorie.</li>
+    </ul>
+  </div>
+</div>
+<table class="plain">
+  <thead><tr><th style="width: 34%">Im Text</th><th>Wirkung</th></tr></thead>
+  <tbody>
+    <tr><td><code>{{Zielgruppe}}</code></td><td>ein Feld „Zielgruppe“</td></tr>
+    <tr><td><code>{{Zielgruppe}}</code> … <code>{{zielgruppe}}</code></td><td>ein Feld, der Wert steht an beiden Stellen (groß/klein, ä/ae und Leerzeichen am Rand zählen nicht)</td></tr>
+    <tr><td><code>{{Anzahl Punkte}}</code></td><td>Leerzeichen, Ziffern, Umlaute, - und _ sind erlaubt (höchstens 40 Zeichen)</td></tr>
+    <tr><td><code>{{ungültig!}}</code>, <code>{x}</code>, <code>[Name]</code></td><td>kein Platzhalter, bleibt als Text stehen; bei <code>{{</code> ohne <code>}}</code> und ungültigen Namen warnt der Dialog mit Zeilenangabe</td></tr>
+  </tbody>
+</table>
+<p class="small"><strong>Beispiel:</strong> <code>Fasse den angehängten E-Mail-Verlauf für {{Zielgruppe}} in {{Anzahl Punkte}} Punkten zusammen. Achte besonders auf: {{Schwerpunkt}}</code> – mit „Anzahl Punkte“ vorausgefüllt auf 5 und „Schwerpunkt“ mehrzeilig mit der Beschriftung „Was ist dir wichtig?“. Freebie bringt zum Start zwölf solche Prompts in sechs Kategorien mit; sie lassen sich frei ändern oder löschen.</p>
+
+<h3>Kategorien</h3>
+<div class="cols" style="grid-template-columns: 1fr 1fr; align-items: start">
+  <div>
+    <p style="margin-top: 0">Im Unterreiter <span class="ui">Kategorien</span> neue Kategorien anlegen, umbenennen, mit „nach oben/unten“ sortieren und leere löschen. Die Reihenfolge gilt auch im Fundus der Teilnehmenden; Kategorien ohne aktive Prompts sehen sie nicht. Doppelte Namen lehnt Freebie ab, auch in anderer Schreibweise („Einfache sprache“). Eine Kategorie mit Prompts lässt sich erst löschen, wenn sie leer ist.</p>
+  </div>
+  <figure style="margin-top: 0"><img src="shots/a20-kategorien.jpg"><figcaption><b>Kategorien</b> mit Zahl der Prompts.</figcaption></figure>
+</div>
+<div class="box tip">
+  <span class="t">Gute Prompts für Übungen</span>
+  <ul>
+    <li>Eine Aufgabe je Prompt, mit Ziel und Form: „in fünf Punkten“, „als Tabelle“, „unter 120 Wörtern“.</li>
+    <li>Wenige Platzhalter (zwei bis drei) mit Beispiel im Hinweis – sonst wird die Maske zum Formular.</li>
+    <li>Was das Modell nicht wissen kann, ausdrücklich als offene Frage markieren lassen („Erfinde keine Fristen“).</li>
+    <li>Zum Prompt eine passende Datei im Fundus nennen, z. B. in der Kurzbeschreibung: „passt zum Verlauf Mitzeichnung Kita“.</li>
+  </ul>
+</div>
+
+<h2 id="k3-8"><span class="num">3.8</span>Sicherheit</h2>
 <figure class="w60"><img src="shots/a15-sicherheit.jpg"><figcaption><b>Reiter „Sicherheit“.</b></figcaption></figure>
 <ul>
   <li><strong>Zugänge:</strong> Erklärt den Admin-Zugang. Das Admin-Passwort steht in der Vercel-Umgebung (<code>ADMIN_PASSWORD</code>) und lässt sich nur dort ändern.</li>
@@ -683,7 +788,8 @@
     <tr><td>Chats</td><td>Nur im Browser des Geräts</td><td>Gäste: bis zum Abmelden bzw. Termin-Ende. Kursleitung: bis zum Löschen im Browser.</td></tr>
     <tr><td>Uploads und erzeugte Bilder</td><td>Privater Dateispeicher (Vercel Blob), nur mit Anmeldung abrufbar</td><td>Standard 7 Tage (Einstellung „Dateien aufbewahren“)</td></tr>
     <tr><td>Ausgelesene Texte, Transkripte</td><td>Datenbank</td><td>Gleiche Frist; bei erneuter Nutzung derselben Datei beginnt sie neu</td></tr>
-    <tr><td>Fundus</td><td>Teil von Freebie, für alle gleich – nichts wird hochgeladen</td><td>Bleibt; ausgelesene Texte wie bei Uploads. Was jemand daraus anhängt, steht nur im Chat auf dem Gerät</td></tr>
+    <tr><td>Fundus (mitgeliefert)</td><td>Teil von Freebie, für alle gleich – nichts wird hochgeladen</td><td>Bleibt; ausgelesene Texte wie bei Uploads. Was jemand daraus anhängt, steht nur im Chat auf dem Gerät</td></tr>
+    <tr><td>Eigene Inhalte im Fundus, Prompts</td><td>Privater Dateispeicher (eigener Bereich <code>fundus/</code>) und Datenbank</td><td>Bis die Kursleitung sie löscht – der Aufräumjob lässt sie stehen. Löschen entfernt Datei und Text sofort; wer sie schon angehängt hatte, bei dem bekommt das Modell danach nur noch den Hinweis „nicht mehr verfügbar“. Werte aus der Prompt-Maske werden nicht gespeichert</td></tr>
     <tr><td>Antwort-Cache</td><td>Datenbank, für alle gemeinsam</td><td>Standard 24 Stunden; jederzeit leerbar (Sicherheit)</td></tr>
     <tr><td>Gast-Zugänge</td><td>Datenbank</td><td>Bis zum Termin-Ende</td></tr>
     <tr><td>Übungs-Mails (Posteingang)</td><td>Datenbank, je Postfach eine Kopie</td><td>Bis zum Abmelden der Person, spätestens zum Termin-Ende; bei „Jetzt beenden“ oder gelöschtem Termin sofort, auch die Kopien bei der Kursleitung. „Alle abmelden“ lässt sie stehen. Notizen der Kursleitung an sich selbst höchstens 24 Stunden</td></tr>
@@ -698,7 +804,7 @@
 <ul>
   <li><strong>Anthropic</strong> (Claude-Modelle): Nachrichten, ausgelesene Dateiinhalte, Bilder und – bei „PDFs nativ“ – die PDF-Datei; die Websuche für Claude führt Anthropic aus. Standardmäßig erzeugt auch Claude Haiku die Chat-Titel.</li>
   <li><strong>OpenAI</strong> (GPT-Modelle): dasselbe für GPT-Chats. <strong>Immer über OpenAI</strong>, egal welches Chatmodell gewählt ist: Bilder erzeugen und bearbeiten, Audio-Transkription und Spracheingabe.</li>
-  <li><strong>Fundus:</strong> Angehängte Fundus-Dateien gehen wie Uploads an den Anbieter des gewählten Modells – unbedenklich, weil alles erfunden ist.</li>
+  <li><strong>Fundus:</strong> Angehängte Fundus-Dateien – mitgelieferte wie eigene der Kursleitung – gehen wie Uploads an den Anbieter des gewählten Modells, und nur dann. Bei den mitgelieferten ist das unbedenklich, weil alles erfunden ist; eigene Inhalte deshalb nur ohne echte Daten hochladen. Ein ausgefüllter Prompt ist normaler Nachrichtentext.</li>
   <li><strong>Posteingang:</strong> Nur in Chats mit eingeschalteter Verbindung gehen die Mails, die Freebie liest (Absender, Empfänger, Betreff, Text), an den Anbieter des gewählten Modells. Ohne Verbindung sieht kein Modell die Mails.</li>
   <li><strong>Gruppenchats:</strong> Auf <strong>@Freebie</strong> geht der ganze Verlauf des Gruppenchats (Beiträge mit Benutzernamen und Uhrzeit, Anhänge) an den Anbieter des Modells, das die fragende Person gewählt hat. Ohne @Freebie geht nichts an einen Anbieter. Ein Posteingang ist im Gruppenchat nie verbunden.</li>
   <li><strong>Vercel</strong> (USA): Betrieb der Anwendung, Datenbank und Dateispeicher.</li>
@@ -715,6 +821,7 @@
       <li>Bei Bedarf „Hinweise an das Modell“ mit dem Kurskontext füllen und passende Vorlagen aktivieren.</li>
       <li>Begrüßungs-E-Mail als erste Übungsaufgabe anpassen (Einstellungen).</li>
       <li>Übungsdateien im Fundus aussuchen und Titel oder Suchbegriff in die Aufgabe schreiben. Sollen nur Fundus-Dateien in den Chat, den Datei-Upload ausschalten.</li>
+      <li>Fundus pflegen: eigene Übungsdateien hochladen, Prompts und Kategorien prüfen (passen Texte, Platzhalter und Reihenfolge zum Kurs?), unpassende mitgelieferte Einträge ausblenden.</li>
       <li>Kurz testen: als Gast anmelden (ab 30 Minuten vor Beginn), eine Frage stellen.</li>
       <li>Für eine Gruppenübung: Aufgabe vorbereiten (z. B. „Sammelt Notizen zur Teamrunde und lasst Freebie ein Protokoll schreiben“) und bei Bedarf einen Gruppenchat zum Vorführen starten.</li>
     </ul>
@@ -759,7 +866,13 @@
 <h4>Teilnehmende wollen nichts aus ihrer Behörde hochladen.</h4>
 <p>Genau dafür ist der Fundus da: Datenbank-Symbol neben der Büroklammer, passende Datei suchen, <span class="ui">Anhängen</span>. Alle Dateien sind erfunden. Wer ganz sichergehen will, schaltet in den Einstellungen den Datei-Upload aus und lässt den Fundus an.</p>
 <h4>Das Datenbank-Symbol fehlt.</h4>
-<p>Der Fundus ist in den Einstellungen ausgeschaltet (Schalter <span class="ui">Fundus</span>).</p>
+<p>Der Fundus ist in den Einstellungen ausgeschaltet (Schalter <span class="ui">Fundus</span>). Damit fehlen auch die Prompts.</p>
+<h4>Eine eigene Datei fehlt im Fundus der Teilnehmenden.</h4>
+<p>Ist sie inaktiv (Kennzeichen „inaktiv“)? Dann im Reiter <span class="ui">Fundus</span> den Aktiv-Schalter einschalten. Teilnehmende sehen Änderungen, sobald sie den Fundus erneut öffnen. Ein Anhang eines inaktiven Verlaufs ist ebenfalls unsichtbar.</p>
+<h4>Ein Platzhalter erscheint nicht als Feld.</h4>
+<p>Er braucht doppelte geschweifte Klammern und einen gültigen Namen: <code>{{Zielgruppe}}</code>, nicht <code>{Zielgruppe}</code> oder <code>[Zielgruppe]</code>; erlaubt sind Buchstaben, Ziffern, Leerzeichen, - und _. Der Prompt-Dialog warnt bei ungültigen Namen und offenen Klammern mit Zeilenangabe.</p>
+<h4>Outlook speichert nur .msg-Dateien.</h4>
+<p>Die Mail öffnen und über <span class="ui">Datei › Speichern unter</span> den Dateityp „Outlook-Nachricht (.eml)“ wählen bzw. in neueren Versionen die Mail aus der Liste in einen Ordner ziehen. Freebie lehnt .msg mit genau diesem Tipp ab.</p>
 <h4>Warum kostet eine Antwort nichts?</h4>
 <p>Sie kam aus dem Antwort-Cache, weil jemand am selben Tag exakt dieselbe Frage gestellt hat. „Neu generieren“ erzeugt eine frische Antwort.</p>
 <h4>Ein Modell fehlt in der Auswahl.</h4>

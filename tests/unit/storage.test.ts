@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { blobAuth } from "@/lib/storage";
+import { assertSafeKey, blobAuth, isUserKey, KEEP_FOREVER } from "@/lib/storage";
 
 describe("blobAuth", () => {
   it("erkennt den klassischen Token", () => {
@@ -28,5 +28,21 @@ describe("blobAuth", () => {
     expect(blobAuth({ BLOB_READ_WRITE_TOKEN: "  " })).toBeNull();
     expect(blobAuth({ OTHER_READ_WRITE_TOKEN: "kein-blob-token" })).toBeNull();
     expect(blobAuth({ A_STORE_ID: "store_1", B_STORE_ID: "store_2" })).toBeNull();
+  });
+});
+
+describe("Dateischlüssel", () => {
+  it("erlaubt den Fundus der Kursleitung, aber nicht für Teilnehmende", () => {
+    const fundus = "fundus/0f8fad5b-d9cb-469f-a165-70867728950e/Bericht.pdf";
+    expect(() => assertSafeKey(fundus)).not.toThrow();
+    expect(isUserKey(fundus)).toBe(false);
+    expect(isUserKey("uploads/0f8fad5b-d9cb-469f-a165-70867728950e/a.pdf")).toBe(true);
+    for (const bad of ["library/x/y.pdf", "fundus/../uploads/x.pdf", "fundus/kurz/x.pdf", "Fundus/0f8fad5b-d9cb-469f-a165-70867728950e/x.pdf"]) {
+      expect(() => assertSafeKey(bad), bad).toThrow("Ungültiger Dateipfad.");
+    }
+  });
+
+  it("dauerhaft gespeicherte Dateien laufen nie ab", () => {
+    expect(KEEP_FOREVER.getTime()).toBeGreaterThan(Date.UTC(9000, 0, 1));
   });
 });

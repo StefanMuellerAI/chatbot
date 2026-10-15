@@ -121,7 +121,7 @@ test("X03 kleines PDF über den Blob-Speicher hochladen und befragen", async ({ 
   await ask(page, `Worum geht es in dem PDF? Ein Satz. (Smoke ${uniq()})`);
 });
 
-test("X08 eine Fundus-Datei anhängen und befragen", async ({ page }) => {
+test("X08 eine Fundus-Datei anhängen und befragen; der Reiter „Prompts“ hat Einträge", async ({ page }) => {
   await login(page);
   await chooseModel(page, "Claude Haiku 5.5");
   await page.getByRole("button", { name: "Fundus öffnen" }).click();
@@ -130,6 +130,48 @@ test("X08 eine Fundus-Datei anhängen und befragen", async ({ page }) => {
   await fundus.getByRole("region", { name: "Vorschau" }).getByRole("button", { name: "Anhängen", exact: true }).click();
   await expectReady(page, "V-2025-0412 Beschlussvorlage Kita-Ausbau Nordstadt.docx", /Fundus · ca\. [\d.]+ Tokens/);
   await ask(page, `Was soll der Rat beschließen? Ein Satz. (Smoke ${uniq()})`);
+  // Der Reiter „Prompts“ hat Einträge (Startbestand oder eigene der Kursleitung).
+  await page.getByRole("button", { name: "Fundus öffnen" }).click();
+  await fundus.getByRole("tab", { name: /^Prompts/ }).click();
+  await expect(fundus.getByRole("listbox", { name: "Prompts" }).getByRole("option").first()).toBeVisible();
+  await page.keyboard.press("Escape");
+});
+
+test("X11 Prompt mit Platzhalter: Kursleitung legt Kategorie und Prompt an, Gast füllt die Maske und fragt Claude Haiku", async ({ page }) => {
+  const settings = await (await admin.get("/api/admin/settings")).json();
+  test.skip(!settings.features?.library, "Der Fundus ist ausgeschaltet – X11 übersprungen.");
+  const category = await admin.post("/api/admin/fundus/categories", { data: { name: `Smoke ${uniq()}` } });
+  expect(category.status(), await category.text()).toBe(200);
+  const categoryId = ((await category.json()) as { id: string }).id;
+  let promptId = "";
+  try {
+    const title = `Smoke-Prompt ${uniq()}`;
+    const created = await admin.post("/api/admin/fundus/prompts", {
+      data: { title, categoryId, text: "Antworte nur mit genau diesem Wort: {{Codewort}}", placeholders: { codewort: { hint: "z. B. Leuchtturm" } } },
+    });
+    expect(created.status(), await created.text()).toBe(200);
+    promptId = ((await created.json()) as { id: string }).id;
+
+    await login(page);
+    await chooseModel(page, "Claude Haiku 5.5");
+    await page.getByRole("button", { name: "Fundus öffnen" }).click();
+    const fundus = page.getByRole("dialog", { name: "Fundus" });
+    await fundus.getByRole("tab", { name: /^Prompts/ }).click();
+    await fundus.getByRole("listbox", { name: "Prompts" }).locator(`[data-id="${promptId}"]`).click();
+    await fundus.getByRole("button", { name: "Ausfüllen und einfügen" }).click();
+    const mask = page.getByRole("dialog", { name: "Prompt ausfüllen" });
+    await mask.getByLabel("Codewort", { exact: true }).fill("Leuchtturm");
+    await mask.getByRole("button", { name: "Einfügen", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Nachricht" })).toHaveValue("Antworte nur mit genau diesem Wort: Leuchtturm");
+    const answers = page.getByRole("article", { name: "Antwort von Freebie" });
+    await page.getByRole("button", { name: "Senden", exact: true }).click();
+    await expect(answers).toHaveCount(1, { timeout: ANSWER_TIMEOUT });
+    await expect(answers.last()).toHaveAttribute("aria-busy", "false", { timeout: ANSWER_TIMEOUT });
+    await expect(answers.last()).toContainText(/leuchtturm/i);
+  } finally {
+    if (promptId) await admin.delete(`/api/admin/fundus/prompts?id=${promptId}`);
+    await admin.delete(`/api/admin/fundus/categories?id=${categoryId}`);
+  }
 });
 
 test("X04 kurze MP3 transkribieren", async ({ page }) => {

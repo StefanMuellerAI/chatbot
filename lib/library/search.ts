@@ -1,5 +1,5 @@
 // Suche und Filter im Fundus (Browser; ohne Server-Abhängigkeiten, auch in Unit-Tests nutzbar).
-import type { LibraryCatalog, LibraryDocType, LibraryDocument, LibraryOrg, LibraryTag, LibraryThread } from "./types";
+import type { FundusCatalog, LibraryCatalog, LibraryDocType, LibraryDocument, LibraryOrg, LibraryPrompt, LibraryTag, LibraryThread } from "./types";
 
 /** Vereinheitlicht Text für die Suche: klein, ä = ae, ß = ss, ohne Akzente. */
 export function fold(text: string): string {
@@ -126,4 +126,24 @@ export function filterThreads(catalog: LibraryCatalog, f: LibraryFilter): Librar
 /** Organisationseinheit als lesbare Zeile: „Amt 51 – Jugendamt · Abteilung Kindertagesbetreuung“. */
 export function unitLabel(catalog: LibraryCatalog, orgId: string, unitId: string): string {
   return unitName(catalog, orgId, unitId).reverse().slice(-2).join(" · ");
+}
+
+export interface PromptFilter {
+  query: string;
+  /** Kategorien (mehrere = oder). */
+  categories: string[];
+}
+
+export const EMPTY_PROMPT_FILTER: PromptFilter = { query: "", categories: [] };
+
+export function promptFilterActive(f: PromptFilter): boolean {
+  return Boolean(f.query.trim() || f.categories.length);
+}
+
+/** Prompts nach Kategorie und Suche (Titel, Beschreibung, Text, Platzhalter, Kategorie) – in der Reihenfolge des Katalogs. */
+export function filterPrompts(catalog: Pick<FundusCatalog, "prompts" | "categories">, f: PromptFilter): LibraryPrompt[] {
+  const names = new Map(catalog.categories.map((c) => [c.id, c.name]));
+  return catalog.prompts
+    .filter((p) => !f.categories.length || f.categories.includes(p.categoryId))
+    .filter((p) => matches([p.title, p.description, p.text, names.get(p.categoryId) ?? "", ...p.placeholders.map((x) => x.label)], f.query));
 }

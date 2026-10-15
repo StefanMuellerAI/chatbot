@@ -203,4 +203,72 @@ export const BOOTSTRAP_STATEMENTS: string[] = [
   `CREATE INDEX IF NOT EXISTS group_chat_messages_version_idx ON group_chat_messages (chat_id, version)`,
   // Freebie antwortet je Gruppenchat höchstens einmal zur Zeit (Sperre für gleichzeitige Anfragen).
   `CREATE UNIQUE INDEX IF NOT EXISTS group_chat_messages_pending_idx ON group_chat_messages (chat_id) WHERE status = 'pending'`,
+  // Fundus pflegen: eigene Inhalte, ausgeblendete mitgelieferte Einträge, Kategorien und Prompts.
+  `CREATE TABLE IF NOT EXISTS fundus_items (
+    id text PRIMARY KEY,
+    kind text NOT NULL,
+    title text NOT NULL,
+    summary text NOT NULL DEFAULT '',
+    date text NOT NULL,
+    tags jsonb NOT NULL,
+    keywords jsonb NOT NULL,
+    doc_type text,
+    file_name text,
+    file_key text,
+    mime text,
+    size integer NOT NULL DEFAULT 0,
+    sha256 text,
+    text text,
+    tokens integer NOT NULL DEFAULT 0,
+    preview jsonb,
+    thread_id text,
+    enabled boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS fundus_items_thread_idx ON fundus_items (thread_id)`,
+  `CREATE TABLE IF NOT EXISTS fundus_mails (
+    id text PRIMARY KEY,
+    thread_id text NOT NULL REFERENCES fundus_items(id) ON DELETE CASCADE,
+    position integer NOT NULL,
+    subject text NOT NULL,
+    from_name text NOT NULL DEFAULT '',
+    from_email text NOT NULL DEFAULT '',
+    to_addresses jsonb NOT NULL,
+    cc_addresses jsonb NOT NULL,
+    date timestamptz,
+    message_id text,
+    file_name text NOT NULL,
+    file_key text NOT NULL,
+    size integer NOT NULL DEFAULT 0,
+    sha256 text NOT NULL,
+    text text NOT NULL,
+    tokens integer NOT NULL DEFAULT 0,
+    body text NOT NULL DEFAULT '',
+    attachments jsonb NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS fundus_mails_thread_idx ON fundus_mails (thread_id, position)`,
+  `CREATE TABLE IF NOT EXISTS fundus_hidden (
+    id text PRIMARY KEY,
+    hidden_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS prompt_categories (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    sort_order integer NOT NULL DEFAULT 100,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE TABLE IF NOT EXISTS prompts (
+    id text PRIMARY KEY,
+    category_id text NOT NULL REFERENCES prompt_categories(id) ON DELETE RESTRICT,
+    title text NOT NULL,
+    description text NOT NULL DEFAULT '',
+    text text NOT NULL,
+    placeholders jsonb NOT NULL,
+    enabled boolean NOT NULL DEFAULT true,
+    sort_order integer NOT NULL DEFAULT 100,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS prompts_category_idx ON prompts (category_id, sort_order)`,
 ];

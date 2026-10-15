@@ -328,6 +328,10 @@ dialog::backdrop {
   background: rgba(13, 10, 23, 0.55);
   backdrop-filter: blur(2px);
 }
+/* Dialog über einem Dialog: der untere ist schon weichgezeichnet (siehe components/ui/Dialog.tsx). */
+dialog[data-stacked]::backdrop {
+  backdrop-filter: none;
+}
 
 /* Druckansicht (PDF-Export): nur der Gesprächsverlauf */
 @media print {

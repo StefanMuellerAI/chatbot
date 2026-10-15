@@ -9,7 +9,10 @@ Teilnehmende ohne eigenes ChatGPT- oder Claude-Konto mit aktuellen KI-Modellen a
 - **Datei-Upload**: PDF, Word, Excel/CSV, PowerPoint, E-Mails (`.eml`), Text, Code und Bilder (auch per Drag & Drop oder Einfügen)
 - **Fundus**: 150 erfundene, echt wirkende Word-, Excel- und PowerPoint-Dateien und 40 E-Mail-Verläufe aus neun
   Verwaltungen (Schwerpunkt Kommune) zum Anhängen – zum Üben, ohne echte Daten der eigenen Behörde (eigener Schalter im
-  Admin, Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md))
+  Admin, Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md)). Die Kursleitung pflegt den Fundus im Admin: **eigene Dokumente**
+  (Word, Excel, PowerPoint, PDF) und **E-Mail-Verläufe** (`.eml`) hochladen, mitgelieferte Einträge ausblenden und
+  **Prompts mit Platzhaltern** in Kategorien anlegen. Teilnehmende füllen einen Prompt in einer Maske aus (jedes Feld
+  ist Pflicht) und bekommen den fertigen Text ins Eingabefeld (Plan: [FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md))
 - **Audio-Transkription** (MP3, M4A, WAV …) und **Spracheingabe** per Mikrofon
 - **Bildgenerierung** im Chat (auch mit Claude) und im Bild-Modus, inkl. Bearbeitung hochgeladener Bilder
 - **Artefakte**: HTML-Seiten, Charts, Mermaid-Diagramme, SVG und Dokumente im Seitenpanel mit Vorschau und Download
@@ -20,8 +23,8 @@ Teilnehmende ohne eigenes ChatGPT- oder Claude-Konto mit aktuellen KI-Modellen a
   die Kursleitung kann Gruppenchats zum Vorführen starten (Plan: [GRUPPENCHAT-PLAN.md](GRUPPENCHAT-PLAN.md))
 - **Verbindungen**: im Chat pro Gespräch zuschaltbar – mit der Verbindung „Posteingang“ liest Freebie die eigenen
   E-Mails und kann im Namen der Person senden (gekennzeichnet „über Freebie“)
-- **Admin-Bereich**: Modelle, Funktionen, Vorlagen, Hinweistext, Begrüßungs-E-Mail, Not-Aus, Termine und Gast-Zugänge,
-  Kosten- und Ersparnis-Dashboard
+- **Admin-Bereich**: Modelle, Funktionen, Vorlagen, Fundus (eigene Inhalte, Prompts, Kategorien), Hinweistext,
+  Begrüßungs-E-Mail, Not-Aus, Termine und Gast-Zugänge, Kosten- und Ersparnis-Dashboard
 - **Caching auf allen Ebenen**: Prompt Caching bei beiden Anbietern, gemeinsamer Antwort-Cache, Datei- und Transkript-Cache
 
 Der ursprüngliche Umsetzungsplan steht in [PLAN.md](PLAN.md).
@@ -116,7 +119,7 @@ Freebie-Instanzen mit frischer Datenbank und eine nachgebaute Anthropic-/OpenAI-
 | Projekt | Inhalt | Server |
 |---|---|---|
 | `chat`, `mobile`, `tablet` | Oberfläche für Teilnehmende (Desktop, 390 px, 820 px) | Mock, parallel |
-| `admin` | Admin-Bereich, ändert Einstellungen (Rücksetzen nach jedem Test) | Mock, seriell |
+| `admin` | Admin-Bereich, ändert Einstellungen und den Fundus (Rücksetzen nach jedem Test) | Mock, seriell |
 | `api` | alle Routen ohne Browser | Mock, parallel |
 | `provider`, `provider-serial` | echte Claude-/GPT-Adapter gegen die Fake-API inkl. Caching-Vertrag | Fake-API |
 | `belastung` | Neustart, Abbrüche, 500 Chats, 25 Personen über eine IP (Chat, Posteingang und Gruppenchats) | Mock |
@@ -132,8 +135,9 @@ app/                 Seiten (Chat, Login, Admin) und API-Routen
   api/chat           Streaming-Endpunkt (Server-Sent Events) mit Antwort-Cache und Tool-Schleife
   api/files, upload  Direkt-Upload (Vercel Blob), Textextraktion, Auslieferung privater Dateien
   api/transcribe     Audio in Etappen: start (ffmpeg teilt) → chunk (parallel) → finish
-  api/library        Fundus: Katalog, Vorschau, Download, Anhängen (liest .library/ aus dem Deployment)
+  api/library        Fundus: Katalog, Vorschau, Download, Anhängen (mitgeliefert aus .library/, eigene aus Postgres und Blob)
   api/admin          Modelle, Einstellungen, Vorlagen, Sicherheit, Übersicht, Termine
+  api/admin/fundus   Fundus pflegen: Upload nach fundus/, Prüfen, eigene Dokumente und Verläufe, Prompts, Kategorien, Ausblenden
   api/mail           Posteingang: Liste, Lesen, Senden, Markieren, Löschen, Adressbuch
   api/groupchats     Gruppenchats: Starten, Mitglieder, Beiträge, Abfrage „seit Stand n“, Antwort von Freebie (SSE)
   api/status         gemeinsame Abfrage alle 15 s: neue Mails und Gruppenchats (Einladungen, Neues)
@@ -142,7 +146,9 @@ lib/tools            Eigene Werkzeuge für die Tool-Schleife (Bild erzeugen)
 lib/mail             Postfächer in Postgres (eine Zeile je Kopie), Werkzeuge der Verbindung „Posteingang“
 lib/groupchat        Gruppenchats in Postgres: Rechte, Mitglieder, Beiträge, Sperre „eine Antwort zur Zeit“, Aufräumen
 lib/chat             System-Prompt, Aufbereitung der Nachrichten, Antwort-Cache, Ablaufsteuerung
-lib/db               Drizzle-Schema, Bootstrap (CREATE TABLE IF NOT EXISTS), Startbelegung
+lib/db               Drizzle-Schema, Bootstrap (CREATE TABLE IF NOT EXISTS), Startbelegung (inkl. 12 Start-Prompts)
+lib/fundus           Eigene Fundus-Inhalte: Speichern, Prüfen und Vorschau beim Hochladen, Hinweise auf echte Daten
+lib/shared/placeholders.ts  Platzhalter {{Name}} in Prompts: Parsen, Prüfen, Ausfüllen (Browser und Server)
 components/          Chat-Oberfläche, Posteingang (components/mail), Gruppenchats (components/groupchat), Artefakt-Panel, Fundus-Dialog, Admin-Oberfläche, UI-Bausteine
 library/             Fundus: erfundenes Weltmodell, Inhalte als Daten und der Generator für .docx/.xlsx/.pptx/.eml
 proxy.ts             Schützt alle Seiten und APIs per signiertem Sitzungs-Cookie
@@ -172,6 +178,10 @@ werden – nur so lange, wie der Termin läuft bzw. bis zum Abmelden. Auch Grupp
    Modell, der Cache-Schlüssel hängt am Chat, und die Werkzeuge nennen keine persönliche Adresse – egal, wer fragt,
    bleibt der Präfix byte-gleich (V08).
 3. **Datei- und Transkript-Cache.** Dateien werden per SHA-256 erkannt und nur einmal ausgelesen bzw. transkribiert.
+   Eigene Fundus-Dateien haben feste Bytes – wie bei den mitgelieferten gibt es Treffer über Personen hinweg; ihr
+   ausgelesener Text liegt zusätzlich in der Datenbank und überdauert den Aufräumjob. Ein ausgefüllter Prompt ist
+   normaler Nachrichtentext: kein eigener Teil im System-Prompt, der Prompt-Cache bleibt unberührt, gleiche Werte
+   treffen den Antwort-Cache.
 
 Die Wirkung zeigt das Admin-Dashboard (Cache-Quote, Ersparnis in USD, Antwort-Cache-Treffer).
 
@@ -189,6 +199,12 @@ Die Wirkung zeigt das Admin-Dashboard (Cache-Quote, Ersparnis in USD, Antwort-Ca
   angewiesen ist, Anweisungen darin nicht zu folgen; gesendet wird nur auf ausdrücklichen Auftrag, höchstens 5 Mails pro Antwort, sichtbar als
   „über Freebie“. Postfächer werden beim Abmelden und zum Termin-Ende gelöscht. Empfehlung für den Hinweistext:
   „Bitte keine echten oder vertraulichen Daten in Chats und Mails.“
+- **Fundus pflegen:** eigene Dokumente und Verläufe der Kursleitung bleiben **dauerhaft** gespeichert (bis zum
+  Löschen; der Aufräumjob lässt sie stehen) und gehen nur beim Anhängen an die KI-Anbieter. Speichern geht nur mit der
+  Bestätigung „keine echten personenbezogenen oder vertraulichen Daten“; Freebie warnt vor echten Mail-Domains,
+  gültigen IBANs und Telefonnummern. Die Dateien liegen unter `fundus/` getrennt von Uploads: Gäste erreichen sie nur
+  über `/api/library/[id]/file` (mit Schalter-Prüfung), nie über `/api/files` oder die Upload-Wege. Werte aus der
+  Prompt-Maske bleiben nur im Speicher des Browsers (nicht in `localStorage`).
 - **Gruppenchats:** nur innerhalb einer Gruppe eines laufenden Termins; der Server prüft jede Einladung. Nicht-Mitglieder
   bekommen auf alles 404, wer gegangen ist, sieht nichts Späteres. Der Posteingang ist im Gruppenchat nie verbunden
   (Freebie würde sonst private Mails in den Chat holen). Beiträge gehen als markierte Nachrichten mit Autor an das

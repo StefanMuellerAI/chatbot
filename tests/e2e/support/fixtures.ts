@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
@@ -255,7 +255,7 @@ export class AdminApi {
     return new AdminApi(api);
   }
 
-  async json<T = Record<string, unknown>>(method: "GET" | "POST" | "PUT" | "DELETE", url: string, data?: unknown): Promise<T> {
+  async json<T = Record<string, unknown>>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: string, data?: unknown): Promise<T> {
     const res = await this.api.fetch(url, { method, data });
     const body = await res.json().catch(() => ({}));
     expect(res.ok(), `${method} ${url}: ${res.status()} ${JSON.stringify(body)}`).toBeTruthy();
@@ -288,10 +288,53 @@ export class AdminApi {
     return this.json<{ id: string; guests: Guest[] }>("POST", "/api/admin/events/groups", { eventId, name, count });
   }
 
+  // ---------------------------------------------------------------- Fundus pflegen
+
+  fundus() {
+    return this.json<FundusOverview>("GET", "/api/admin/fundus");
+  }
+  /** Lädt eine Datei nach `fundus/` hoch (vorgemerkt, noch nicht gespeichert); liefert den Schlüssel. */
+  async uploadFundusFile(name: string, data: Buffer): Promise<string> {
+    const key = `fundus/${randomUUID()}/${name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^[._]+/, "") || "datei"}`;
+    const res = await this.api.post("/api/admin/fundus/local", { multipart: { key, file: { name, mimeType: "application/octet-stream", buffer: data } } });
+    expect(res.status(), await res.text()).toBe(200);
+    return key;
+  }
+  /** Lädt Dateien hoch und speichert sie als eigene Dokumente (mit Bestätigung). */
+  async addDocuments(files: { name: string; data: Buffer; meta?: Partial<FundusMeta> }[]): Promise<string[]> {
+    const refs = [];
+    for (const f of files) refs.push({ key: await this.uploadFundusFile(f.name, f.data), name: f.name, ...fundusMeta(f.name, f.meta) });
+    const { saved, failed } = await this.json<{ saved: string[]; failed: unknown[] }>("POST", "/api/admin/fundus/documents", { confirmed: true, files: refs });
+    expect(failed).toEqual([]);
+    return saved;
+  }
+  /** Lädt .eml-Dateien hoch und speichert sie als eigenen Verlauf. */
+  async addThread(files: { name: string; data: Buffer }[], meta: Partial<FundusMeta> = {}): Promise<{ id: string; mails: number; attachments: number }> {
+    const refs = [];
+    for (const f of files) refs.push({ key: await this.uploadFundusFile(f.name, f.data), name: f.name });
+    return this.json("POST", "/api/admin/fundus/threads", { confirmed: true, files: refs, ...fundusMeta("Verlauf", meta) });
+  }
+  async createCategory(name: string): Promise<string> {
+    return (await this.json<{ id: string }>("POST", "/api/admin/fundus/categories", { name })).id;
+  }
+  async createPrompt(p: { title: string; categoryId: string; text: string; description?: string; placeholders?: Record<string, unknown>; enabled?: boolean }): Promise<string> {
+    return (await this.json<{ id: string }>("POST", "/api/admin/fundus/prompts", p)).id;
+  }
+  updatePrompt(p: { id: string; title: string; categoryId: string; text: string; description?: string; placeholders?: Record<string, unknown>; enabled?: boolean }) {
+    return this.json("PUT", "/api/admin/fundus/prompts", p);
+  }
+  deleteFundus(kind: "documents" | "threads" | "prompts" | "categories", id: string) {
+    return this.json("DELETE", `/api/admin/fundus/${kind}?id=${encodeURIComponent(id)}`);
+  }
+  hide(id: string, hidden = true) {
+    return this.json("PUT", "/api/admin/fundus/hidden", { id, hidden });
+  }
+
   /** Zustand direkt nach dem Serverstart (einmal pro Lauf gesichert). */
   async snapshot(file: string): Promise<Snapshot> {
     if (existsSync(file)) return JSON.parse(readFileSync(file, "utf8")) as Snapshot;
-    const snap: Snapshot = { settings: await this.settings(), models: await this.models(), presets: await this.presets() };
+    const { categories, prompts } = await this.fundus();
+    const snap: Snapshot = { settings: await this.settings(), models: await this.models(), presets: await this.presets(), categories, prompts };
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify(snap));
     return snap;
@@ -319,14 +362,103 @@ export class AdminApi {
       const exists = presets.some((x) => x.id === p.id);
       await this.json(exists ? "PUT" : "POST", "/api/admin/presets", p);
     }
+    await this.restoreFundus(snap);
     await this.security("clear-answer-cache");
   }
+
+  /**
+   * Fundus wie nach dem Start: eigene Einträge samt Dateien weg, alles eingeblendet, Kategorien und Prompts aus dem
+   * Schnappschuss (Inhalt und Reihenfolge). Gelöschte Start-Einträge entstehen neu (mit neuer ID).
+   */
+  async restoreFundus(snap: Snapshot) {
+    let now = await this.fundus();
+    for (const t of now.threads) if (t.source === "eigen") await this.deleteFundus("threads", t.id);
+    for (const d of now.documents) if (d.source === "eigen" && !d.threadId) await this.deleteFundus("documents", d.id);
+    if (now.documents.some((d) => d.hidden) || now.threads.some((t) => t.hidden)) await this.json("PUT", "/api/admin/fundus/hidden", { all: true, hidden: false });
+
+    // Kategorien: vorhandene per ID (sonst per Name), fehlende neu anlegen.
+    const categoryId = new Map<string, string>();
+    for (const c of snap.categories) {
+      const match = now.categories.find((x) => x.id === c.id) ?? now.categories.find((x) => x.name.toLowerCase() === c.name.toLowerCase());
+      if (!match) categoryId.set(c.id, await this.createCategory(c.name));
+      else {
+        categoryId.set(c.id, match.id);
+        if (match.name !== c.name) await this.json("PUT", "/api/admin/fundus/categories", { id: match.id, name: c.name });
+      }
+    }
+    const keep = new Set(snap.prompts.map((p) => p.id));
+    const extra = now.prompts.filter((p) => !keep.has(p.id));
+    for (let i = 0; i < extra.length; i += 10) await Promise.all(extra.slice(i, i + 10).map((p) => this.deleteFundus("prompts", p.id)));
+    for (const p of snap.prompts) {
+      const body = { title: p.title, categoryId: categoryId.get(p.categoryId)!, description: p.description, text: p.text, placeholders: p.placeholders, enabled: p.enabled };
+      const current = now.prompts.find((x) => x.id === p.id);
+      if (!current) await this.createPrompt(body);
+      else if (
+        JSON.stringify(body) !==
+        JSON.stringify({ title: current.title, categoryId: current.categoryId, description: current.description, text: current.text, placeholders: current.placeholders, enabled: current.enabled })
+      ) {
+        await this.updatePrompt({ id: p.id, ...body });
+      }
+    }
+    now = await this.fundus();
+    const wanted = new Set(categoryId.values());
+    for (const c of now.categories) if (!wanted.has(c.id)) await this.deleteFundus("categories", c.id);
+
+    // Reihenfolge mit „eine Stelle nach oben“ herstellen.
+    const reorder = async (current: string[], target: string[], move: (id: string) => Promise<unknown>) => {
+      const list = current.filter((id) => target.includes(id));
+      for (let i = 0; i < target.length; i++) {
+        let j = list.indexOf(target[i]);
+        while (j > i) {
+          await move(target[i]);
+          [list[j - 1], list[j]] = [list[j], list[j - 1]];
+          j--;
+        }
+      }
+    };
+    now = await this.fundus();
+    await reorder(
+      now.categories.map((c) => c.id),
+      snap.categories.map((c) => categoryId.get(c.id)!),
+      (id) => this.json("PUT", "/api/admin/fundus/categories", { id, move: -1 }),
+    );
+    const idOf = new Map(now.prompts.map((p) => [p.id, p.id]));
+    for (const c of snap.categories) {
+      const target = snap.prompts.filter((p) => p.categoryId === c.id).map((p) => idOf.get(p.id) ?? p.id);
+      const current = now.prompts.filter((p) => p.categoryId === categoryId.get(c.id)).map((p) => p.id);
+      await reorder(current, target, (id) => this.json("PATCH", "/api/admin/fundus/prompts", { id, move: -1 }));
+    }
+  }
+}
+
+/** Angaben zu einem eigenen Dokument oder Verlauf. */
+export interface FundusMeta {
+  title: string;
+  summary: string;
+  date: string;
+  tags: string[];
+  keywords: string[];
+}
+
+export function fundusMeta(name: string, meta: Partial<FundusMeta> = {}): FundusMeta {
+  return { title: name.replace(/\.[a-z]+$/i, ""), summary: "", date: "2026-10-14", tags: [], keywords: [], ...meta };
+}
+
+export interface FundusOverview {
+  revision: number;
+  libraryEnabled: boolean;
+  documents: { id: string; source: "eigen" | "fundus"; title: string; type: string; enabled: boolean; hidden: boolean; threadId: string | null; fileName: string; tags: string[] }[];
+  threads: { id: string; source: "eigen" | "fundus"; title: string; mails: number; attachments: number; enabled: boolean; hidden: boolean }[];
+  categories: { id: string; name: string; prompts: number; activePrompts: number }[];
+  prompts: { id: string; categoryId: string; title: string; description: string; text: string; placeholders: Record<string, unknown>; enabled: boolean }[];
 }
 
 export interface Snapshot {
   settings: Record<string, unknown>;
   models: Record<string, unknown>[];
   presets: Record<string, unknown>[];
+  categories: FundusOverview["categories"];
+  prompts: FundusOverview["prompts"];
 }
 
 function serverNameFor(baseURL: string): string {

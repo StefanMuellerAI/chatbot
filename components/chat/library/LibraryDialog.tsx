@@ -1,15 +1,29 @@
 "use client";
-import { Check, ChevronLeft, Download, Loader2, Paperclip, RotateCcw, Search, SlidersHorizontal } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Check, ChevronLeft, Download, Loader2, Paperclip, RotateCcw, Search, SlidersHorizontal, SquarePen } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { libraryFileUrl, loadCatalog, loadPreview } from "@/lib/client/library";
-import { EMPTY_FILTER, filterActive, filterDocuments, filterThreads, unitLabel, unitTree, type LibraryFilter } from "@/lib/library/search";
+import {
+  EMPTY_FILTER,
+  EMPTY_PROMPT_FILTER,
+  filterActive,
+  filterDocuments,
+  filterPrompts,
+  filterThreads,
+  promptFilterActive,
+  unitLabel,
+  unitTree,
+  type LibraryFilter,
+  type PromptFilter,
+} from "@/lib/library/search";
 import {
   LEVEL_LABELS,
   LIBRARY_TAGS,
+  type FundusCatalog,
   type LibraryCatalog,
   type LibraryDocType,
   type LibraryDocument,
   type LibraryPreview,
+  type LibraryPrompt,
   type LibraryTag,
   type LibraryThread,
 } from "@/lib/library/types";
@@ -17,15 +31,17 @@ import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import { cn } from "@/components/ui/cn";
 import { formatMailDate, MailCard, PreviewView, TYPE_STYLE } from "./Previews";
+import { PromptText } from "./PromptFill";
 
 export interface LibraryPick {
   id: string;
   name: string;
 }
 
-type Tab = "docs" | "mails";
+type Tab = "docs" | "mails" | "prompts";
 
-const DOC_TYPES: LibraryDocType[] = ["word", "excel", "powerpoint"];
+const TABS: Tab[] = ["docs", "mails", "prompts"];
+const DOC_TYPES: LibraryDocType[] = ["word", "excel", "powerpoint", "pdf"];
 const number = new Intl.NumberFormat("de-DE");
 const day = (iso: string) => iso.slice(0, 10).split("-").reverse().join(".");
 const plural = (n: number, one: string, many: string) => `${number.format(n)} ${n === 1 ? one : many}`;
@@ -35,7 +51,7 @@ function sizeLabel(bytes: number): string {
 }
 
 /**
- * Fundus: erfundene Dokumente und E-Mails aus Verwaltungen zum Anhängen.
+ * Fundus: erfundene Dokumente und E-Mails aus Verwaltungen zum Anhängen, dazu Prompts zum Ausfüllen.
  * Der Zustand (Reiter, Filter, Auswahl) bleibt beim Schließen erhalten, bis die Seite neu geladen wird.
  */
 export function LibraryDialog({
@@ -44,6 +60,7 @@ export function LibraryDialog({
   attachedIds,
   freeSlots,
   onAttach,
+  onPrompt,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,8 +69,10 @@ export function LibraryDialog({
   /** Freie Plätze bis zur Grenze von Anhängen je Nachricht. */
   freeSlots: number;
   onAttach: (items: LibraryPick[]) => void;
+  /** Prompt gewählt: mit Platzhaltern öffnet der Aufrufer die Maske, ohne fügt er direkt ein. */
+  onPrompt: (prompt: LibraryPrompt, category: string) => void;
 }) {
-  const [catalog, setCatalog] = useState<LibraryCatalog | null>(null);
+  const [catalog, setCatalog] = useState<FundusCatalog | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("docs");
   const [docFilter, setDocFilter] = useState<LibraryFilter>(EMPTY_FILTER);
@@ -64,19 +83,32 @@ export function LibraryDialog({
   const [detail, setDetail] = useState(false);
   const [withAttachments, setWithAttachments] = useState(true);
   const [notice, setNotice] = useState<string | null>(null);
+  const [promptFilter, setPromptFilter] = useState<PromptFilter>(EMPTY_PROMPT_FILTER);
+  const [activePrompt, setActivePrompt] = useState<string | null>(null);
+  const selectedRef = useRef<string[]>([]);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
 
+  // Bei jedem Öffnen nachfragen, ob sich der Fundus geändert hat (die Kursleitung kann ihn im Kurs pflegen).
   const fetchCatalog = useCallback(() => {
     loadCatalog()
       .then((c) => {
         setCatalog(c);
         setLoadError(null);
+        const docs = new Set(c.documents.map((d) => d.id));
+        const gone = selectedRef.current.filter((id) => !docs.has(id));
+        if (gone.length) {
+          setSelected(selectedRef.current.filter((id) => docs.has(id)));
+          setNotice(gone.length === 1 ? "1 Eintrag ist nicht mehr im Fundus." : `${gone.length} Einträge sind nicht mehr im Fundus.`);
+        }
       })
       .catch((err: unknown) => setLoadError(err instanceof Error ? err.message : "Unbekannter Fehler"));
   }, []);
 
   useEffect(() => {
-    if (open && !catalog) fetchCatalog();
-  }, [open, catalog, fetchCatalog]);
+    if (open) fetchCatalog();
+  }, [open, fetchCatalog]);
 
   const retry = () => {
     setLoadError(null);
@@ -125,15 +157,26 @@ export function LibraryDialog({
 
   const attachSelection = () => finish(selection.map(docPick).filter((x): x is LibraryPick => Boolean(x)));
 
+  const prompt = catalog?.prompts.find((p) => p.id === activePrompt) ?? null;
+  const choosePrompt = (id: string) => {
+    const p = catalog?.prompts.find((x) => x.id === id);
+    if (!p || !catalog) return;
+    setActivePrompt(id);
+    onPrompt(p, catalog.categories.find((c) => c.id === p.categoryId)?.name ?? "");
+  };
+
   const tabsId = useId();
   const tabs: { key: Tab; label: string; count: number }[] = [
     { key: "docs", label: "Dokumente", count: catalog?.documents.length ?? 0 },
     { key: "mails", label: "E-Mails", count: catalog?.threads.length ?? 0 },
+    { key: "prompts", label: "Prompts", count: catalog?.prompts.length ?? 0 },
   ];
   const onTabKey = (e: KeyboardEvent) => {
     if (e.key !== "ArrowRight" && e.key !== "ArrowLeft" && e.key !== "Home" && e.key !== "End") return;
     e.preventDefault();
-    const next: Tab = e.key === "Home" ? "docs" : e.key === "End" ? "mails" : tab === "docs" ? "mails" : "docs";
+    const index = TABS.indexOf(tab);
+    const next: Tab =
+      e.key === "Home" ? TABS[0] : e.key === "End" ? TABS[TABS.length - 1] : TABS[(index + (e.key === "ArrowRight" ? 1 : TABS.length - 1)) % TABS.length];
     setTab(next);
     setDetail(false);
     document.getElementById(`${tabsId}-${next}`)?.focus();
@@ -148,7 +191,7 @@ export function LibraryDialog({
       bodyClassName="max-sm:p-4"
     >
       <div className="flex h-[min(78vh,820px)] flex-col max-sm:h-[calc(100dvh-6rem)]">
-        <p className="-mt-2 mb-3 text-sm text-muted">Erfundene Dateien und E-Mails aus Verwaltungen – zum Üben, ohne echte Daten.</p>
+        <p className="-mt-2 mb-3 text-sm text-muted">Erfundene Dateien und E-Mails aus Verwaltungen – zum Üben, ohne echte Daten. Dazu Prompts zum Ausfüllen.</p>
         <div role="tablist" aria-label="Fundus" className="mb-3 flex gap-1 border-b border-border">
           {tabs.map((t) => (
             <button
@@ -212,6 +255,20 @@ export function LibraryDialog({
               detail={detail}
               onBack={() => setDetail(false)}
             />
+          ) : tab === "prompts" ? (
+            <PromptsPanel
+              catalog={catalog}
+              filter={promptFilter}
+              onFilter={setPromptFilter}
+              active={activePrompt}
+              onActive={(id) => {
+                setActivePrompt(id);
+                setDetail(true);
+              }}
+              onChoose={choosePrompt}
+              detail={detail}
+              onBack={() => setDetail(false)}
+            />
           ) : (
             <MailsPanel
               catalog={catalog}
@@ -235,12 +292,20 @@ export function LibraryDialog({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           <p className={cn("text-sm", notice ? "text-warning" : "text-muted")} role="status">
             {notice ??
-              (tab === "docs" && selection.length
+              (tab === "prompts"
+                ? "Ausgefüllt landet der Prompt im Eingabefeld – gesendet wird erst, wenn du abschickst."
+                : tab === "docs" && selection.length
                 ? `${plural(selection.length, "Datei", "Dateien")} ausgewählt`
                 : freeSlots > 0
                   ? `Noch ${plural(freeSlots, "Anhang", "Anhänge")} möglich`
                   : "Keine weiteren Anhänge möglich")}
           </p>
+          {tab === "prompts" && (
+            <Button variant="primary" size="sm" disabled={!prompt} onClick={() => prompt && choosePrompt(prompt.id)}>
+              <SquarePen className="h-4 w-4" />
+              {prompt && prompt.placeholders.length === 0 ? "Einfügen" : "Ausfüllen und einfügen"}
+            </Button>
+          )}
           {tab === "docs" && (
             <div className="flex gap-2">
               {selection.length > 0 && (
@@ -332,11 +397,11 @@ function FilterBar({
         <select
           aria-label="Organisationseinheit"
           value={filter.unitId ?? ""}
-          disabled={!org}
+          disabled={!org || org.units.length === 0}
           onChange={(e) => onFilter({ ...filter, unitId: e.target.value || null })}
           className="h-9 w-full rounded-full border border-border bg-surface px-3 text-sm disabled:opacity-50 sm:w-64"
         >
-          <option value="">{org ? "Alle Einheiten" : "Erst Verwaltung wählen"}</option>
+          <option value="">{!org ? "Erst Verwaltung wählen" : org.units.length ? "Alle Einheiten" : "Keine Einheiten"}</option>
           {org &&
             unitTree(org).map((u) => (
               <option key={u.id} value={u.id}>
@@ -347,7 +412,7 @@ function FilterBar({
         </select>
         {showTypes && (
           <div role="group" aria-label="Dateityp" className="flex flex-wrap gap-1">
-            {DOC_TYPES.map((t) => (
+            {DOC_TYPES.filter((t) => t !== "pdf" || catalog.documents.some((d) => d.type === "pdf")).map((t) => (
               <Chip key={t} active={filter.types.includes(t)} onClick={() => onFilter({ ...filter, types: toggleIn(filter.types, t) })}>
                 {TYPE_STYLE[t].label}
               </Chip>
@@ -515,9 +580,7 @@ function DocumentsPanel({
                   <Icon className="mt-0.5 h-5 w-5 shrink-0" style={{ color }} aria-label={label} />
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-sm font-medium">{d.title}</span>
-                    <span className="block truncate text-xs text-muted">
-                      {org?.short} · {unitLabel(catalog, d.orgId, d.unitId)}
-                    </span>
+                    <span className="block truncate text-xs text-muted">{[org?.short, unitLabel(catalog, d.orgId, d.unitId)].filter(Boolean).join(" · ")}</span>
                     <span className="block text-xs text-muted">
                       {d.kind} · {day(d.date)} · ca. {number.format(d.tokens)} Tokens
                       {isAttached && <span className="ml-1 font-medium text-success">· angehängt</span>}
@@ -605,8 +668,12 @@ function DocumentDetail({
         <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs">
           <dt className="text-muted">Verwaltung</dt>
           <dd>{org.name}</dd>
-          <dt className="text-muted">Einheit</dt>
-          <dd>{unitLabel(catalog, doc.orgId, doc.unitId)}</dd>
+          {doc.unitId && (
+            <>
+              <dt className="text-muted">Einheit</dt>
+              <dd>{unitLabel(catalog, doc.orgId, doc.unitId)}</dd>
+            </>
+          )}
           <dt className="text-muted">Verfasst von</dt>
           <dd>
             {doc.author.name}
@@ -620,6 +687,12 @@ function DocumentDetail({
           </dd>
           <dt className="text-muted">Merkmale</dt>
           <dd>{doc.tags.map((t) => LIBRARY_TAGS[t]).join(", ")}</dd>
+          {doc.keywords.length > 0 && doc.orgId === "eigen" && (
+            <>
+              <dt className="text-muted">Stichwörter</dt>
+              <dd>{doc.keywords.join(", ")}</dd>
+            </>
+          )}
         </dl>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="primary" size="sm" onClick={onAttach} disabled={attached}>
@@ -809,9 +882,7 @@ function ThreadDetail({
         </p>
         <h3 className="mt-1 font-display text-lg leading-snug font-semibold">{thread.subject}</h3>
         <p className="mt-1 text-sm text-muted">{thread.summary}</p>
-        <p className="mt-2 text-xs text-muted">
-          {org.name} · {unitLabel(catalog, thread.orgId, thread.unitId)}
-        </p>
+        <p className="mt-2 text-xs text-muted">{[org.name, unitLabel(catalog, thread.orgId, thread.unitId)].filter(Boolean).join(" · ")}</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {thread.mails.length > 1 && (
             <Button variant="primary" size="sm" onClick={() => attachMail(thread.mails.length - 1, true)} disabled={attached.has(last.id)}>
@@ -847,6 +918,171 @@ function ThreadDetail({
             <Loader2 className="h-4 w-4 animate-spin" /> Verlauf wird geladen …
           </p>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Prompts
+
+function PromptsPanel({
+  catalog,
+  filter,
+  onFilter,
+  active,
+  onActive,
+  onChoose,
+  detail,
+  onBack,
+}: {
+  catalog: FundusCatalog;
+  filter: PromptFilter;
+  onFilter: (f: PromptFilter) => void;
+  active: string | null;
+  onActive: (id: string) => void;
+  onChoose: (id: string) => void;
+  detail: boolean;
+  onBack: () => void;
+}) {
+  const prompts = useMemo(() => filterPrompts(catalog, filter), [catalog, filter]);
+  // In der Reihenfolge der Kategorien aus dem Admin; innerhalb der Kategorie wie dort sortiert.
+  const groups = useMemo(
+    () => catalog.categories.map((c) => ({ category: c, prompts: prompts.filter((p) => p.categoryId === c.id) })).filter((g) => g.prompts.length > 0),
+    [catalog, prompts],
+  );
+  const ordered = useMemo(() => groups.flatMap((g) => g.prompts), [groups]);
+  const counts = useMemo(() => {
+    // Zahl je Kategorie bei der aktuellen Suche (ohne Kategorie-Filter).
+    const matching = filterPrompts(catalog, { ...filter, categories: [] });
+    return new Map(catalog.categories.map((c) => [c.id, matching.filter((p) => p.categoryId === c.id).length]));
+  }, [catalog, filter]);
+  const keys = useListKeys(ordered, active, onActive, (e, id) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onActive(id);
+      if (e.key === "Enter") onChoose(id);
+      return true;
+    }
+    return false;
+  });
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const prompt = catalog.prompts.find((p) => p.id === active) ?? null;
+  const toggleIn = (list: string[], v: string) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className={cn("mb-3 space-y-2", detail && prompt && "max-md:hidden")}>
+        <div className="flex gap-2">
+          <label className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
+            <input
+              type="search"
+              value={filter.query}
+              onChange={(e) => onFilter({ ...filter, query: e.target.value })}
+              placeholder="Suchen: Titel, Text, Platzhalter …"
+              aria-label="Prompts durchsuchen"
+              className="h-9 w-full rounded-full border border-border bg-surface pr-3 pl-9 text-sm outline-none focus:border-primary"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((v) => !v)}
+            aria-expanded={filtersOpen}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 text-sm md:hidden"
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden /> Kategorien{filter.categories.length ? ` (${filter.categories.length})` : ""}
+          </button>
+        </div>
+        <div role="group" aria-label="Kategorien" className={cn("flex flex-wrap gap-1", !filtersOpen && "max-md:hidden")}>
+          {catalog.categories.map((c) => (
+            <Chip key={c.id} active={filter.categories.includes(c.id)} onClick={() => onFilter({ ...filter, categories: toggleIn(filter.categories, c.id) })}>
+              {c.name} <span>({counts.get(c.id) ?? 0})</span>
+            </Chip>
+          ))}
+        </div>
+        <div className="flex items-center justify-between gap-2 text-xs text-muted">
+          <span aria-live="polite">{plural(prompts.length, "Prompt", "Prompts")}</span>
+          {promptFilterActive(filter) && (
+            <button type="button" onClick={() => onFilter(EMPTY_PROMPT_FILTER)} className="underline hover:text-text">
+              Filter zurücksetzen
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className={cn("min-h-0 overflow-y-auto rounded-2xl border border-border p-1", detail && prompt && "max-md:hidden")}>
+          {ordered.length === 0 && <p className="p-4 text-sm text-muted">{catalog.prompts.length ? "Keine Treffer." : "Noch keine Prompts im Fundus."}</p>}
+          <div role="listbox" aria-label="Prompts" hidden={ordered.length === 0}>
+            {groups.map((g) => (
+              <div key={g.category.id} role="group" aria-label={g.category.name}>
+                <p className="px-2.5 pt-2 pb-1 text-xs font-semibold tracking-wide text-muted uppercase" aria-hidden>
+                  {g.category.name}
+                </p>
+                {g.prompts.map((p) => (
+                  <div
+                    key={p.id}
+                    id={keys.optionId(p.id)}
+                    data-id={p.id}
+                    role="option"
+                    aria-selected={active === p.id}
+                    tabIndex={keys.current === p.id ? 0 : -1}
+                    onKeyDown={(e) => keys.onKeyDown(e, p.id)}
+                    onClick={() => onActive(p.id)}
+                    onDoubleClick={() => onChoose(p.id)}
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-xl px-2.5 py-2 outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                      active === p.id ? "bg-primary-soft" : "hover:bg-surface-2",
+                    )}
+                  >
+                    <SquarePen className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-2 text-sm font-medium">{p.title}</span>
+                      {p.description && <span className="line-clamp-2 block text-xs text-muted">{p.description}</span>}
+                      <span className="block text-xs text-muted">
+                        {p.placeholders.length ? plural(p.placeholders.length, "Platzhalter", "Platzhalter") : "ohne Platzhalter"}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+        <section aria-label="Vorschau" className={cn("min-h-0 overflow-y-auto", !(detail && prompt) && "max-md:hidden")}>
+          {prompt ? (
+            <div>
+              <BackButton onBack={onBack} />
+              <div className="rounded-2xl border border-border bg-surface p-4">
+                <p className="text-xs font-medium text-muted">{catalog.categories.find((c) => c.id === prompt.categoryId)?.name}</p>
+                <h3 className="mt-1 font-display text-lg leading-snug font-semibold">{prompt.title}</h3>
+                {prompt.description && <p className="mt-1 text-sm text-muted">{prompt.description}</p>}
+                <div className="mt-3 rounded-xl bg-surface-2 p-3" data-testid="prompt-text">
+                  <PromptText text={prompt.text} placeholders={prompt.placeholders} />
+                </div>
+                {prompt.placeholders.length > 0 ? (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-muted">Felder in der Maske (alle Pflicht)</p>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm" aria-label="Felder">
+                      {prompt.placeholders.map((p) => (
+                        <li key={p.key}>
+                          {p.label}
+                          {p.type === "select" ? <span className="text-muted"> – Auswahl: {p.options.join(", ")}</span> : p.type === "area" ? <span className="text-muted"> – mehrzeilig</span> : null}
+                          {p.default && <span className="text-muted"> (vorausgefüllt: {p.default})</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-muted">Ohne Platzhalter – der Text kommt direkt ins Eingabefeld.</p>
+                )}
+                <p className="mt-3 text-xs text-muted">Tipp: Eine passende Übungsdatei hängst du selbst aus dem Fundus an.</p>
+              </div>
+            </div>
+          ) : (
+            <p className="grid h-full place-items-center rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">
+              Wähle links einen Prompt, um ihn zu sehen.
+            </p>
+          )}
+        </section>
       </div>
     </div>
   );

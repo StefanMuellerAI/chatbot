@@ -302,7 +302,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| O01 | Admin-Anmeldung über die gemeinsame Login-Seite (`/admin` → `/login?weiter=admin`) | falsches Passwort abgewiesen; Admin-Bereich mit allen Reitern; Cookie 12 Stunden, SameSite=Lax; Chat ohne zweite Anmeldung; Gäste kommen nicht hinein (T09) |
+| O01 | Admin-Anmeldung über die gemeinsame Login-Seite (`/admin` → `/login?weiter=admin`) | falsches Passwort abgewiesen; Admin-Bereich mit allen Reitern (auch „Fundus“); Cookie 12 Stunden, SameSite=Lax; Chat ohne zweite Anmeldung; Gäste kommen nicht hinein (T09) |
 | O02 | Kennzahlen | Kosten, Ersparnis, Anfragen, Cache-Quote und Treffer stimmen exakt mit den im Test ausgelösten Aktionen überein (im Fake-API-Modus mit echten Preisen) |
 | O03 | Diagramm | Balken mit Beschriftung, Tooltip per Maus und Tastatur, Tabellenansicht mit denselben Zahlen |
 | O04 | Systemstatus | jede Zeile spiegelt die Umgebung (Schlüssel, Datenbank, Blob per Token/OIDC, Secrets, Admin-Zugang, laufende Termine) |
@@ -337,7 +337,7 @@ Jede Zeile wird zu einem oder mehreren Tests. Die IDs tauchen in der Abdeckungsm
 | Q18 | Hinweistext lang/kurz | siehe B |
 | Q19 | Hinweise an das Modell | Abschnitt im System-Prompt, neuer Cache-Schlüssel |
 | Q20 | Speichern | „Gespeichert.“, Fehler sichtbar, zwei Admins gleichzeitig überschreiben sich nicht |
-| Q21 | Funktionsschalter „Fundus“ | aus: kein Datenbank-Symbol, Fundus-API 403; Upload aus, Fundus an: nur das Datenbank-Symbol, Anhängen geht; Pause sperrt Symbol und API (503) |
+| Q21 | Funktionsschalter „Fundus“ | aus: kein Datenbank-Symbol, damit auch keine Prompts, Fundus-API 403; Admin › Fundus bleibt bedienbar mit Hinweis; Upload aus, Fundus an: nur das Datenbank-Symbol, Anhängen geht; Pause sperrt Symbol und API (503) |
 | Q22 | Schalter „Posteingang“ aus und wieder an | Umschalter, Verbindung, Werkzeuge (Mock-Diagnose „aus“) und API (403) weg, alter Link führt zum Chat; wieder an: alles da, vorhandene Mails bleiben |
 | Q23 | Begrüßungs-E-Mail ändern bzw. leeren | neue Postfächer bekommen den neuen Text (einmal, auch bei erneuter Anmeldung), leer: keine Begrüßung; zu lang: Meldung |
 | Q24 | Schalter „Gruppenchats“ aus und wieder an | Symbol, Abschnitt und API (403) weg; offener Gruppenchat wechselt sauber zu „Neuer Chat“; wieder an: alles da, vorhandene Chats bleiben; Posteingang davon unberührt |
@@ -391,7 +391,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 
 | ID | Szenario | Erwartete Wirkung |
 |---|---|---|
-| U01 | Ohne, mit gefälschter und mit Gast-Sitzung an Admin-Routen (inkl. der Posteingangs-Routen); Cookie-Attribute; ändernde Aufrufe von fremden Seiten | 401 bzw. 403 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit; fremde Origin → 403 |
+| U01 | Ohne, mit gefälschter und mit Gast-Sitzung an Admin-Routen (inkl. der Posteingangs- und Fundus-Routen); Cookie-Attribute; ändernde Aufrufe von fremden Seiten | 401 bzw. 403 mit deutscher Meldung; HttpOnly, SameSite, begrenzte Laufzeit; fremde Origin → 403 |
 | U02 | Falsche Methode | 405 |
 | U03 | Kaputtes JSON, falsche Felder, Grenzwerte (Nachricht, Anhänge, Bild-Prompt, Passwort) | 400 mit deutscher Meldung bzw. „Passwort stimmt nicht“ – nie 500 |
 | U04 | Pfad-Tricks (`../`, kodiert, fremde Präfixe, Nullbyte), hochgeladenes HTML, Upload auf einen schon vorhandenen Pfad, Upload-Token für Blob | 400/404; Auslieferung als Download mit Sandbox-CSP; 409, die Datei bleibt unverändert; Tokens nur für `uploads/` und erlaubte Typen, mit Größengrenze je Typ |
@@ -410,6 +410,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | V06 | Titel, Transkription, Bilder, Modell-Listen | Anfragen in der erwarteten Form |
 | V07 | Claude und GPT lesen den Posteingang und senden (Werkzeug-Schleife) | Liste → Lesen → Antwort mit Betreff; Senden → Mail beim Empfänger; Statuszeilen; Karten „Gelesene E-Mails“ und „Gesendete E-Mails“; ohne Verbindung Werkzeug-Fehler mit Hinweis |
 | V08 | Claude und GPT im Gruppenchat (Fake-API) | Beiträge mit Autor und Uhrzeit in einer Nutzernachricht; **Caching-Vertrag über 3 Runden mit Beiträgen dazwischen**: System-Prompt, Werkzeuge und frühere Runden byte-gleich, Cache-Marker korrekt, gleicher Cache-Schlüssel für alle Mitglieder; zweites Mitglied mit anderem Modell funktioniert |
+| V09 | Eigenes PDF aus dem Fundus bei Claude und GPT (Fake-API), „PDF nativ“ an und aus | an: Dokument-Block mit den echten Bytes aus `fundus/`; aus: Text; Prüfsumme und Antwort-Cache wie bei Uploads; Caching-Vertrag (V05) unverändert |
 
 ### W · Belastbarkeit
 
@@ -421,8 +422,9 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | W04 | **Schulungssituation:** 25 Personen gleichzeitig, eine IP | keine Sperre, keine Fehler, Antwort-Cache wird geteilt |
 | W05 | 25 Personen einer Gruppe schreiben sich gleichzeitig Mails, alle Postfächer fragen ab | keine Fehler, keine Sperre, jede Mail kommt an |
 | W06 | 25 Personen einer Gruppe in drei Gruppenchats posten gleichzeitig, alle fragen ab, zwei rufen `@Freebie` | keine Fehler, keine Sperre, jeder Beitrag kommt bei allen in derselben Reihenfolge an, genau eine Antwort je Chat und Runde |
-| W07 | Zufallstest: zufällige Folgen aus 21 Teilnehmer-Aktionen (tippen, einfügen, doppelt senden, stoppen, bearbeiten, Dateien, Chats wechseln und löschen, Posteingang, neu laden, Diktat …) mit festen Seeds | nach jedem Schritt: Frage/Antwort im Wechsel, „Stoppen“ nur bei laufender Antwort, kein Mikrofon ohne Aufnahme, keine internen Fehlertexte, höchstens ein neuer Chat; am Ende öffnet sich jeder Chat. CI: 5 Seeds × 40 Schritte, nachts 50 neue Seeds × 60 Schritte |
+| W07 | Zufallstest: zufällige Folgen aus 24 Teilnehmer-Aktionen (tippen, einfügen, doppelt senden, stoppen, bearbeiten, Dateien, Chats wechseln und löschen, Posteingang, neu laden, Diktat, Prompt ausfüllen und einfügen mit Sonderzeichen, Maske abbrechen, Fundus-Dokument anhängen …) mit festen Seeds | nach jedem Schritt: kein Platzhalter `{{…}}` eines ausgefüllten Prompts im Eingabefeld, Maske abbrechen ändert nichts, Frage/Antwort im Wechsel, „Stoppen“ nur bei laufender Antwort, kein Mikrofon ohne Aufnahme, keine internen Fehlertexte, höchstens ein neuer Chat; am Ende öffnet sich jeder Chat. CI: 5 Seeds × 40 Schritte, nachts 50 neue Seeds × 60 Schritte |
 | W08 | Sehr lange Chats: 420 und 500 Nachrichten, über 4,5 MB (viele Websuchen), Verlauf länger als das Kontextfenster (Fake-API) | ab 400 Nachrichten bzw. großem Verlauf ein Hinweis mit „Neuer Chat“; an der Grenze die Meldung „Dieser Chat ist zu lang geworden …“ statt eines Fehlercodes, über 4,5 MB ohne Anfrage |
+| W09 | 25 Gäste öffnen den Fundus, füllen Prompts aus und senden, während die Kursleitung Prompts speichert und eine Datei hochlädt | keine Fehler, kein 500; jeder sieht nach erneutem Öffnen den neuen Stand; ETag bleibt stimmig |
 
 ### X · Live-Smoke (`freebie.stefanai.de`)
 
@@ -440,9 +442,10 @@ Gruppenchat (X10) kommt ein eigener Termin mit zwei Gästen einer Gruppe dazu
 | X05 | ein Bild in Entwurfsqualität | Bild erscheint |
 | X06 | eine Websuche-Frage und ein kleines Artefakt | Quellen; Artefakt-Panel öffnet sich |
 | X07 | Gast meldet sich über das Formular an; Termin wird gelöscht | nur Chat, kein Admin; nach dem Löschen spätestens nach 15 Sekunden abgemeldet („abgelaufen“) |
-| X08 | eine Fundus-Datei anhängen und befragen | Fundus wird aus dem Deployment gelesen, Anhang bereit, Antwort |
+| X08 | eine Fundus-Datei anhängen und befragen; Reiter „Prompts“ | Fundus wird aus dem Deployment gelesen, Anhang bereit, Antwort; der Reiter „Prompts“ hat Einträge |
 | X09 | Gast schreibt sich selbst eine Mail, verbindet den Posteingang und fragt Claude Haiku („Niedrig“) nach dem Betreff; meldet sich ab | Antwort nennt den Betreff, Karte „Gelesene E-Mails“; nach erneuter Anmeldung ist das Postfach geleert (übersprungen, wenn der Posteingang ausgeschaltet ist) |
 | X10 | Live: zwei Gäste einer Gruppe, A startet einen Gruppenchat mit B, beide posten eine Notiz, B fragt `@Freebie` (Claude Haiku, „Niedrig“) nach einer Zusammenfassung | Antwort nennt beide Notizen; nach dem Löschen des Termins ist der Chat weg (< 0,01 $; übersprungen, wenn der Schalter aus ist) |
+| X11 | Live: Kursleitung legt eine Kategorie und einen Prompt mit Platzhalter an, Gast füllt die Maske, sendet an Claude Haiku („Niedrig“) | Antwort nimmt den eingesetzten Wert auf; Prompt und Kategorie danach gelöscht (< 0,01 $; übersprungen, wenn der Schalter aus ist) |
 
 Geschätzte Kosten: unter 0,10 $ pro Lauf.
 
@@ -450,6 +453,9 @@ Geschätzte Kosten: unter 0,10 $ pro Lauf.
 
 Neben der Büroklammer öffnet ein Datenbank-Symbol den Fundus: erfundene Word-, Excel- und PowerPoint-Dateien sowie
 E-Mail-Verläufe aus neun Verwaltungen, die sich wie Uploads anhängen lassen (Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md)).
+Dazu kommen eigene Dokumente (auch PDF) und Verläufe der Kursleitung unter „Eigene Inhalte“ sowie der Reiter „Prompts“
+(Bereiche FP und PR, Plan: [FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md)). Y22–Y26 ändern den Fundus und laufen
+deshalb im Projekt `admin`; Y03/Y04 bleiben im parallelen Projekt `chat` (dort gibt es keine eigenen Einträge).
 Unit-Tests prüfen zusätzlich Weltmodell, Generator (feste Prüfsummen), Auslesbarkeit, Formeln und den
 „Erfunden“-Wächter über alle Dateien (`tests/unit/library.test.ts`, `tests/unit/extract-mail.test.ts`).
 
@@ -475,7 +481,14 @@ Unit-Tests prüfen zusätzlich Weltmodell, Generator (feste Prüfsummen), Ausles
 | Y18 | Caches | zweites Anhängen aus dem Datei-Cache; gleiche Frage mit gleicher Datei im neuen Chat aus dem Antwort-Cache; ohne Datei-Cache-Eintrag liest der Server die Datei neu aus |
 | Y19 | Nur Tastatur und axe (hell und dunkel) | Reiter mit Pfeiltasten, Liste mit Pfeilen/Pos1/Ende, Leertaste wählt, Enter hängt an; keine schweren axe-Befunde in Liste, allen Vorschauen und E-Mails |
 | Y20 | Handy und Tablet | Handy: Vollbild, Filter einklappbar, Liste → Vorschau → Zurück, kein seitliches Scrollen; Tablet: Liste und Vorschau nebeneinander |
-| Y21 | Fundus-API | 401 ohne Sitzung; ETag/304; Vorschau für Dokument, Verlauf und E-Mail; ungültige IDs und Pfad-Tricks 400, unbekannte 404; Download mit Sandbox-CSP und `nosniff`; Upload-Wege lehnen `library/`-Pfade ab |
+| Y21 | Fundus-API | 401 ohne Sitzung; ETag/304; Vorschau für Dokument, Verlauf und E-Mail; ungültige IDs und Pfad-Tricks 400, unbekannte 404; Download mit Sandbox-CSP und `nosniff`; Upload-Wege lehnen `library/`- und `fundus/`-Pfade ab, `/api/files` liefert Gästen keine `fundus/`-Dateien; Katalog mit Kategorien und Prompts, ETag mit Revision |
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| Y22 | Eigene Dokumente im Chat | im Reiter „Dokumente“ mit Zahl; Verwaltung „Eigene Inhalte“ im Filter; Typ-Chip „PDF“; Merkmale; Vorschau (Text, Tabellen, Folien); Download byte-gleich; Anhängen → Chip „Fundus · ca. n Tokens“, das Modell bekommt den Inhalt |
+| Y23 | Eigene Verläufe im Chat | Reihenfolge nach Datum, einzelne Mail, ganzer Verlauf, „Anhänge mitnehmen“ |
+| Y24 | Ausgeblendet, inaktiv, gelöscht | ausgeblendet und inaktiv fehlen in Auswahl und API (404); schon angehängt bleibt im Chat nutzbar (Neu generieren); gelöscht → statt des Inhalts nur noch der Hinweis „… ist nicht mehr verfügbar“ |
+| Y25 | Neuer Stand ohne Neuladen | Kursleitung ändert, Gast öffnet den Fundus erneut → neuer Stand (200 statt 304); gewählte, inzwischen gelöschte Einträge fallen mit Hinweis aus der Auswahl |
+| Y26 | Text nach Ablauf des Datei-Caches | ohne Eintrag im Datei-Cache (unbekannte Prüfsumme, wie nach dem Aufräumjob) geht der eigene Fundus-Anhang weiter mit Inhalt (aus der Datenbank) ans Modell – im Chat und im Gruppenchat |
 
 ### Z · Posteingang und Verbindung „Posteingang“
 
@@ -538,6 +551,67 @@ Gruppenchats nie im Antwort-Cache), **N01/N03** (GC16/GC17), **Z10** (GC11: im G
 | GC18 | API der Gruppenchats | 401, 403 (Schalter aus, fremde Origin, Schreiben nach dem Verlassen, startende Person verlässt), 400 mit deutscher Meldung (Felder, Grenzen), 404 (fremde und unbekannte IDs, fremder Beitrag bleibt unverändert), 409 (laufende Antwort), 429 (Senderate); Not-Aus: Lesen geht, Schreiben und Freebie 503 |
 | GC19 | Neues und Abfrage | Punkt verschwindet beim Öffnen, eigene Beiträge zählen nicht; Hinweis nur bei Einladungen; Abfrage nur bei sichtbarem Tab, schneller im offenen Chat, langsamer bei Ruhe (Uhr vorgespult) |
 | GC20 | Grenzen | 30 Mitglieder, 10 eigene Chats, 1.000 Beiträge, 50.000 Zeichen: verständliche Meldungen, nichts halb angelegt |
+
+### FP · Fundus pflegen (Admin)
+
+Die Kursleitung lädt eigene Dokumente und E-Mail-Verläufe hoch, blendet mitgelieferte Einträge aus und legt Prompts
+mit Platzhaltern in Kategorien an (Plan: [FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md)). Alle Tests ändern den Fundus
+und laufen im Projekt `admin` (serieller Server); `restore()` löscht danach eigene Einträge samt Dateien, blendet alles
+ein und stellt Kategorien und Start-Prompts samt Reihenfolge wieder her. Neue Testdateien (`generate-files.ts`,
+Version 5): `verlauf-1.eml` bis `verlauf-3.eml`, `ohne-datum.eml`, `doppelt.eml`, `kaputt.eml`, `echte-daten.docx`,
+`nur-bild.docx`. Seitenobjekte: `FundusAdminPage`, `PromptMask`, `PromptsTab` (`support/fundus.ts`).
+
+Angepasst wurden dafür: **Q21** (Fundus aus: keine Prompts, Pflege im Admin mit Hinweis), **O01** (Reiter „Fundus“),
+**Y21** (`fundus/`-Pfade, Kategorien und Prompts im Katalog), **U01–U03** (neue Routen), **W07** (Prompt-Aktionen),
+**X08** (Reiter „Prompts“ hat Einträge).
+
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| FP01 | Reiter „Fundus“ | Unterreiter, Zahlen, Listen mit „eigen/mitgeliefert/ausgeblendet/inaktiv“, Suche und Auswahl; Hinweis, wenn der Schalter aus ist |
+| FP02 | Dokumente hochladen: Word, Excel, PowerPoint, PDF, mehrere auf einmal, per Auswahl und Ablegen | Fortschritt je Datei; Prüfschritt mit Typ, Tokens, Länge, Vorschau; gemeinsame und einzelne Angaben; nach dem Speichern in der Liste und im Chat (Y22) |
+| FP03 | Prüfungen beim Hochladen | `.doc`, `.msg`, `.exe`, Bild → Meldung mit Tipp; PNG als `.docx` erkannt; leer, kaputt, Zip-Bombe, ohne lesbaren Text (422); zu groß (413) über die API in FP16; fehlerhafte Datei bleibt mit Meldung stehen, die anderen werden gespeichert |
+| FP04 | Dubletten, Doppelklick, Abbruch | dieselbe Datei erneut → „gibt es schon als …“, nichts doppelt; Doppelklick auf „Speichern“ legt einmal an; Abbrechen während des Uploads hinterlässt keinen Eintrag (dass der Aufräumjob die vorgemerkte Datei löscht: Unit `fundus-katalog.test.ts`) |
+| FP05 | Hinweis auf echte Daten | `echte-daten.docx` → Warnung je Fundstelle; „Speichern“ erst mit Bestätigung (immer nötig); API ohne Bestätigung 400 |
+| FP06 | E-Mail-Verlauf hochladen | drei `.eml` in falscher Reihenfolge → nach Datum sortiert; Titel ohne „AW:“/„WG:“; Beteiligte; docx-Anhang als Dokument des Verlaufs; im Chat wie mitgelieferte Verläufe (Y23) |
+| FP07 | Prüfungen Verlauf | `.msg` mit Tipp; Datei ohne Kopfzeilen (422); doppelte Mail; Mail ohne Datum (Hinweis, Stelle der Auswahl); mehr als 50 Mails; nicht unterstützte Anhänge nur genannt; kodierte Betreffs und Umlaute korrekt |
+| FP08 | Eigene Einträge bearbeiten (Dokumente und Verläufe) | Titel, Datum, Merkmale, Stichwörter, Beschreibung, Aktiv; Wirkung im Chat beim nächsten Öffnen; ein abgeschalteter Verlauf nimmt seine Anhänge mit; Prüfsumme und Datei unverändert, Download im Admin |
+| FP09 | Eigene Einträge löschen | Rückfrage nennt die Anhang-Dokumente eines Verlaufs; Datei und Zeilen weg (Download 404); Verlauf nimmt seine Anhänge mit; Anhang-Dokument einzeln 409; Prompts bleiben unberührt |
+| FP10 | Mitgelieferte ausblenden | kein Bearbeiten und Löschen (API 404); Vorschau im Admin auch ausgeblendet; einzeln aus- und einblenden, „Alle einblenden“; ausgeblendet fehlt im Chat-Katalog und beim Anhängen (404) |
+| FP11 | Kategorien | anlegen, umbenennen, nach oben/unten (Maus und Tastatur); doppelter Name (auch „Einfache sprache“, „Einfache Sprache “) abgelehnt; leer oder zu lang; Löschen nur leer (409 nennt die Zahl) |
+| FP12 | Prompt anlegen | Titel, Kategorie (auch „Neue Kategorie …“ im Dialog), Beschreibung, Text; Platzhalter-Tabelle erscheint beim Tippen; je Platzhalter Beschriftung, Hinweis, Art, Auswahlwerte, Standardwert (keine Einstellung „Pflicht“); Probe-Maske; nach dem Speichern im Chat |
+| FP13 | Prompt-Prüfungen | Titel, Kategorie oder Text fehlt, Text über 8.000 Zeichen, ungültiger Name, `{{` ohne `}}` (Warnung mit Stelle), 21 Platzhalter, Auswahl ohne bzw. mit zu vielen Werten, Standardwert nicht in der Auswahl, Hinweis „ohne Platzhalter“; Einstellung eines kurz entfernten Platzhalters bleibt bis zum Speichern |
+| FP14 | Prompts ordnen und pflegen | nach oben/unten innerhalb der Kategorie, Kategorie wechseln, deaktivieren, löschen (Rückfrage) |
+| FP15 | Startbestand | frische Installation: 12 Prompts in 6 Kategorien; alle löschen, Server neu starten → bleibt leer (eigener Server, zusammen mit FP17); Start-Prompts frei bearbeitbar (FP14) |
+| FP16 | Admin-API des Fundus | 401, 403 (Gast, fremde Origin), 400 mit deutscher Meldung (Felder, Grenzen, IDs, Schlüssel außerhalb `fundus/`, ungeprüfte Schlüssel), 404, 409, 413, 422; während der Pause geht die Pflege |
+| FP17 | Speicher und Aufräumjob | Aufräumjob: eigene Fundus-Dateien und Texte bleiben (abgelaufene vorgemerkte Uploads gehen: Unit); nach Neustart ist alles da; Gäste erreichen `fundus/` weder über `/api/files` noch über die Upload-Wege (400) |
+| FP18 | Grenzen | 500 Prompts, 50 Kategorien, 20 Platzhalter, 20 Dateien je Upload: verständliche Meldungen, nichts halb angelegt (Dokumente und Verläufe: Unit-Test) |
+| FP19 | Barrierefreiheit und Tastatur | axe ohne „serious/critical“ für Reiter, Upload-, Verlauf-, Prompt- und Kategorien-Dialog, hell und dunkel; Platzhalter-Tabelle per Tastatur; Fehler mit `aria-invalid` und `aria-describedby`; Fokus kehrt zurück |
+
+### PR · Prompts im Chat
+
+Der Fundus hat einen dritten Reiter „Prompts“. Mit Platzhaltern öffnet ein Prompt die Maske „Prompt ausfüllen“: jedes
+Feld ist Pflicht, erst danach steht der fertige Text im Eingabefeld (gesendet wird nichts automatisch). Die Tests lesen
+nur den Startbestand (12 Prompts in 6 Kategorien) und laufen in `chat`, `mobile`, `tablet`, WebKit und Firefox.
+
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| ID | Szenario | Erwartete Wirkung |
+|---|---|---|
+| PR01 | Reiter „Prompts“ | Zahl im Reiter wie in der API; gruppiert nach Kategorie in Admin-Reihenfolge; leere Kategorien fehlen; Reiter und Filter bleiben beim Schließen |
+| PR02 | Filter und Suche | Kategorie-Chips mit Zahl (mehrere = oder); Suche in Titel, Beschreibung, Text und Platzhaltern (groß/klein, ä/ae, ß/ss); kombiniert; „Keine Treffer.“; „Filter zurücksetzen“ |
+| PR03 | Vorschau | Kategorie, Beschreibung, Text mit hervorgehobenen Platzhaltern, Liste der Felder; Pfeiltasten wechseln, `Enter` öffnet die Maske |
+| PR04 | Maske ausfüllen und einfügen | ein Feld je Platzhalter in Reihenfolge des ersten Vorkommens (doppelter Platzhalter → ein Feld, zweimal eingesetzt); Beschriftung, Hinweis, Standardwert, Auswahl, mehrzeilig; Live-Vorschau; „Einfügen“ → Text im Eingabefeld, Cursor am Ende, beide Dialoge zu, nichts gesendet |
+| PR05 | Alle Felder Pflicht | ein leeres Feld (auch nur Leerzeichen, auch ein gelöschter Standardwert) → „Bitte ausfüllen.“ am Feld, Fokus aufs erste leere, nichts eingefügt; erst alle gefüllt → Einfügen; Länge je Feld; Ergebnis über der Grenze des Eingabefelds → „Einfügen“ gesperrt mit Zahl |
+| PR06 | Werte aus dem echten Leben | Umlaute, Emoji, Arabisch (RTL), geschütztes Leerzeichen, eingefügter Word-Text mit Zeilen; `{{Zielgruppe}}`, `$&`, `$1`, `\` im Wert bleiben wörtlich; Steuerzeichen und Null-Byte entfernt; einzeilig ohne Zeilenumbruch |
+| PR07 | Entwurf im Eingabefeld | Maske zeigt Hinweis, „Ersetzen“ und „Anfügen“ (Leerzeile dazwischen); ein unverändert eingefügter Prompt gilt nicht als Entwurf; beim Bearbeiten einer früheren Nachricht landet der Prompt im Bearbeitungsfeld, der Entwurf kommt danach zurück; „Abbrechen“ ändert nichts |
+| PR08 | Prompt ohne Platzhalter | „Einfügen“ ohne Maske; Entwurfsschutz wie C25 (Hinweis mit „Ersetzen“) |
+| PR09 | Senden und Caches | gefüllter Prompt geht als normale Nachricht (Mock: Text wörtlich, keine Platzhalter mehr, keine Zeile „Vorlage“); zweiter Gast mit gleichen Werten → Antwort aus dem Cache; zusammen mit einer Vorlage nutzbar (Zeile „Vorlage“ nennt die Vorlage) |
+| PR10 | Gruppenchat | Prompts im Fundus des Gruppenchats; eingefügter Text beginnt mit „@Freebie “; Grenze 50.000 Zeichen; die anderen sehen erst nach dem Senden etwas |
+| PR11 | Doppelklick und Tastatur | Doppelklick und doppeltes `Enter` auf „Einfügen“ fügen einmal ein; `Enter` im einzeiligen Feld → nächstes Feld, im letzten = Einfügen; `Strg`/`Cmd`+`Enter` fügt ein; im mehrzeiligen Feld macht `Enter` eine neue Zeile (auch iPad); `Esc` schließt erst die Maske, dann den Fundus; Werte bleiben beim erneuten Öffnen desselben Prompts bis zum Neuladen |
+| PR12 | Handy und Tablet (`@mobil`, `@tablet`) | Reiter erreichbar, Liste/Detail im Wechsel, Maske im Vollbild, aktives Feld nicht von der Tastatur verdeckt, kein seitliches Scrollen |
+| PR13 | Barrierefreiheit | Felder mit Beschriftung, `aria-required`, Fehler mit `aria-invalid`/`aria-describedby`; axe ohne „serious/critical“ in Reiter und Maske, hell und dunkel; Fokus kehrt ins Eingabefeld |
 
 ## 5. Abdeckungsmatrix
 
@@ -679,6 +753,13 @@ und `groupchat-store.test.ts`.
 **Bekannte Grenze (77):** Bei GPT meldet die API die Eingabe-Tokens erst am Ende – bricht eine Antwort ab, zählt dort
 nur die aus dem Text geschätzte Ausgabe. Bei Claude kommen Eingabe und Cache gleich zu Beginn und zählen exakt.
 
+**Fundus pflegen** (15. Oktober 2026)
+
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 79 | Gruppenchat-Antworten auf Vercel: der mitgelieferte Fundus fehlte im Funktions-Bundle der Route `/api/groupchats/[id]/freebie` – nach Ablauf des Datei-Caches wäre ein Fundus-Anhang dort „nicht mehr verfügbar“ gewesen | `next.config.ts` (Tracing), Y26 |
+| 80 | Dialoge, die die Seite beim Schließen entfernt statt schließt (z. B. „Vorlage bearbeiten“), gaben den Fokus nicht an den auslösenden Knopf zurück | FP19 |
+
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
@@ -722,8 +803,9 @@ liegt bei dir.
 | 12 · Grenzfälle, Phase 2 | C19/C20, C24–C26, C30, E11, E12, E15, E16, F17, H06; Fehler 54–61 (`GRENZFAELLE-PLAN.md`) | erledigt |
 | 13 · Grenzfälle, Phase 3 | A15/A16, C18, C23, C27–C29, E13, F11, F12, F16, F18, W07 (Zufallstest, nachts mit 50 Seeds), W08, Z18; Testhelfer `support/grenzfaelle.ts`; Fehler 62–71 (`GRENZFAELLE-PLAN.md`) | erledigt |
 | 14 · Testlücken | Code und Tests bereichsweise abgeglichen: Fehler 72–78 behoben, vier Scheinprüfungen (U03/U04, U05/Q13, T17, GC14) prüfen jetzt die Wirkung; A07, U04, U05, T17, V04 erweitert | erledigt |
+| 15 · Fundus pflegen | Bereiche FP und PR, Y22–Y26, V09, W09, X11; Q21, O01, Y21, U01–U03, W07 und X08 angepasst; `restore()` kennt den Fundus; Fehler 79–80 (`FUNDUS-PFLEGE-PLAN.md`) | erledigt |
 
-Ergebnis: 376 E2E-Tests in 32 Dateien (plus 10 Live-Smoke-Tests, dazu nachts der Zufallstest mit 50 Seeds) und 190
+Ergebnis: 417 E2E-Tests in 35 Dateien (plus 11 Live-Smoke-Tests, dazu nachts der Zufallstest mit 50 Seeds) und 245
 Unit-Tests; die komplette Suite läuft lokal in gut 12 Minuten (3 Worker). Nach Phase 3 der Grenzfälle (14. Oktober
 2026) war sie vollständig grün, die 45 Grenzfall-Tests (Chat, Handy, Tablet) auch dreimal hintereinander; der
 Zufallstest lief vorab mit rund 60 Seeds. Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den

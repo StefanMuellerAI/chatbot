@@ -1,6 +1,7 @@
 // Screenshots für das Handbuch – gegen einen Freebie-Server im Testmodus (siehe erstellen.mjs).
 // Legt Beispieltermine an, lädt Beispiel-Chats über den Import und fotografiert jede Ansicht.
-import { writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { request } from "@playwright/test";
 import {
@@ -10,6 +11,9 @@ import {
   GROUP_TITLE,
   groupAnswer,
   groupNotes,
+  OWN_DOC,
+  ownDocx,
+  ownThreadMails,
   patchEvents,
   patchOverview,
   sampleChats,
@@ -117,6 +121,31 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
   await json("POST", "/api/admin/events/groups", { eventId: later.id, name: "Gruppe 1", count: 10 });
   const short = await json("POST", "/api/admin/events", { name: "Kurzschulung Datenschutz", startsAt: iso(-60), endsAt: iso(9) });
   const shortGroup = await json("POST", "/api/admin/events/groups", { eventId: short.id, name: "Teilnehmende", count: 3 });
+  // Fundus pflegen: ein eigenes Dokument, ein eigener Verlauf, ein ausgeblendeter mitgelieferter Eintrag.
+  const upload = async (name, buffer) => {
+    const key = `fundus/${randomUUID()}/${name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+    const res = await api.post("/api/admin/fundus/local", { multipart: { key, file: { name, mimeType: "application/octet-stream", buffer } } });
+    if (!res.ok()) throw new Error(`Fundus-Upload ${name}: ${await res.text()}`);
+    return { key, name };
+  };
+  const ownDoc = await upload(OWN_DOC.name, ownDocx(OWN_DOC.paragraphs));
+  await json("POST", "/api/admin/fundus/documents", {
+    confirmed: true,
+    files: [{ ...ownDoc, title: OWN_DOC.title, summary: OWN_DOC.summary, date: iso(-24 * 60).slice(0, 10), tags: ["personendaten"], keywords: OWN_DOC.keywords }],
+  });
+  const threadFiles = [];
+  for (const m of ownThreadMails()) threadFiles.push(await upload(m.name, Buffer.from(m.text)));
+  await json("POST", "/api/admin/fundus/threads", {
+    confirmed: true,
+    files: threadFiles,
+    title: "Sondernutzung Marktplatz – Herbstfest",
+    summary: "Heimatverein fragt nach Genehmigung, Ordnungsamt fordert Unterlagen nach.",
+    tags: ["unstrukturiert"],
+    keywords: ["Sondernutzung", "Marktplatz"],
+  });
+  await json("PUT", "/api/admin/fundus/hidden", { id: "bh-beschwerde-laerm-dgh", hidden: true });
+  for (const m of ownThreadMails("-neu")) writeFileSync(path.join(filesDir, m.name), m.text);
+  writeFileSync(path.join(filesDir, OWN_DOC.name), ownDocx(OWN_DOC.paragraphs.slice(0, 3)));
   await api.dispose();
   const state = { today: today.id, vormittag, nachmittag };
 
@@ -348,6 +377,40 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await shot(page.getByRole("group", { name: "Anhänge" }).locator("xpath=.."), "c31-fundus-chat");
     await page.getByRole("textbox", { name: "Nachricht" }).fill("");
     await clearAttachments();
+  });
+
+  // ---------------------------------------------------------------- Prompts
+
+  const mask = page.getByRole("dialog", { name: "Prompt ausfüllen" });
+  await step("Fundus-Prompts", async () => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.getByRole("button", { name: "Fundus öffnen" }).click();
+    await fundus.getByRole("tab", { name: /^Prompts/ }).click();
+    await fundus.getByRole("listbox", { name: "Prompts" }).locator('[data-id="prompt-mailverlauf"]').click();
+    await fundus.getByTestId("prompt-text").waitFor();
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(500);
+    await shot(page, "c38-fundus-prompts");
+  });
+
+  await step("Prompt-Maske", async () => {
+    await fundus.getByRole("button", { name: "Ausfüllen und einfügen" }).click();
+    await mask.waitFor();
+    await mask.getByLabel("Zielgruppe", { exact: true }).fill("die Amtsleitung");
+    await mask.getByLabel("Was ist dir wichtig?", { exact: true }).click();
+    await page.waitForTimeout(400);
+    await shot(page, "c39-prompt-maske");
+  });
+
+  await step("Prompt eingefügt", async () => {
+    await mask.getByLabel("Was ist dir wichtig?", { exact: true }).fill("Fristen und Kosten");
+    await mask.getByRole("button", { name: "Einfügen", exact: true }).click();
+    await mask.waitFor({ state: "hidden" });
+    await fundus.waitFor({ state: "hidden" });
+    await page.waitForTimeout(500);
+    await shot(page.getByRole("textbox", { name: "Nachricht" }).locator("xpath=.."), "c40-prompt-eingefuegt");
+    await page.getByRole("textbox", { name: "Nachricht" }).fill("");
+    await page.setViewportSize({ width: 1280, height: 800 });
   });
 
   // ---------------------------------------------------------------- Posteingang
@@ -655,6 +718,78 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await shot(adminPage.getByRole("dialog"), "a14-vorlage-dialog");
     await adminPage.keyboard.press("Escape");
     await adminPage.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  // ---------------------------------------------------------------- Fundus pflegen
+
+  const sub = async (name) => {
+    await adminPage.getByRole("tablist", { name: "Fundus-Bereiche" }).getByRole("tab", { name: new RegExp(`^${name}`) }).click();
+    await adminPage.waitForTimeout(400);
+  };
+  await step("Fundus: Dokumente", async () => {
+    await tab("Fundus");
+    await adminPage.getByRole("list", { name: "Dokumente im Fundus" }).waitFor();
+    await adminPage.setViewportSize({ width: 1280, height: 1000 });
+    await adminPage.mouse.move(0, 0);
+    await adminPage.waitForTimeout(400);
+    await shot(adminPage, "a16-fundus-dokumente");
+  });
+
+  await step("Fundus: Prüfen", async () => {
+    await adminPage.getByRole("button", { name: "Dateien hochladen" }).click();
+    const dialog = adminPage.getByRole("dialog", { name: "Dokumente hochladen" });
+    await dialog.getByLabel("Dateien für den Fundus auswählen").setInputFiles(
+      ["bericht.pdf", OWN_DOC.name, "umsatz.csv"].map((name) => ({ name, mimeType: "application/octet-stream", buffer: readFileSync(path.join(filesDir, name)) })),
+    );
+    await dialog.getByText(/(wird|werden) hochgeladen und geprüft/).waitFor({ state: "hidden", timeout: 30_000 });
+    await dialog.locator('li[data-datei="bericht.pdf"]').getByLabel("Titel für „bericht.pdf“").fill("Quartalsbericht Bürgerservice");
+    await dialog.getByLabel("Stichwörter").fill("Quartal, Wartezeiten");
+    await dialog.getByRole("checkbox", { name: "Mit Zahlen" }).check();
+    await dialog.getByRole("checkbox", { name: /keine echten personenbezogenen/ }).check();
+    await adminPage.setViewportSize({ width: 1280, height: 1400 });
+    // Nach dem Häkchen ist der Inhalt nach unten gescrollt – fürs Bild wieder von oben.
+    await dialog.locator(".overflow-y-auto").first().evaluate((el) => (el.scrollTop = 0));
+    await adminPage.waitForTimeout(400);
+    await shot(dialog, "a17-fundus-pruefen");
+    await dialog.getByRole("button", { name: "Abbrechen" }).click();
+    await adminPage.setViewportSize({ width: 1280, height: 800 });
+    await dialog.waitFor({ state: "hidden" });
+  });
+
+  await step("Fundus: Verlauf", async () => {
+    await sub("E-Mail-Verläufe");
+    await adminPage.getByRole("button", { name: "Verlauf hochladen" }).click();
+    const dialog = adminPage.getByRole("dialog", { name: "E-Mail-Verlauf hochladen" });
+    try {
+      await dialog.getByLabel("E-Mails für den Verlauf auswählen").setInputFiles(
+        ownThreadMails().map((m) => ({ name: m.name, mimeType: "message/rfc822", buffer: readFileSync(path.join(filesDir, m.name)) })),
+      );
+      await dialog.locator("li[data-mail]").nth(2).waitFor({ timeout: 30_000 });
+      await dialog.getByRole("checkbox", { name: /keine echten personenbezogenen/ }).check();
+      await adminPage.setViewportSize({ width: 1280, height: 1500 });
+      await adminPage.waitForTimeout(400);
+      await shot(dialog, "a18-fundus-verlauf");
+    } finally {
+      await dialog.getByRole("button", { name: "Abbrechen" }).click();
+      await adminPage.setViewportSize({ width: 1280, height: 800 });
+    }
+  });
+
+  await step("Prompt-Dialog", async () => {
+    await sub("Prompts");
+    await adminPage.setViewportSize({ width: 1280, height: 1700 });
+    await adminPage.getByRole("button", { name: "„E-Mail-Verlauf zusammenfassen“ bearbeiten" }).click();
+    const dialog = adminPage.getByRole("dialog", { name: "Prompt bearbeiten" });
+    await dialog.waitFor();
+    await adminPage.waitForTimeout(400);
+    await shot(dialog, "a19-prompt-dialog");
+    await adminPage.keyboard.press("Escape");
+    await adminPage.setViewportSize({ width: 1280, height: 800 });
+  });
+
+  await step("Kategorien", async () => {
+    await sub("Kategorien");
+    await fullShot(adminPage, "a20-kategorien");
   });
 
   await step("Sicherheit", async () => {
