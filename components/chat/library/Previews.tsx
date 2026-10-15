@@ -494,8 +494,10 @@ const mailDate = new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
 });
 
+/** Datum einer Mail; eigene Mails können ohne Datum sein. */
 export function formatMailDate(iso: string): string {
-  return mailDate.format(new Date(iso));
+  const date = new Date(iso);
+  return iso && !Number.isNaN(date.getTime()) ? mailDate.format(date) : "ohne Datum";
 }
 
 /** Eine Mail des Verlaufs; ohne `onAttach` (Vorschau im Admin) ohne Knopf zum Anhängen. */

@@ -1072,6 +1072,7 @@ export function ChatApp({ account, initialView = "chat" }: { account: AccountInf
               onSend={send}
               onStop={() => abortRef.current?.abort()}
               onImageMode={() => !streaming && setImageMode(true)}
+              onToast={showToast}
               connections={
                 mailEnabled
                   ? {

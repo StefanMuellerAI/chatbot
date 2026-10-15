@@ -13,7 +13,6 @@ import {
   LIBRARY_EXTENSION,
   LIBRARY_ID,
   LIBRARY_MIME,
-  LIBRARY_TYPE_LABEL,
   OWN_ORG,
   OWN_ORG_ID,
   type FundusCatalog,
@@ -63,7 +62,7 @@ function ownDocument(row: OwnItemRow): LibraryDocument {
   return {
     id: row.id,
     type,
-    kind: row.threadId ? "Anhang" : `${LIBRARY_TYPE_LABEL[type]}-Datei`,
+    kind: row.threadId ? "Anhang aus einem Verlauf" : "Eigene Datei",
     title: row.title,
     fileName: row.fileName ?? row.title,
     orgId: OWN_ORG_ID,

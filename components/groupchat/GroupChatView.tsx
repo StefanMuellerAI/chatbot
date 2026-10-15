@@ -9,7 +9,7 @@ import { GROUPCHAT_LIMITS, mentionsFreebie, splitMentions, systemText, type Grou
 import { mailName } from "@/lib/shared/mail";
 import type { Attachment, Effort, PublicConfig, PublicModel, StreamEvent } from "@/lib/shared/types";
 import { ArtifactPanel } from "@/components/artifacts/ArtifactPanel";
-import { Composer, type ComposerHandle } from "@/components/chat/Composer";
+import { Composer, type ComposerHandle, type ComposerToast } from "@/components/chat/Composer";
 import { AssistantMessage, AttachmentChip, type StreamingState } from "@/components/chat/Message";
 import { ModelPicker } from "@/components/chat/ModelPicker";
 import { MailAvatar } from "@/components/mail/Avatar";
@@ -131,7 +131,7 @@ export function GroupChatView({
   hidden: boolean;
   onOpenMenu: () => void;
   onNewChat: () => void;
-  onToast: (text: string) => void;
+  onToast: (toast: string | ComposerToast) => void;
   onBusy: (busy: boolean) => void;
   /** Den Chat gibt es für mich nicht mehr (gelöscht, ausgeblendet, Schalter aus). */
   onGone: (message: string) => void;
@@ -549,6 +549,8 @@ export function GroupChatView({
                 mentions
                 placeholder="Schreib der Gruppe … – mit @Freebie fragst du Freebie"
                 maxChars={GROUPCHAT_LIMITS.text}
+                promptPrefix="@Freebie "
+                onToast={onToast}
               />
             )
           )}

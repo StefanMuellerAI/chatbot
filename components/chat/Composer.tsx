@@ -5,10 +5,13 @@ import { ACCEPT_ATTRIBUTE, MAX_ATTACHMENTS, MAX_MESSAGE_CHARS, maxBytesFor, unsu
 import { attachFromLibrary } from "@/lib/client/library";
 import { useLeaveWarning } from "@/lib/client/leave";
 import { prepareImage, processUpload, transcribeUpload, UPLOAD_OFFLINE, uploadCategory, uploadFile } from "@/lib/client/upload";
+import type { LibraryPrompt } from "@/lib/library/types";
+import { mentionsFreebie } from "@/lib/shared/groupchat";
 import { EFFORT_LEVELS, type Attachment, type Effort, type PublicConfig, type PublicModel } from "@/lib/shared/types";
 import { cn } from "@/components/ui/cn";
 import { LogoMark } from "@/components/ui/Logo";
 import { LibraryDialog, type LibraryPick } from "./library/LibraryDialog";
+import { PromptFillDialog, type FillablePrompt, type InsertMode } from "./library/PromptFill";
 import { AttachmentChip } from "./Message";
 import { VoiceButton } from "./VoiceButton";
 
@@ -62,6 +65,15 @@ interface Props {
   mentions?: boolean;
   /** Höchstlänge der Nachricht (Gruppenchat: kürzer als im privaten Chat). */
   maxChars?: number;
+  /** Vorangestellt beim Einfügen eines Prompts aus dem Fundus (Gruppenchat: „@Freebie “). */
+  promptPrefix?: string;
+  /** Hinweis mit Aktion (Entwurfsschutz beim Einfügen eines Prompts ohne Platzhalter). */
+  onToast?: (toast: ComposerToast) => void;
+}
+
+export interface ComposerToast {
+  text: string;
+  action?: { label: string; onClick: () => void };
 }
 
 export interface ConnectionsProps {
@@ -88,6 +100,9 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [fillPrompt, setFillPrompt] = useState<FillablePrompt | null>(null);
+  // Zuletzt eingefügter Prompt: steht er unverändert im Feld, ist er kein eigener Entwurf.
+  const [inserted, setInserted] = useState<string | null>(null);
   const features = config.features;
   const touchKeyboard = useTouchKeyboard();
 
@@ -261,6 +276,41 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
     if (!canSend) return;
     onSend(text, ready);
     setPending((l) => l.filter((p) => p.status === "error"));
+  };
+
+  // ---------------------------------------------------------------- Prompts aus dem Fundus
+
+  const prefix = props.promptPrefix ?? "";
+  const isDraft = text.trim().length > 0 && text !== inserted;
+  /** Text für das Eingabefeld: im Gruppenchat mit „@Freebie “ vorn; beim Anfügen unter den Entwurf (Leerzeile dazwischen). */
+  const composePrompt = (filled: string, mode: InsertMode): string => {
+    const own = prefix && !filled.toLowerCase().startsWith(prefix.trim().toLowerCase()) ? `${prefix}${filled}` : filled;
+    if (mode === "replace" || !text.trim()) return own;
+    return `${text.replace(/\s+$/, "")}\n\n${prefix && mentionsFreebie(text) ? filled : own}`;
+  };
+  /** Nur ein ersetzter Text ist „unverändert eingefügt“ – angefügt steckt der eigene Entwurf darin. */
+  const insertText = (value: string, mode: InsertMode = "replace") => {
+    setInserted(mode === "replace" ? value : null);
+    onTextChange(value);
+    // Nach dem Schließen der Dialoge: Fokus ins Eingabefeld, Cursor ans Ende.
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+      el.scrollTop = el.scrollHeight;
+    }, 60);
+  };
+  const choosePrompt = (prompt: LibraryPrompt, category: string) => {
+    if (prompt.placeholders.length) {
+      setFillPrompt({ id: prompt.id, title: prompt.title, text: prompt.text, placeholders: prompt.placeholders, category });
+      return;
+    }
+    // Ohne Platzhalter: gleich einfügen – ein eigener Entwurf bleibt stehen (Hinweis mit „Ersetzen“).
+    setLibraryOpen(false);
+    const value = composePrompt(prompt.text, "replace");
+    if (!isDraft) return insertText(value);
+    if (props.onToast) props.onToast({ text: "Im Eingabefeld steht schon dein Entwurf – er bleibt stehen.", action: { label: "Ersetzen", onClick: () => insertText(value) } });
   };
 
   const efforts = model?.efforts ?? [];
@@ -470,6 +520,21 @@ export const Composer = forwardRef<ComposerHandle, Props>(function Composer(prop
             addLibraryItems(items);
             // Nach dem Anhängen direkt weiterschreiben (nach dem Schließen gibt der Dialog den Fokus sonst ans Symbol zurück).
             setTimeout(() => textareaRef.current?.focus(), 60);
+          }}
+          onPrompt={choosePrompt}
+        />
+      )}
+      {features.library && (
+        <PromptFillDialog
+          prompt={fillPrompt}
+          draft={isDraft}
+          maxChars={maxChars}
+          compose={composePrompt}
+          onClose={() => setFillPrompt(null)}
+          onInsert={(value, mode) => {
+            setFillPrompt(null);
+            setLibraryOpen(false);
+            insertText(value, mode);
           }}
         />
       )}
