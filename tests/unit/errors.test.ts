@@ -1,5 +1,7 @@
+import { APIError } from "@anthropic-ai/sdk";
 import { describe, expect, it } from "vitest";
-import { CHAT_TOO_LONG, providerErrorMessage } from "@/lib/errors";
+import { userMessageFor } from "@/lib/chat/run";
+import { CHAT_TOO_LONG, isProviderError, providerErrorMessage } from "@/lib/errors";
 
 describe("providerErrorMessage", () => {
   it("nimmt die Detailmeldung bei 400 aus beiden SDK-Formaten", () => {
@@ -20,6 +22,18 @@ describe("providerErrorMessage", () => {
     expect(providerErrorMessage(connection)).toBe("Die Verbindung zum Anbieter ist abgebrochen. Bitte „Neu generieren“ verwenden.");
     const timeout = Object.assign(new Error("Request timed out."), { name: "APIConnectionTimeoutError" });
     expect(providerErrorMessage(timeout)).toBe("Der Anbieter hat zu lange nicht geantwortet. Bitte „Neu generieren“ verwenden.");
+  });
+
+  it("Fehler-Ereignis mitten im Claude-Stream (ohne HTTP-Status): Meldung nach Fehlertyp statt „interner Fehler“", () => {
+    // So baut das Anthropic-SDK den Fehler aus „event: error“ nach HTTP 200.
+    const stream = (type: NonNullable<ConstructorParameters<typeof APIError>[4]>, message: string) => new APIError(undefined, { type: "error", error: { type, message } }, undefined, new Headers(), type);
+    const overloaded = stream("overloaded_error", "Overloaded");
+    expect(isProviderError(overloaded)).toBe(true);
+    expect(userMessageFor(overloaded)).toBe("Der Anbieter ist gerade überlastet. Bitte gleich nochmal versuchen.");
+    expect(userMessageFor(stream("api_error", "Internal server error"))).toBe("Der Anbieter hat gerade Probleme. Bitte gleich nochmal versuchen.");
+    expect(userMessageFor(stream("rate_limit_error", "slow down"))).toMatch(/^Der Anbieter ist gerade überlastet oder das Kontingent/);
+    // Unbekannte Fehler ohne Status bleiben „intern“ (Wortlaut nur im Server-Log).
+    expect(userMessageFor(new Error("db kaputt"))).toBe("Es ist ein interner Fehler aufgetreten. Bitte „Neu generieren“ verwenden.");
   });
 
   it("bevorzugt eigene Nutzermeldungen", () => {

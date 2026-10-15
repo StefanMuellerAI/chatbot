@@ -4,7 +4,7 @@ import { HttpError, requireAdmin } from "@/lib/auth/session";
 import { fundusError } from "@/lib/fundus/api";
 import { assertFundusKey } from "@/lib/fundus/upload";
 import { extensionOf, FUNDUS_LIMITS, OWN_DOC_EXTENSIONS } from "@/lib/shared/fundus";
-import { blobAuth, registerFile } from "@/lib/storage";
+import { blobAuth, claimUploadKey } from "@/lib/storage";
 
 /**
  * Direkt-Upload eigener Fundus-Dateien in Vercel Blob (nur Kursleitung, nur `fundus/…`). Die Datei ist zunächst für
@@ -19,7 +19,8 @@ export async function POST(request: Request) {
       assertFundusKey(pathname);
       const ext = extensionOf(pathname);
       if (!OWN_DOC_EXTENSIONS[ext] && ext !== "eml") throw new HttpError(400, "Dieses Format geht im Fundus nicht (Word, Excel, PowerPoint, PDF und .eml).");
-      await registerFile(pathname, "fundus", "application/octet-stream", 0, 1);
+      // Reserviert den Pfad (kein Überschreiben vorhandener Dateien) und merkt ihn für einen Tag vor.
+      await claimUploadKey(pathname, "fundus", 1);
       return FUNDUS_LIMITS.fileBytes;
     };
     if (auth.kind === "token") {

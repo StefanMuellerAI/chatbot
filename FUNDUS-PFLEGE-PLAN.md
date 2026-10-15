@@ -598,7 +598,7 @@ Vorschau-Cache (1 Stunde im Browser) stimmig.
 | 3 · Chat | Reiter „Prompts“, Filter, Vorschau, Maske, Ersetzen/Anfügen, Gruppenchat, eigene Dateien und Verläufe im Chat, PDF-Typ, Revalidierung | PR01–PR13, Y22–Y26, Q21, V09 |
 | 4 · Abschluss | Doku inkl. beider Handbücher, Belastung, Zufallstest, Live-Smoke, Stabilitätslauf (3 ×), CI in drei Browsern | W07, W09, X08, X11 |
 
-**Stand der Umsetzung (15. Oktober 2026):** Phasen 1–4 erledigt. 233 Unit-Tests (55 neu) und 413 E2E-Tests in 35
+**Stand der Umsetzung (15. Oktober 2026):** Phasen 1–4 erledigt. 245 Unit-Tests (55 neu) und 417 E2E-Tests in 35
 Dateien (41 neu, dazu X11 im Live-Smoke); die Abdeckungsprüfung kennt alle 20 neuen Routen und 21 neuen Bedienelemente.
 Abweichungen vom Plan:
 
@@ -619,7 +619,7 @@ Abweichungen vom Plan:
   `provider-serial` (beide ändern den Fundus). W07 hängt ein mitgeliefertes Fundus-Dokument an (im parallelen Projekt
   gibt es keine eigenen Einträge).
 - **Nebenbei behoben:** Dialoge, die beim Schließen entfernt statt geschlossen werden, geben den Fokus jetzt an den
-  auslösenden Knopf zurück (Fehler 73 im Testplan).
+  auslösenden Knopf zurück (Fehler 80 im Testplan).
 
 **Wie schnell?**
 

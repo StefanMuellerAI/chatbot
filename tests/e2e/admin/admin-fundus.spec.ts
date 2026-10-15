@@ -724,6 +724,9 @@ test.describe("FP · Fundus pflegen", () => {
       multipart: { key: "fundus/0f8fad5b-d9cb-469f-a165-70867728950e/gross.pdf", file: { name: "gross.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(50 * 1024 * 1024 + 1) } },
     });
     await error(big, 413, "Die Datei ist zu groß.");
+    // Ein vorhandener Pfad wird nie überschrieben (auch keine gespeicherte Fundus-Datei).
+    const taken = await admin.uploadFundusFile("vorhanden.docx", docxWith(["Vorhanden"]));
+    await error(await api.post("/api/admin/fundus/local", { multipart: { key: taken, file: { name: "vorhanden.docx", mimeType: "application/octet-stream", buffer: docxWith(["Neu"]) } } }), 409, /gibt es schon/);
     const key = await admin.uploadFundusFile("leer.docx", docxWith([]));
     const empty = await admin.json<{ failed: { error: string }[] }>("POST", "/api/admin/fundus/documents", { confirmed: true, files: [{ key, name: "leer.docx", title: "x", date: "2026-10-14" }] });
     expect(empty.failed[0].error).toMatch(/lesbare/);

@@ -310,8 +310,28 @@ test.describe("U · API-Robustheit", () => {
       await expectGermanError(res, 400);
     }
     await expectGermanError(await api.post("/api/files/process", { data: { key: "uploads/../../package.json", name: "x.txt" } }), 400);
-    await expectGermanError(await api.post("/api/upload/token", { data: { type: "blob.generate-client-token", payload: { pathname: "images/abcdefgh-1234/x.png", clientPayload: null, multipart: false } } }), 400);
+    // Die Testserver laufen ohne Blob-Speicher – die Pfadprüfung für Tokens steht in tests/unit/upload-token.test.ts.
+    await expectGermanError(
+      await api.post("/api/upload/token", { data: { type: "blob.generate-client-token", payload: { pathname: "images/abcdefgh-1234/x.png", clientPayload: null, multipart: false } } }),
+      400,
+      "Es ist kein Blob-Speicher verbunden.",
+    );
     await api.dispose();
+  });
+
+  test("U04 eine vorhandene Datei lässt sich nicht überschreiben – auch nicht von anderen, die ihren Pfad kennen", async ({ baseURL, ip }) => {
+    const owner = await client(baseURL!, ip, "user");
+    const other = await client(baseURL!, `${ip}-b`, "user");
+    const key = `uploads/${uniq()}${uniq()}/protokoll.txt`;
+    const upload = (api: APIRequestContext, text: string) =>
+      api.post("/api/upload/local", { multipart: { key, file: { name: "protokoll.txt", mimeType: "text/plain", buffer: Buffer.from(text) } } });
+    expect((await upload(owner, "Original")).status()).toBe(200);
+    // Pfade sind z. B. im Gruppenchat für alle Mitglieder sichtbar.
+    await expectGermanError(await upload(other, "Gefälscht"), 409, "Diese Datei gibt es schon.");
+    await expectGermanError(await upload(owner, "Zweiter Versuch"), 409);
+    expect(await (await owner.get(`/api/files/${key}`)).text()).toBe("Original");
+    await owner.dispose();
+    await other.dispose();
   });
 
   test("U04 hochgeladene Dateien laufen nie als Seite: Sandbox-CSP und Download", async ({ baseURL, ip }) => {

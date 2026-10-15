@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { SignJWT } from "jose";
+import { decodeJwt, SignJWT } from "jose";
 import { createGuest, expect, ipFor, loginUser, test } from "../support/fixtures";
 import { ADMIN, SESSION_SECRET } from "../support/servers.mjs";
 
@@ -143,6 +143,24 @@ test.describe("A · Zugang und Sitzung", () => {
     await other.dispose();
     // Die Kursleitung an derselben IP hat einen eigenen Zähler.
     expect((await page.request.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
+  });
+
+  test("A07 die Anmeldung der Kursleitung merkt sich das Gerät für die Login-Bremse – Gäste bekommen kein Geräte-Cookie", async ({ playwright, baseURL, ip }) => {
+    const api = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { "x-forwarded-for": ipFor(`${ip}-geraet`) } });
+    const deviceCookie = async () => (await api.storageState()).cookies.find((c) => c.name === "freebie_geraet");
+    const guest = await createGuest(baseURL!);
+    expect((await api.post("/api/auth/login", { data: guest })).status()).toBe(200);
+    expect(await deviceCookie()).toBeUndefined();
+
+    expect((await api.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
+    const first = await deviceCookie();
+    // Nur an die Anmeldung geschickt, nicht für Skripte lesbar, ein halbes Jahr gültig.
+    expect(first).toMatchObject({ httpOnly: true, sameSite: "Lax", path: "/api/auth/login" });
+    expect((first!.expires * 1000 - Date.now()) / 86_400_000).toBeGreaterThan(179);
+    // Die nächste Anmeldung verlängert es – es bleibt dasselbe Gerät.
+    expect((await api.post("/api/auth/login", { data: ADMIN })).status()).toBe(200);
+    expect(decodeJwt((await deviceCookie())!.value).did).toBe(decodeJwt(first!.value).did);
+    await api.dispose();
   });
 
   test("A08 abgelaufene, gefälschte, veraltete und Tokens unbekannter Gäste öffnen den Chat nicht", async ({ page, context, baseURL }) => {

@@ -38,6 +38,14 @@ describe("Artefakt-Parser", () => {
   it("bettet eine CSP in HTML ein und benennt Downloads sinnvoll", () => {
     expect(hardenHtml("<html><head><title>t</title></head><body></body></html>")).toContain("Content-Security-Policy");
     expect(hardenHtml("<p>nur ein Fragment</p>")).toMatch(/^<!doctype html>/);
+    // <header> ist kein <head>: die CSP muss trotzdem im <head> stehen, sonst ignoriert der Browser sie.
+    const inHead = (html: string) => /<head[^>]*>(?:(?!<\/head>).)*Content-Security-Policy/is.test(html);
+    for (const html of ["<header><h1>Titel</h1></header><form><input></form>", "<html><body><header>x</header></body></html>", '<html lang="de"><HEAD data-x="1"></HEAD><header>x</header></html>']) {
+      const out = hardenHtml(html);
+      expect(inHead(out), html).toBe(true);
+      expect(out.match(/Content-Security-Policy/g), html).toHaveLength(1);
+      expect(out).not.toMatch(/<header><meta/i);
+    }
     expect(fileNameFor({ id: "Mein Chart", type: "code", language: "python", title: "", content: "", complete: true })).toBe("mein-chart.py");
   });
 });

@@ -65,6 +65,34 @@ test("Q10/V01 Kosten pro Antwort und Übersicht rechnen mit den Modellpreisen", 
   expect(end.periods[0].savedUsd - mid.periods[0].savedUsd).toBeCloseTo(cost, 6);
 });
 
+test("Q10 Stoppen mitten in der Antwort: Bezahltes zählt in der Übersicht, die Anfrage an den Anbieter endet", async ({ chat, admin }) => {
+  const models = await admin.models();
+  const sonnet = models.find((m) => m.id === "claude-sonnet-5-5") as { priceIn: number; priceOut: number; priceCacheRead: number; priceCacheWrite: number };
+  const row = (o: Overview) => o.byModel.find((m) => m.modelId === "claude-sonnet-5-5") ?? { requests: 0, costUsd: 0, savedUsd: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
+  const before = await admin.json<Overview>("GET", "/api/admin/overview");
+
+  const id = uniq();
+  await chat.send(`#fake:haengt ${id}`);
+  await expect(chat.lastAnswer).toContainText("Fake-Antwort");
+  await chat.stopButton.click();
+  await chat.waitForAnswer();
+
+  // Eingabe und Cache meldet Claude zu Beginn (bezahlt), die Ausgabe ist aus dem gestreamten Text geschätzt.
+  const paid = (FAKE_USAGE.input * sonnet.priceIn + FAKE_USAGE.cacheRead * sonnet.priceCacheRead + FAKE_USAGE.cacheWrite * sonnet.priceCacheWrite) / 1e6;
+  let after = before;
+  await expect(async () => {
+    after = await admin.json<Overview>("GET", "/api/admin/overview");
+    expect(row(after).requests - row(before).requests).toBe(1);
+  }).toPass({ timeout: 10_000 });
+  const cost = row(after).costUsd - row(before).costUsd;
+  expect(cost).toBeGreaterThan(paid);
+  expect(cost).toBeLessThan(paid + (FAKE_USAGE.output * sonnet.priceOut) / 1e6);
+  expect(row(after).cacheReadTokens - row(before).cacheReadTokens).toBe(FAKE_USAGE.cacheRead);
+  expect(row(after).cacheWriteTokens - row(before).cacheWriteTokens).toBe(FAKE_USAGE.cacheWrite);
+  // „Stoppen“ bricht auch die Anfrage an den Anbieter ab (sonst liefe und kostete sie weiter).
+  await expect.poll(async () => (await fakeRequests(id, "/v1/messages")).find((r) => r.body.stream === true)?.closed).toBe(true);
+});
+
 test("Q11 Claude-Cache-Dauer 1 Stunde setzt die TTL an allen Cache-Markern", async ({ chat, page, admin }) => {
   await admin.updateSettings({ claudeCacheTtl: "1h" });
   await page.reload();

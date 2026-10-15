@@ -4,6 +4,8 @@
 // Verhalten pro Anfrage über Schlüsselwörter in der letzten Nutzer-Nachricht:
 //   #fake:websuche  #fake:bild  #fake:pause  #fake:maxtokens  #fake:ablehnung
 //   #fake:ersatzmodell  #fake:fehler:NNN  #fake:abbruch  #fake:langsam
+//   #fake:ueberlastet (Claude: Überlastung als Fehler-Ereignis mitten im Stream, nach HTTP 200)
+//   #fake:haengt (Claude: nach dem ersten Text weiter offen, bis Freebie die Verbindung schließt – „closed“ im Mitschnitt)
 //   #fake:postfach (Liste → Lesen → Antwort)  #fake:senden:<name> (Senden → Antwort)
 // Jede Anfrage wird mitgeschrieben: GET /__requests?contains=<Text> liefert alle Anfragen,
 // deren Inhalt den Text enthält (so bleiben parallel laufende Tests getrennt).
@@ -93,6 +95,8 @@ function scenario(text) {
     fallback: has("ersatzmodell"),
     abort: has("abbruch"),
     slow: has("langsam"),
+    overloaded: has("ueberlastet"),
+    hang: has("haengt"),
     tooLong: has("zu-lang"),
     status: status ? Number(status) : null,
     mailbox: has("postfach"),
@@ -321,6 +325,19 @@ async function anthropicMessages(req, res, body) {
         res.socket?.destroy();
         return;
       }
+      // „Stoppen“: offen bleiben, bis Freebie die Anfrage abbricht (höchstens 30 Sekunden).
+      if (s.hang && delta.type === "text_delta") {
+        const closed = await Promise.race([new Promise((r) => res.on("close", () => r(true))), sleep(30_000).then(() => false)]);
+        if (req.fakeEntry) req.fakeEntry.closed = closed;
+        res.end();
+        return;
+      }
+      // Wie die echte API bei Überlastung während der Antwort: Fehler-Ereignis statt message_stop.
+      if (s.overloaded && delta.type === "text_delta") {
+        send("error", { type: "error", error: { type: "overloaded_error", message: "Overloaded" } });
+        res.end();
+        return;
+      }
     }
     send("content_block_stop", { type: "content_block_stop", index });
   }
@@ -485,7 +502,7 @@ const server = createServer(async (req, res) => {
     const buf = await readBody(req);
     const type = req.headers["content-type"] ?? "";
     const body = type.includes("application/json") && buf.length ? JSON.parse(buf.toString("utf8")) : type.includes("multipart/form-data") ? parseMultipart(buf, type) : {};
-    recorded.push({
+    const entry = {
       at: Date.now(),
       provider,
       method: req.method ?? "GET",
@@ -493,7 +510,10 @@ const server = createServer(async (req, res) => {
       headers: { "anthropic-beta": String(req.headers["anthropic-beta"] ?? ""), "content-type": type.split(";")[0] },
       body,
       raw: JSON.stringify(body),
-    });
+    };
+    recorded.push(entry);
+    // Für #fake:haengt: ob Freebie die Verbindung von sich aus geschlossen hat.
+    req.fakeEntry = entry;
     if (recorded.length > 5000) recorded.splice(0, 1000);
 
     const key = provider === "anthropic" ? req.headers["x-api-key"] : String(req.headers.authorization ?? "").replace(/^Bearer /, "");

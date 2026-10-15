@@ -562,12 +562,19 @@ export async function startAnswer(
       answerId = last.id;
       previousModelId = last.modelId;
       history = all.filter((r) => r.seq < last.seq && r.kind !== "system");
-      await db.execute(sql`
-        WITH v AS (${bump(chatId)})
+      // Nur, wenn die Antwort nicht inzwischen schon neu generiert wird (zwei Klicks gleichzeitig): sonst 409.
+      const res = await db.execute(sql`
+        WITH v AS (
+          UPDATE group_chats SET version = version + 1, updated_at = now()
+          WHERE id = ${chatId} AND EXISTS (SELECT 1 FROM group_chat_messages WHERE id = ${answerId} AND status <> 'pending')
+          RETURNING version
+        )
         UPDATE group_chat_messages SET status = 'pending', text = '', answer = NULL, native = NULL, asked_by = ${actor.name},
           model_id = ${opts.modelId}, effort = ${opts.effort}, web_search = ${opts.webSearch}, version = (SELECT version FROM v), updated_at = now()
-        WHERE id = ${answerId} AND chat_id = ${chatId}
+        WHERE id = ${answerId} AND chat_id = ${chatId} AND status <> 'pending' AND EXISTS (SELECT 1 FROM v)
+        RETURNING id
       `);
+      if (!rowsOf(res).length) throw new HttpError(409, BUSY);
     } else {
       const lastAnswer = [...all].reverse().find((r) => r.kind === "freebie");
       const trigger = [...all]

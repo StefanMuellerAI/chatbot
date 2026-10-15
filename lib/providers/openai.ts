@@ -11,15 +11,14 @@ import type {
 import type { PreparedMessage } from "@/lib/chat/prepare";
 import type { Citation, Effort } from "@/lib/shared/types";
 import {
-  addUsage,
-  emptyUsage,
   maxTokensFor,
   ProviderError,
+  UsageMeter,
+  WEB_SEARCH_COST_USD,
   type ProviderRequest,
   type ProviderResult,
 } from "./types";
 
-const WEB_SEARCH_COST_USD = 0.01;
 const MAX_ITERATIONS = 8;
 
 export const WEB_SEARCH_OFF_NOTE =
@@ -125,7 +124,7 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
   const openai = getOpenAI();
   const params = buildOpenAIRequest(req);
   const appended: ResponseInputItem[] = [];
-  let usage = emptyUsage();
+  const meter = req.meter ?? new UsageMeter();
   let text = "";
   let thinking = "";
   const citations: Citation[] = [];
@@ -137,6 +136,8 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
       text += "\n\n";
       req.emit({ type: "text", text: "\n\n" });
     }
+    // Die Eingabe-Tokens meldet OpenAI erst am Ende – bei einem Abbruch zählt nur die geschätzte Ausgabe.
+    meter.start();
     const stream = await openai.responses.create(
       { ...params, input: [...(params.input as ResponseInputItem[]), ...appended], stream: true },
       { signal: req.signal },
@@ -147,6 +148,7 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
       switch (event.type) {
         case "response.output_text.delta":
           text += event.delta;
+          meter.streamed(event.delta.length);
           req.emit({ type: "text", text: event.delta });
           break;
         case "response.refusal.delta":
@@ -154,6 +156,7 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
           break;
         case "response.reasoning_summary_text.delta":
           thinking += event.delta;
+          meter.streamed(event.delta.length);
           req.emit({ type: "thinking", text: event.delta });
           break;
         case "response.reasoning_summary_part.added":
@@ -167,6 +170,7 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
           req.emit({ type: "status", status: "Suche im Web …" });
           break;
         case "response.web_search_call.completed":
+          meter.webSearch();
           req.emit({ type: "status", status: null });
           break;
         case "response.output_item.added":
@@ -205,7 +209,7 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
     if (u) {
       const cached = u.input_tokens_details?.cached_tokens ?? 0;
       const written = u.input_tokens_details?.cache_write_tokens ?? 0;
-      usage = addUsage(usage, {
+      meter.finish({
         inputTokens: Math.max(0, u.input_tokens - cached - written),
         outputTokens: u.output_tokens,
         cacheReadTokens: cached,
@@ -220,9 +224,9 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
         thinking,
         citations,
         native: undefined,
-        usage,
+        usage: meter.total,
         stopReason: "refusal",
-        extraCostUsd: (usage.webSearches ?? 0) * WEB_SEARCH_COST_USD,
+        extraCostUsd: (meter.total.webSearches ?? 0) * WEB_SEARCH_COST_USD,
       };
     }
 
@@ -278,9 +282,9 @@ export async function runOpenAI(req: ProviderRequest): Promise<ProviderResult> {
     thinking,
     citations,
     native: { provider: "openai", model: req.model.modelId, items: appended },
-    usage,
+    usage: meter.total,
     stopReason,
-    extraCostUsd: (usage.webSearches ?? 0) * WEB_SEARCH_COST_USD,
+    extraCostUsd: (meter.total.webSearches ?? 0) * WEB_SEARCH_COST_USD,
   };
 }
 

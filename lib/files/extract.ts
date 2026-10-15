@@ -32,6 +32,11 @@ export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3.5);
 }
 
+/** ZIP-Container (xlsx, ods, docx, pptx …) erkennt man an „PK“ am Anfang. */
+function isZip(data: Uint8Array): boolean {
+  return data.length >= 2 && data[0] === 0x50 && data[1] === 0x4b;
+}
+
 /** Lehnt ZIP-basierte Dateien ab, deren entpackter Inhalt unverhältnismäßig groß ist. */
 export function assertZipSafe(data: Uint8Array): void {
   let total = 0;
@@ -75,7 +80,8 @@ async function extractByKind(data: Buffer, name: string, mime: string): Promise<
       assertZipSafe(data);
       return extractDocx(data);
     case "sheet":
-      if (["xlsx", "xlsm", "ods"].includes(extensionOf(name))) assertZipSafe(data);
+      // Nach Inhalt, nicht nach Endung: SheetJS liest ZIP auch als .xls oder .csv.
+      if (isZip(data)) assertZipSafe(data);
       return extractSheet(data, name);
     case "pptx":
       assertZipSafe(data);

@@ -2,7 +2,7 @@ import { HttpError, requireAdmin } from "@/lib/auth/session";
 import { fundusError } from "@/lib/fundus/api";
 import { assertFundusKey } from "@/lib/fundus/upload";
 import { extensionOf, FUNDUS_LIMITS, OWN_DOC_EXTENSIONS } from "@/lib/shared/fundus";
-import { putFile, storageMode } from "@/lib/storage";
+import { claimUploadKey, putFile, storageMode } from "@/lib/storage";
 
 /** Upload eigener Fundus-Dateien ohne Vercel Blob (lokale Entwicklung, Tests): Datei geht über den Server. */
 export async function POST(request: Request) {
@@ -20,7 +20,9 @@ export async function POST(request: Request) {
     if (!OWN_DOC_EXTENSIONS[ext] && ext !== "eml") throw new HttpError(400, "Dieses Format geht im Fundus nicht (Word, Excel, PowerPoint, PDF und .eml).");
     if (file.size === 0) throw new HttpError(400, "Die Datei ist leer.");
     if (file.size > FUNDUS_LIMITS.fileBytes) throw new HttpError(413, "Die Datei ist zu groß.");
-    // Vorgemerkt für einen Tag; „Speichern“ macht sie dauerhaft.
+    // Vorgemerkt für einen Tag; „Speichern“ macht sie dauerhaft. Ein vorhandener Pfad (etwa eine gespeicherte
+    // Fundus-Datei) wird nie überschrieben.
+    await claimUploadKey(key, "fundus", 1);
     await putFile(key, Buffer.from(await file.arrayBuffer()), file.type || "application/octet-stream", "fundus", 1);
     return Response.json({ key });
   } catch (err) {
