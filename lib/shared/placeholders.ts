@@ -66,6 +66,21 @@ function validName(name: string): boolean {
   return name.length >= 1 && name.length <= PROMPT_LIMITS.name && NAME.test(name);
 }
 
+/**
+ * Namen, die als Schlüssel eines Objekts Eingebautes treffen (`values.constructor` ist die Funktion `Object`):
+ * keine Platzhalter, sie bleiben mit Hinweis als Text stehen. Sonst bräche die Maske an solchen Prompts.
+ */
+const RESERVED = new Set(["__proto__", "constructor", "prototype"]);
+
+export function reservedName(name: string): boolean {
+  return RESERVED.has(placeholderKey(name));
+}
+
+/** Einstellungen eines Platzhalters – nur eigene Einträge, nie Geerbtes. */
+function settingFor(settings: PlaceholderSettings, key: string): PlaceholderSetting {
+  return Object.hasOwn(settings, key) ? settings[key] : {};
+}
+
 function position(text: string, index: number): string {
   const before = text.slice(0, index);
   const line = before.split("\n").length;
@@ -95,11 +110,13 @@ export function parsePrompt(text: string): ParsedPrompt {
     const end = start + m[0].length;
     const name = m[1].trim();
     const braced = text[start - 1] === "{" || text[end] === "}";
-    if (braced || !validName(name)) {
+    if (braced || !validName(name) || reservedName(name)) {
       warnings.push(
         braced
           ? `„${m[0]}“ hat zu viele geschweifte Klammern (${position(text, start)}) – bleibt als Text stehen.`
-          : `„${m[0]}“ ist kein gültiger Platzhalter (${position(text, start)}): erlaubt sind Buchstaben, Ziffern, Leerzeichen, - und _, höchstens ${PROMPT_LIMITS.name} Zeichen. Bleibt als Text stehen.`,
+          : validName(name)
+            ? `„${m[0]}“: dieser Name ist reserviert (${position(text, start)}) – bleibt als Text stehen.`
+            : `„${m[0]}“ ist kein gültiger Platzhalter (${position(text, start)}): erlaubt sind Buchstaben, Ziffern, Leerzeichen, - und _, höchstens ${PROMPT_LIMITS.name} Zeichen. Bleibt als Text stehen.`,
       );
       continue;
     }
@@ -134,7 +151,7 @@ export function parsePrompt(text: string): ParsedPrompt {
 /** Platzhalter des Texts mit den Einstellungen der Kursleitung (fehlende Angaben mit Standardwerten). */
 export function resolvePlaceholders(text: string, settings: PlaceholderSettings = {}): Placeholder[] {
   return parsePrompt(text).placeholders.map(({ key, name }) => {
-    const s = settings[key] ?? {};
+    const s = settingFor(settings, key);
     const type = s.type && PLACEHOLDER_TYPES.includes(s.type) ? s.type : "text";
     return {
       key,
@@ -196,7 +213,7 @@ export function validatePrompt(
   }
   const clean: PlaceholderSettings = {};
   for (const { key, name } of parsed.placeholders) {
-    const s = settings[key] ?? {};
+    const s = settingFor(settings, key);
     const type: PlaceholderType = s.type && PLACEHOLDER_TYPES.includes(s.type) ? s.type : "text";
     const label = (s.label ?? "").trim();
     const hint = (s.hint ?? "").trim();

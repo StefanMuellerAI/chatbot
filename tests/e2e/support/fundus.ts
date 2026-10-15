@@ -106,6 +106,67 @@ export class PromptMask {
   }
 }
 
+/** Admin › Fundus › Prompts › „Importieren“ (Plan: PROMPT-IMPORT-PLAN.md). */
+export class PromptImportDialog {
+  constructor(public readonly page: Page) {}
+
+  static async open(page: Page) {
+    await FundusAdminPage.open(page, "Prompts");
+    const d = new PromptImportDialog(page);
+    await page.getByRole("button", { name: "Importieren", exact: true }).click();
+    await expect(d.dialog).toBeVisible();
+    return d;
+  }
+
+  get dialog() {
+    return this.page.getByRole("dialog", { name: "Prompts importieren" });
+  }
+  get input() {
+    return this.dialog.getByLabel("Prompt-Bibliothek (JSON) auswählen");
+  }
+  /** Datei wählen: JSON-Objekt, Text oder Bytes. */
+  async choose(content: unknown, name = "bibliothek.json") {
+    const buffer = Buffer.isBuffer(content) ? content : Buffer.from(typeof content === "string" ? content : JSON.stringify(content, null, 2));
+    await this.input.setInputFiles({ name, mimeType: "application/json", buffer });
+  }
+  get summary() {
+    return this.dialog.getByRole("status");
+  }
+  get alert() {
+    return this.dialog.getByRole("alert");
+  }
+  get entries() {
+    return this.dialog.getByRole("list", { name: "Prompts in der Datei" }).locator("li[data-eintrag]");
+  }
+  entry(index: number) {
+    return this.dialog.locator(`li[data-eintrag="${index}"]`);
+  }
+  get category() {
+    return this.dialog.getByRole("combobox", { name: "Kategorie" });
+  }
+  get newName() {
+    return this.dialog.getByLabel("Name der neuen Kategorie");
+  }
+  get style() {
+    return this.dialog.getByRole("combobox", { name: "Schreibweise der Platzhalter in der Datei" });
+  }
+  get inactive() {
+    return this.dialog.getByRole("checkbox", { name: /Alle zunächst inaktiv importieren/ });
+  }
+  get confirm() {
+    return this.dialog.getByRole("checkbox", { name: /keine echten personenbezogenen/ });
+  }
+  get submit() {
+    return this.dialog.getByRole("button", { name: /^Importieren/ });
+  }
+  /** Bestätigen und importieren; wartet, bis der Dialog zu ist. */
+  async importAll() {
+    await this.confirm.check();
+    await this.submit.click();
+    await expect(this.dialog).toBeHidden();
+  }
+}
+
 /** Fundus-Dialog im Chat, Reiter „Prompts“. */
 export class PromptsTab {
   constructor(public readonly page: Page) {}

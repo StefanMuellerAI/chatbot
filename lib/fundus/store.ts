@@ -6,7 +6,8 @@ import { HttpError } from "@/lib/errors";
 import { fold } from "@/lib/library/search";
 import { LIBRARY_ID, type LibraryTag } from "@/lib/library/types";
 import { FUNDUS_LIMITS } from "@/lib/shared/fundus";
-import { type PlaceholderSettings, validatePrompt } from "@/lib/shared/placeholders";
+import { type PlaceholderSettings } from "@/lib/shared/placeholders";
+import { checkPromptFields, type PromptFields, titleKey } from "@/lib/shared/prompt-import";
 import { deleteFiles } from "@/lib/storage";
 
 // Eigene Inhalte, ausgeblendete mitgelieferte Einträge, Kategorien und Prompts (Plan: FUNDUS-PFLEGE-PLAN.md).
@@ -184,19 +185,13 @@ export async function listPrompts(opts: { includeDisabled?: boolean } = {}): Pro
 }
 
 async function checkPrompt(input: PromptInput): Promise<{ title: string; description: string; placeholders: PlaceholderSettings }> {
-  const title = input.title.replace(/\s+/g, " ").trim();
-  if (!title) throw new HttpError(400, "Titel: darf nicht leer sein");
-  if (title.length > FUNDUS_LIMITS.promptTitle) throw new HttpError(400, `Titel: höchstens ${FUNDUS_LIMITS.promptTitle} Zeichen`);
-  const description = input.description.trim();
-  if (description.length > FUNDUS_LIMITS.promptDescription) {
-    throw new HttpError(400, `Kurzbeschreibung: höchstens ${FUNDUS_LIMITS.promptDescription} Zeichen`);
-  }
+  const checked = checkPromptFields(input);
+  if (checked.fieldErrors.length) throw new HttpError(400, checked.fieldErrors[0]);
   const db = await getDb();
   const cat = await db.select({ id: schema.promptCategories.id }).from(schema.promptCategories).where(eq(schema.promptCategories.id, input.categoryId)).limit(1);
   if (!cat.length) throw new HttpError(400, "Kategorie: bitte eine vorhandene Kategorie wählen.");
-  const checked = validatePrompt(input.text, input.placeholders);
   if (checked.errors.length) throw new HttpError(400, checked.errors[0]);
-  return { title, description, placeholders: checked.settings };
+  return checked.clean;
 }
 
 async function nextSortOrder(categoryId: string): Promise<number> {
@@ -275,6 +270,113 @@ export async function deletePrompt(id: string): Promise<void> {
   const deleted = await db.delete(schema.prompts).where(eq(schema.prompts.id, id)).returning({ id: schema.prompts.id });
   if (!deleted.length) throw new HttpError(404, "Prompt nicht gefunden.");
   await bumpRevision();
+}
+
+// ---------------------------------------------------------------- Import (Plan: PROMPT-IMPORT-PLAN.md)
+
+export interface ImportTarget {
+  categoryId: string | null;
+  newCategory: string | null;
+}
+
+export interface ImportResult {
+  categoryId: string | null;
+  categoryName: string;
+  created: number;
+  skipped: { title: string; reason: string }[];
+}
+
+/** Importe nacheinander (je Server-Instanz): ein zweiter sieht die Prompts des ersten als Dubletten. */
+let importQueue: Promise<unknown> = Promise.resolve();
+
+function serialized<T>(work: () => Promise<T>): Promise<T> {
+  const run = importQueue.then(work, work);
+  importQueue = run.catch(() => undefined);
+  return run;
+}
+
+/**
+ * Legt Prompts in einer Kategorie an (ggf. neu): alles oder nichts. Einträge mit Fehlern weist der Server ab – der
+ * Browser schickt nur geprüfte. Dubletten (gleicher Titel in der Kategorie oder weiter oben) werden übersprungen.
+ */
+export function importPrompts(entries: PromptFields[], target: ImportTarget, opts: { inactive: boolean }): Promise<ImportResult> {
+  return serialized(async () => {
+    const clean = entries.map((e, i) => {
+      const checked = checkPromptFields(e);
+      if (checked.errors.length) throw new HttpError(400, `Eintrag ${i + 1} („${checked.clean.title || "ohne Titel"}“): ${checked.errors[0]}`);
+      return { ...checked.clean, enabled: opts.inactive ? false : checked.clean.enabled };
+    });
+
+    const db = await getDb();
+    const categories = await db.select().from(schema.promptCategories);
+    let categoryId: string;
+    let categoryName: string;
+    const isNew = !target.categoryId;
+    if (target.categoryId) {
+      const cat = categories.find((c) => c.id === target.categoryId);
+      if (!cat) throw new HttpError(409, "Die Kategorie gibt es nicht mehr – bitte neu wählen.");
+      categoryId = cat.id;
+      categoryName = cat.name;
+    } else {
+      if (categories.length >= FUNDUS_LIMITS.categories) throw new HttpError(400, `Höchstens ${FUNDUS_LIMITS.categories} Kategorien.`);
+      categoryName = checkCategoryName(target.newCategory ?? "", categories);
+      categoryId = newId("kat", categoryName);
+    }
+
+    const existing = isNew
+      ? []
+      : await db.select({ title: schema.prompts.title }).from(schema.prompts).where(eq(schema.prompts.categoryId, categoryId));
+    const seen = new Set(existing.map((p) => titleKey(p.title)));
+    const skipped: ImportResult["skipped"] = [];
+    const toCreate = [];
+    for (const e of clean) {
+      const key = titleKey(e.title);
+      if (seen.has(key)) {
+        skipped.push({ title: e.title, reason: "gibt es schon" });
+        continue;
+      }
+      seen.add(key);
+      toCreate.push({ id: newId("prompt", e.title), ...e });
+    }
+    if (toCreate.length === 0) return { categoryId: isNew ? null : categoryId, categoryName, created: 0, skipped };
+
+    const full = (count: number) =>
+      new HttpError(
+        400,
+        `Platz für noch ${nf.format(Math.max(0, FUNDUS_LIMITS.prompts - count))} Prompts – die Datei enthält ${nf.format(toCreate.length)} importierbare. Bitte aufteilen oder Prompts löschen.`,
+      );
+    const countAll = async () => Number(rows<{ n: number | string }>(await db.execute(sql`SELECT count(*) AS n FROM prompts`))[0]?.n ?? 0);
+    const before = await countAll();
+    if (before + toCreate.length > FUNDUS_LIMITS.prompts) throw full(before);
+
+    // Eine Anweisung legt Kategorie und Prompts an – ohne Transaktion (Neon über HTTP) trotzdem alles oder nichts.
+    const payload = JSON.stringify(
+      toCreate.map((r, i) => ({ id: r.id, title: r.title, description: r.description, text: r.text, placeholders: r.placeholders, enabled: r.enabled, ord: i + 1 })),
+    );
+    await db.execute(sql`
+      WITH cat AS (
+        INSERT INTO prompt_categories (id, name, sort_order)
+        SELECT ${categoryId}, ${categoryName}, coalesce((SELECT max(sort_order) FROM prompt_categories), 0) + 10
+        WHERE ${isNew}
+        RETURNING id
+      )
+      INSERT INTO prompts (id, category_id, title, description, text, placeholders, enabled, sort_order)
+      SELECT v.id, ${categoryId}, v.title, v.description, v.text, v.placeholders, v.enabled,
+             coalesce((SELECT max(sort_order) FROM prompts WHERE category_id = ${categoryId}), 0) + v.ord * 10
+      FROM jsonb_to_recordset(${payload}::jsonb)
+        AS v(id text, title text, description text, text text, placeholders jsonb, enabled boolean, ord int)`);
+
+    // Mehrere Server-Instanzen gleichzeitig: wer danach über der Grenze liegt, nimmt seinen Import zurück.
+    const after = await countAll();
+    if (after > FUNDUS_LIMITS.prompts) {
+      await db.delete(schema.prompts).where(inArray(schema.prompts.id, toCreate.map((r) => r.id)));
+      if (isNew) await db.delete(schema.promptCategories).where(eq(schema.promptCategories.id, categoryId));
+      await bumpRevision();
+      throw full(after - toCreate.length);
+    }
+    await bumpRevision();
+    return { categoryId, categoryName, created: toCreate.length, skipped };
+  });
 }
 
 // ---------------------------------------------------------------- Eigene Dokumente und Verläufe

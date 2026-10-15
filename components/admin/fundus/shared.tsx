@@ -103,13 +103,13 @@ export function Badge({ tone = "neutral", children }: { tone?: "neutral" | "prim
 }
 
 /** Bestätigung „keine echten Daten“ – ohne sie lässt sich nichts speichern. */
-export function ConfirmReal({ checked, onChange, files }: { checked: boolean; onChange: (v: boolean) => void; files: string }) {
+export function ConfirmReal({ checked, onChange, files, sent = "beim Anhängen" }: { checked: boolean; onChange: (v: boolean) => void; files: string; sent?: string }) {
   return (
     <label className="flex items-start gap-2 rounded-2xl border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
       <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--primary)]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
       <span>
-        {files} enthalten keine echten personenbezogenen oder vertraulichen Daten. Eigene Inhalte bleiben gespeichert, bis du sie löschst, und gehen beim
-        Anhängen an die KI-Anbieter.
+        {files} enthalten keine echten personenbezogenen oder vertraulichen Daten. Eigene Inhalte bleiben gespeichert, bis du sie löschst, und gehen {sent} an
+        die KI-Anbieter.
       </span>
     </label>
   );
