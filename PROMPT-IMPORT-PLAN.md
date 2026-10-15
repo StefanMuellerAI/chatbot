@@ -1,6 +1,7 @@
 # Plan: Prompt-Bibliotheken importieren
 
-Stand: 15. Oktober 2026, **Entwurf** – offene Entscheidungen in Abschnitt 12 · Grundlage: Code vom 15. Oktober 2026
+Stand: 15. Oktober 2026, **umgesetzt** (Stand und Abweichungen in Abschnitt 11) · Entscheidungen in Abschnitt 12 ·
+Grundlage: Code vom 15. Oktober 2026
 nach PR #8 (Prompts in `lib/fundus/store.ts`, `lib/fundus/api.ts`, `app/api/admin/fundus/prompts`; Platzhalter in
 `lib/shared/placeholders.ts`; Admin-Oberfläche in `components/admin/fundus`), Vorgänger:
 [FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md) (dort in Abschnitt 15 als „später möglich“ geführt), E2E-Suite aus
@@ -176,13 +177,14 @@ Ausnahme, egal was in der Datei steht.
 
 - **Fehler** (Eintrag wird übersprungen): kein Objekt, Titel oder Text fehlt/leer, Grenzen überschritten, mehr als 20
   Platzhalter, Auswahl mit weniger als 2 oder mehr als 20 Werten, doppelte Werte, Standard nicht unter den Werten,
-  unbekannte `art`, falscher Typ (z. B. `"werte": "3, 5"`), **reservierte Platzhalternamen** (Abschnitt 10).
+  unbekannte `art`, falscher Typ (z. B. `"werte": "3, 5"`).
 - **Gibt es schon** (übersprungen): gleicher Titel (ohne Groß/klein, ä = ae) schon in der **Zielkategorie** oder
   **früher in derselben Datei**. Hängt von der Kategorie ab und wird beim Wechsel neu bewertet (Entscheidung 4).
 - **Hinweise** (Eintrag wird importiert): unbekannte Felder, `kategorie` ignoriert, Einstellungen ohne Platzhalter,
   Stellen, die wie Platzhalter aussehen und keine sind (vorhandene Warnungen von `parsePrompt`), **echte Daten**
   (`realDataHints`: echte Mail-Domains, gültige IBANs, Telefonnummern), **Text ohne Platzhalter, aber mit `[…]`**
-  („Sollen das Platzhalter sein? Wähle oben die Schreibweise.“, Entscheidung 6).
+  („Sollen das Platzhalter sein? Wähle oben die Schreibweise.“, Entscheidung 6), **reservierte Platzhalternamen**
+  (bleiben Text, Abschnitt 10).
 
 **Ablauf technisch**
 
@@ -277,8 +279,8 @@ Dazu:
   (> 4 MB), `prompts-501.json`.
 - **`AdminApi`**: `importPrompts(einträge, ziel, optionen)`; Seitenobjekt `PromptImportDialog` in `support/fundus.ts`.
 - **`coverage.json`**: neue Route, neue Bedienelemente („Muster herunterladen“, „Importieren“, Dialogfelder).
-- **WebKit und Firefox**: FP-Tests laufen wie alle Admin-Tests in Chromium; PR14 läuft auch in `chat-webkit` und
-  `chat-firefox`.
+- **WebKit und Firefox**: FP-Tests laufen wie alle Admin-Tests in Chromium; PR14 legt einen Prompt an und läuft
+  deshalb ebenfalls im Projekt `admin`.
 
 ## 9. Dokumentation
 
@@ -303,11 +305,12 @@ Außerdem gehen beim Speichern die Einstellungen eines Platzhalters `__proto__` 
 Prototyp statt eines Eintrags). Lokal nachgestellt mit `validatePrompt` und der Logik aus `initialValues`.
 
 Heute kann das nur passieren, wenn die Kursleitung so einen Platzhalter selbst anlegt; mit importierten fremden
-Sammlungen wird es wahrscheinlicher. **Behebung in Phase 1:** `__proto__`, `constructor` und `prototype` als
-Platzhalternamen ablehnen („Dieser Name ist reserviert.“), Werte und Einstellungen in Objekten ohne Prototyp bzw. mit
-`Object.hasOwn` nachschlagen, damit auch Alt-Bestände in der Datenbank die Maske nicht mehr brechen (PR14).
+Sammlungen wird es wahrscheinlicher. **Behoben:** `__proto__`, `constructor` und `prototype` sind keine Platzhalter –
+sie bleiben wie ungültige Namen mit Hinweis als Text stehen („dieser Name ist reserviert“). Weil das schon beim Zerlegen
+des Texts greift, brechen auch Alt-Bestände in der Datenbank die Maske nicht mehr (PR14); Einstellungen werden nur aus
+eigenen Feldern gelesen (`Object.hasOwn`). Fehler 81 im TESTPLAN.
 
-## 11. Umsetzung in Phasen
+## 11. Umsetzung in Phasen, Stand und Abweichungen
 
 | Phase | Inhalt | Tests |
 |---|---|---|
@@ -320,9 +323,29 @@ Platzhalternamen ablehnen („Dieser Name ist reserviert.“), Werte und Einstel
 Umfang: deutlich kleiner als „Fundus pflegen“ – keine neuen Tabellen, keine Dateiablage, ein neuer Dialog und eine
 neue Route.
 
-## 12. Offene Entscheidungen
+**Stand (15. Oktober 2026): alle Phasen umgesetzt.** Unit-Tests 275 (30 neu), E2E 429 in 36 Dateien (12 neu:
+FP20–FP29 mit FP28 hell und dunkel, PR14); FP16 und W09 erweitert; Abdeckungsprüfung vollständig.
 
-| # | Frage | Empfehlung |
+Abweichungen vom Entwurf:
+
+- **Reservierte Platzhalternamen** sind kein Fehler, sondern bleiben mit Hinweis als Text stehen (wie ungültige Namen).
+  So schützt dieselbe Regel auch Prompts, die schon in der Datenbank liegen.
+- **Alles oder nichts ohne Transaktion:** Neon über HTTP kennt keine Transaktionen. Eine einzige SQL-Anweisung legt
+  Kategorie und Prompts an; Importe laufen je Server-Instanz nacheinander (ein zweiter sieht die Prompts des ersten
+  als Dubletten). Laufen mehrere Instanzen gleichzeitig und liegt der Bestand danach über 500, nimmt der Import sich
+  selbst zurück.
+- **Export ohne eigene Route:** Die Datei entsteht im Browser aus der Admin-Übersicht, die ohnehin alle Prompts kennt.
+- **Testdateien** entstehen im Test selbst (`admin-prompt-import.spec.ts`) statt in `generate-files.ts`.
+- **Nebenbei behoben (Fehler 82):** Auf `main` lief PR09 in WebKit ins Zeitlimit. Ursache war die Weichzeichnung
+  hinter Dialogen (`backdrop-filter`), die ohne Grafikkarte bis zu einer Sekunde pro Bild kostet – auch auf Thin
+  Clients und Remote-Desktops. Dialoge dunkeln den Hintergrund jetzt nur noch ab; die Prompt-Tests brauchen in WebKit
+  13–30 statt 27–84 Sekunden.
+
+## 12. Entscheidungen
+
+Getroffen am 15. Oktober 2026: alle Empfehlungen übernommen.
+
+| # | Frage | Entscheidung |
 |---|---|---|
 | 1 | Feldnamen im Muster deutsch (`titel`, `text`, `platzhalter` …) oder englisch? | **Deutsch** – die Datei soll ohne Handbuch verständlich sein; englische Namen werden zusätzlich gelesen |
 | 2 | Neue Kategorie direkt im Import-Dialog anlegen? | **Ja**, Name aus der Datei oder dem Dateinamen vorgeschlagen |

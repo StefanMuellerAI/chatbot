@@ -12,7 +12,9 @@ Teilnehmende ohne eigenes ChatGPT- oder Claude-Konto mit aktuellen KI-Modellen a
   Admin, Plan: [FUNDUS-PLAN.md](FUNDUS-PLAN.md)). Die Kursleitung pflegt den Fundus im Admin: **eigene Dokumente**
   (Word, Excel, PowerPoint, PDF) und **E-Mail-Verläufe** (`.eml`) hochladen, mitgelieferte Einträge ausblenden und
   **Prompts mit Platzhaltern** in Kategorien anlegen. Teilnehmende füllen einen Prompt in einer Maske aus (jedes Feld
-  ist Pflicht) und bekommen den fertigen Text ins Eingabefeld (Plan: [FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md))
+  ist Pflicht) und bekommen den fertigen Text ins Eingabefeld (Plan: [FUNDUS-PFLEGE-PLAN.md](FUNDUS-PFLEGE-PLAN.md)).
+  Ganze **Prompt-Bibliotheken** lassen sich als JSON importieren (Musterdatei zum Herunterladen, Prüfschritt, Kategorie
+  wählen oder neu anlegen) und im selben Format exportieren (Plan: [PROMPT-IMPORT-PLAN.md](PROMPT-IMPORT-PLAN.md))
 - **Audio-Transkription** (MP3, M4A, WAV …) und **Spracheingabe** per Mikrofon
 - **Bildgenerierung** im Chat (auch mit Claude) und im Bild-Modus, inkl. Bearbeitung hochgeladener Bilder
 - **Artefakte**: HTML-Seiten, Charts, Mermaid-Diagramme, SVG und Dokumente im Seitenpanel mit Vorschau und Download
@@ -137,7 +139,7 @@ app/                 Seiten (Chat, Login, Admin) und API-Routen
   api/transcribe     Audio in Etappen: start (ffmpeg teilt) → chunk (parallel) → finish
   api/library        Fundus: Katalog, Vorschau, Download, Anhängen (mitgeliefert aus .library/, eigene aus Postgres und Blob)
   api/admin          Modelle, Einstellungen, Vorlagen, Sicherheit, Übersicht, Termine
-  api/admin/fundus   Fundus pflegen: Upload nach fundus/, Prüfen, eigene Dokumente und Verläufe, Prompts, Kategorien, Ausblenden
+  api/admin/fundus   Fundus pflegen: Upload nach fundus/, Prüfen, eigene Dokumente und Verläufe, Prompts (auch Import), Kategorien, Ausblenden
   api/mail           Posteingang: Liste, Lesen, Senden, Markieren, Löschen, Adressbuch
   api/groupchats     Gruppenchats: Starten, Mitglieder, Beiträge, Abfrage „seit Stand n“, Antwort von Freebie (SSE)
   api/status         gemeinsame Abfrage alle 15 s: neue Mails und Gruppenchats (Einladungen, Neues)
@@ -149,6 +151,7 @@ lib/chat             System-Prompt, Aufbereitung der Nachrichten, Antwort-Cache,
 lib/db               Drizzle-Schema, Bootstrap (CREATE TABLE IF NOT EXISTS), Startbelegung (inkl. 12 Start-Prompts)
 lib/fundus           Eigene Fundus-Inhalte: Speichern, Prüfen und Vorschau beim Hochladen, Hinweise auf echte Daten
 lib/shared/placeholders.ts  Platzhalter {{Name}} in Prompts: Parsen, Prüfen, Ausfüllen (Browser und Server)
+lib/shared/prompt-import.ts Prompt-Bibliotheken als JSON: Musterdatei, Lesen und Prüfen beim Import, Export
 components/          Chat-Oberfläche, Posteingang (components/mail), Gruppenchats (components/groupchat), Artefakt-Panel, Fundus-Dialog, Admin-Oberfläche, UI-Bausteine
 library/             Fundus: erfundenes Weltmodell, Inhalte als Daten und der Generator für .docx/.xlsx/.pptx/.eml
 proxy.ts             Schützt alle Seiten und APIs per signiertem Sitzungs-Cookie

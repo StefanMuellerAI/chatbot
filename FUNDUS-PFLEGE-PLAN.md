@@ -664,7 +664,8 @@ Abweichungen vom Plan:
 - **Prompts auf der Startseite** („Übung des Tages“, Entwurf 4) und **`/` im Eingabefeld** (Entwurf 2). Beides baut auf
   diesem Plan auf und ist danach klein.
 - **Fundus je Termin oder Gruppe** (Teilmengen), schon im Fundus-Plan zurückgestellt.
-- **Export/Import des Fundus** (Sicherung, Umzug zwischen Umgebungen), Prompts per CSV.
+- **Export/Import des Fundus** (Sicherung, Umzug zwischen Umgebungen), Prompts per CSV. *Prompts als JSON importieren
+  und exportieren ist inzwischen umgesetzt: [PROMPT-IMPORT-PLAN.md](PROMPT-IMPORT-PLAN.md).*
 - **Bilder, Scans mit Texterkennung, `.msg`, `.doc`/`.xls`/`.ppt`**; Datei ersetzen (Entscheidung 5).
 - **Versionen und Statistik** von Prompts (wer hat was wie oft genutzt).
 

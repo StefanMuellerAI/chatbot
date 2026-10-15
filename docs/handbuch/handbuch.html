@@ -63,7 +63,7 @@
   <li><strong>Termin anlegen.</strong> Im Admin-Bereich unter <span class="ui">Termine</span> einen Termin mit Datum, Beginn und Ende anlegen (höchstens 24 Stunden). → Kapitel 3.3</li>
   <li><strong>Gruppen und Gäste erzeugen.</strong> Pro Gruppe die Anzahl der Gäste angeben – Freebie erzeugt sofort einfache Zugangsdaten.</li>
   <li><strong>Zugangsdaten verteilen.</strong> Kärtchen drucken und ausschneiden oder die Liste als CSV für Excel herunterladen.</li>
-  <li><strong>Fundus vorbereiten (optional).</strong> Unter <span class="ui">Fundus</span> eigene Übungsdateien und E-Mail-Verläufe hochladen, Prompts für die Übungen anlegen und unpassende mitgelieferte Einträge ausblenden. → Kapitel 3.7</li>
+  <li><strong>Fundus vorbereiten (optional).</strong> Unter <span class="ui">Fundus</span> eigene Übungsdateien und E-Mail-Verläufe hochladen, Prompts für die Übungen anlegen oder eine vorhandene Sammlung importieren und unpassende mitgelieferte Einträge ausblenden. → Kapitel 3.7</li>
   <li><strong>Gäste melden sich an.</strong> Ab 30 Minuten vor Beginn mit Benutzername und Passwort auf freebie.stefanai.de. → Kapitel 2.1</li>
   <li><strong>Während der Schulung</strong> zeigt die Übersicht Anfragen und Kosten; bei Bedarf hilft der <span class="ui">Not-Aus</span> (alle pausieren) oder <span class="ui">Jetzt beenden</span>. Übungsaufgaben kann die Kursleitung per Rundmail in die Posteingänge schicken; für Gruppenübungen sammeln die Gäste Notizen in einem Gruppenchat und lassen sie mit <strong>@Freebie</strong> zusammenfassen. → Kapitel 2.13 und 2.15</li>
   <li><strong>Nach dem Termin</strong> verfallen alle Gast-Zugänge automatisch. Zehn Minuten vorher werden die Gäste gewarnt und können ihre Chats exportieren. Kosten und Anfragen bleiben 90 Tage in der Statistik.</li>
@@ -754,6 +754,43 @@
   </ul>
 </div>
 
+<h3>Prompt-Bibliotheken importieren und exportieren</h3>
+<p>Wer schon Prompt-Sammlungen hat (Word-Listen, Notizen, andere Werkzeuge), muss sie nicht einzeln abtippen. Im Unterreiter <span class="ui">Prompts</span> gibt es dafür drei Knöpfe:</p>
+<ol>
+  <li><span class="ui">Muster herunterladen</span> liefert <code>freebie-prompts-muster.json</code>: eine kurze Anleitung und drei Beispiele – mit einfachen Platzhaltern, mit Auswahlliste und mehrzeiligem Feld, ohne Platzhalter.</li>
+  <li>Die eigene Sammlung in dieses Format bringen (Tipp unten) und als <strong>UTF-8</strong> speichern.</li>
+  <li><span class="ui">Importieren</span> öffnet den Dialog. Datei wählen oder hineinziehen – Freebie prüft sofort, ohne etwas zu speichern.</li>
+</ol>
+<div class="cols" style="grid-template-columns: 1fr 1fr; align-items: start">
+  <figure style="margin-top: 0"><img src="shots/a21-prompt-import.jpg"><figcaption><b>Prüfschritt beim Import:</b> Schreibweise <code>[Name]</code> gewählt, zwei Prompts bereit, eine Dublette, ein Fehler; Vorschau des ersten aufgeklappt.</figcaption></figure>
+  <div>
+    <ul class="small" style="margin-top: 0">
+      <li>Oben steht die Zusammenfassung, z. B. „4 Prompts in der Datei: 2 werden importiert, 1 gibt es schon, 1 hat Fehler.“ Darunter jeder Eintrag mit Zahl der Platzhalter und Zustand: <strong>bereit</strong>, <strong>gibt es schon</strong> (gleicher Titel in der Kategorie oder weiter oben in der Datei) oder <strong>Fehler</strong> mit Grund. Beides wird übersprungen.</li>
+      <li><strong>Hinweise</strong> halten nichts auf: echte Daten (E-Mail-Adresse, IBAN, Telefonnummer), Einstellungen ohne passenden Platzhalter, unbekannte Felder.</li>
+      <li><span class="ui">Schreibweise der Platzhalter</span>: Viele Sammlungen schreiben <code>[THEMA]</code>, <code>{Thema}</code> oder <code>&lt;Thema&gt;</code>. Freebie wandelt sie in <code>{{THEMA}}</code> um; die Vorschau zeigt das Ergebnis. Links, Fußnoten wie <code>[1]</code> und HTML wie <code>&lt;br&gt;</code> bleiben unberührt.</li>
+      <li><span class="ui">Kategorie</span>: eine vorhandene oder <span class="ui">Neue Kategorie …</span> (Name aus der Datei vorgeschlagen). Alle Prompts der Datei kommen dorthin, ans Ende, in der Reihenfolge der Datei.</li>
+      <li><span class="ui">Alle zunächst inaktiv importieren</span>: Teilnehmende sehen die Prompts erst, wenn du sie einschaltest.</li>
+      <li>Wie beim Hochladen ist die Bestätigung „keine echten Daten“ nötig. Dann <span class="ui">Importieren (n Prompts)</span>.</li>
+    </ul>
+  </div>
+</div>
+<table class="plain">
+  <thead><tr><th style="width: 30%">Feld in der Datei</th><th>Bedeutung</th></tr></thead>
+  <tbody>
+    <tr><td><code>titel</code>, <code>text</code></td><td>Pflicht. Titel höchstens 80 Zeichen, Text höchstens 8.000 mit Platzhaltern wie <code>{{Zielgruppe}}</code></td></tr>
+    <tr><td><code>beschreibung</code></td><td>freiwillig, höchstens 200 Zeichen</td></tr>
+    <tr><td><code>platzhalter</code></td><td>freiwillig, je Platzhalter unter seinem Namen: <code>beschriftung</code>, <code>hinweis</code>, <code>art</code> (einzeilig, mehrzeilig, auswahl), <code>werte</code> (bei auswahl 2–20), <code>standard</code></td></tr>
+    <tr><td><code>aktiv</code></td><td>freiwillig, <code>true</code> (Standard) oder <code>false</code></td></tr>
+    <tr><td><code>kategorie</code> und andere Felder</td><td>werden ignoriert – die Kategorie wählst du beim Import</td></tr>
+  </tbody>
+</table>
+<p class="small"><strong>Häufige Meldungen:</strong> „kein gültiges JSON (Zeile 12, Spalte 5)“ – meist ein Komma nach dem letzten Eintrag oder fehlende Anführungszeichen. „nicht als UTF-8 gespeichert“ – im Editor als UTF-8 speichern (Excel und ältere Editoren speichern sonst Umlaute anders). „Platz für noch 37 Prompts“ – Freebie fasst höchstens 500 Prompts; Datei aufteilen oder Prompts löschen. Eine Datei darf höchstens 4 MB groß sein.</p>
+<p><strong>Exportieren:</strong> <span class="ui">Alle exportieren</span> und das Symbol neben jeder Kategorie speichern die Prompts im selben Format – als Sicherung, zum Weitergeben an andere Kursleitungen oder zum Umzug in eine andere Freebie-Umgebung. Eine exportierte Datei lässt sich unverändert wieder importieren.</p>
+<div class="box tip">
+  <span class="t">Sammlung mit Freebie umwandeln</span>
+  <p>Musterdatei und eigene Liste (Word, Excel, Text) im Chat anhängen und schreiben: „Bring meine Prompts in das Format dieser Musterdatei. Platzhalter wie [THEMA] schreibst du als {{THEMA}}. Gib nur das JSON aus.“ Das Ergebnis in eine Datei mit der Endung <code>.json</code> kopieren, als UTF-8 speichern und importieren – der Prüfschritt zeigt, ob alles passt.</p>
+</div>
+
 <h2 id="k3-8"><span class="num">3.8</span>Sicherheit</h2>
 <figure class="w60"><img src="shots/a15-sicherheit.jpg"><figcaption><b>Reiter „Sicherheit“.</b></figcaption></figure>
 <ul>
@@ -870,7 +907,9 @@
 <h4>Eine eigene Datei fehlt im Fundus der Teilnehmenden.</h4>
 <p>Ist sie inaktiv (Kennzeichen „inaktiv“)? Dann im Reiter <span class="ui">Fundus</span> den Aktiv-Schalter einschalten. Teilnehmende sehen Änderungen, sobald sie den Fundus erneut öffnen. Ein Anhang eines inaktiven Verlaufs ist ebenfalls unsichtbar.</p>
 <h4>Ein Platzhalter erscheint nicht als Feld.</h4>
-<p>Er braucht doppelte geschweifte Klammern und einen gültigen Namen: <code>{{Zielgruppe}}</code>, nicht <code>{Zielgruppe}</code> oder <code>[Zielgruppe]</code>; erlaubt sind Buchstaben, Ziffern, Leerzeichen, - und _. Der Prompt-Dialog warnt bei ungültigen Namen und offenen Klammern mit Zeilenangabe.</p>
+<p>Er braucht doppelte geschweifte Klammern und einen gültigen Namen: <code>{{Zielgruppe}}</code>, nicht <code>{Zielgruppe}</code> oder <code>[Zielgruppe]</code>; erlaubt sind Buchstaben, Ziffern, Leerzeichen, - und _. Der Prompt-Dialog warnt bei ungültigen Namen und offenen Klammern mit Zeilenangabe. Die Namen <code>constructor</code>, <code>prototype</code> und <code>__proto__</code> sind reserviert und bleiben Text. Kommen die Prompts aus einem Import mit <code>[Name]</code>, im Import-Dialog die passende Schreibweise wählen.</p>
+<h4>Wie übernehme ich meine vorhandene Prompt-Sammlung?</h4>
+<p>Admin → Fundus → Prompts → <span class="ui">Muster herunterladen</span>, die Sammlung in dieses Format bringen (auch mit Freebie, Tipp in Kapitel 3.7) und über <span class="ui">Importieren</span> einlesen. Der Prüfschritt zeigt vorher jeden Eintrag; nichts wird gespeichert, bevor du <span class="ui">Importieren</span> klickst.</p>
 <h4>Outlook speichert nur .msg-Dateien.</h4>
 <p>Die Mail öffnen und über <span class="ui">Datei › Speichern unter</span> den Dateityp „Outlook-Nachricht (.eml)“ wählen bzw. in neueren Versionen die Mail aus der Liste in einen Ordner ziehen. Freebie lehnt .msg mit genau diesem Tipp ab.</p>
 <h4>Warum kostet eine Antwort nichts?</h4>

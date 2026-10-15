@@ -787,6 +787,45 @@ export async function takeScreenshots({ browser, baseURL, admin, outDir, filesDi
     await adminPage.setViewportSize({ width: 1280, height: 800 });
   });
 
+  await step("Prompts importieren", async () => {
+    await sub("Prompts");
+    await adminPage.getByRole("button", { name: "Importieren", exact: true }).click();
+    const dialog = adminPage.getByRole("dialog", { name: "Prompts importieren" });
+    const library = {
+      format: "freebie-prompts",
+      version: 1,
+      name: "Bürgerservice",
+      prompts: [
+        {
+          titel: "Terminbestätigung schreiben",
+          beschreibung: "Kurz, freundlich, mit allen Angaben.",
+          text: "Schreibe eine Terminbestätigung für [NAME] am [DATUM] um [UHRZEIT] im Bürgerbüro. Nenne, welche Unterlagen mitzubringen sind.",
+          platzhalter: { "[NAME]": { hinweis: "z. B. Frau Lind" } },
+        },
+        { titel: "Antwort auf eine Beschwerde", text: "Antworte sachlich und wertschätzend auf die Beschwerde über [THEMA]. Biete ein Gespräch an." },
+        { titel: "Antwort auf eine Beschwerde", text: "Doppelt eingefügt." },
+        { titel: "Gebühren erklären", text: "Erkläre die Gebühr für [LEISTUNG] in [STIL] Sprache.", platzhalter: { "[STIL]": { art: "auswahl", werte: ["einfacher"] } } },
+      ],
+    };
+    try {
+      await dialog.getByLabel("Prompt-Bibliothek (JSON) auswählen").setInputFiles({
+        name: "buergerservice.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify(library, null, 2)),
+      });
+      await dialog.getByRole("combobox", { name: "Schreibweise der Platzhalter in der Datei" }).selectOption("eckig");
+      await dialog.locator('li[data-eintrag="0"]').getByRole("button", { name: "Vorschau" }).click();
+      await dialog.getByRole("checkbox", { name: /keine echten personenbezogenen/ }).check();
+      await adminPage.setViewportSize({ width: 1280, height: 1500 });
+      await dialog.locator(".overflow-y-auto").first().evaluate((el) => (el.scrollTop = 0));
+      await adminPage.waitForTimeout(400);
+      await shot(dialog, "a21-prompt-import");
+    } finally {
+      await dialog.getByRole("button", { name: "Abbrechen" }).click();
+      await adminPage.setViewportSize({ width: 1280, height: 800 });
+    }
+  });
+
   await step("Kategorien", async () => {
     await sub("Kategorien");
     await fullShot(adminPage, "a20-kategorien");

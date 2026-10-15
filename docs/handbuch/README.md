@@ -50,7 +50,7 @@ für Teilnehmende.
 - Im Testmodus entstehen keine Kosten. Für Übersicht und Termine setzt das Skript im Browser deshalb
   Beispielzahlen und den Systemstatus einer Live-Installation ein. Die Druckkärtchen zeigen „freebie.stefanai.de“.
 - Der Bild-Modus liefert im Testmodus ein Platzhalterbild. Die Bildunterschrift im Handbuch sagt das.
-- Für Prompts und „Fundus pflegen“ (`c38`–`c40`, `a16`–`a20`) lädt das Skript über die Admin-API ein eigenes
+- Für Prompts und „Fundus pflegen“ (`c38`–`c40`, `a16`–`a21`) lädt das Skript über die Admin-API ein eigenes
   Word-Dokument und einen E-Mail-Verlauf aus drei `.eml` hoch (`ownDocx`, `ownThreadMails` in `beispieldaten.mjs`) und
   blendet einen mitgelieferten Eintrag aus. Der Prüfschritt (`a17`) zeigt zusätzlich eine abgelehnte CSV-Datei.
 - Für den Gruppenchat (`c33`–`c37`) starten Beispiel-Gäste der Gruppe „Vormittag“ einen Chat und posten Notizen über
