@@ -198,3 +198,146 @@ export const SEED_PRESETS: SeedPreset[] = [
     sortOrder: 50,
   },
 ];
+
+// ---------------------------------------------------------------- Startbestand der Prompts im Fundus
+
+export interface SeedPromptCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface SeedPrompt {
+  id: string;
+  categoryId: string;
+  title: string;
+  description: string;
+  text: string;
+  /** Einstellungen je Platzhalter (Schlüssel wie placeholderKey: klein, ä = ae). */
+  placeholders: Record<string, { label?: string; hint?: string; type?: "text" | "area" | "select"; options?: string[]; default?: string }>;
+  sortOrder: number;
+}
+
+export const SEED_PROMPT_CATEGORIES: SeedPromptCategory[] = [
+  { id: "kat-schreiben", name: "Schreiben", sortOrder: 10 },
+  { id: "kat-zusammenfassen", name: "Zusammenfassen", sortOrder: 20 },
+  { id: "kat-einfache-sprache", name: "Einfache Sprache", sortOrder: 30 },
+  { id: "kat-auswerten", name: "Auswerten", sortOrder: 40 },
+  { id: "kat-recherche", name: "Recherche", sortOrder: 50 },
+  { id: "kat-prompten-lernen", name: "Prompten lernen", sortOrder: 60 },
+];
+
+export const SEED_PROMPTS: SeedPrompt[] = [
+  {
+    id: "prompt-buergeranfrage",
+    categoryId: "kat-schreiben",
+    title: "Bürgeranfrage freundlich beantworten",
+    description: "Antwortentwurf mit nächsten Schritten, ohne erfundene Fristen.",
+    text: "Du arbeitest im {{Fachbereich}}. Beantworte die angehängte Anfrage freundlich und verständlich in höchstens {{Wortzahl}} Wörtern. Nenne die nächsten Schritte. Erfinde keine Fristen oder Zusagen – was du nicht weißt, markierst du als offene Frage.",
+    placeholders: { fachbereich: { hint: "z. B. Fachdienst ÖPNV" }, wortzahl: { type: "select", options: ["100", "150", "250"], default: "150" } },
+    sortOrder: 10,
+  },
+  {
+    id: "prompt-absage",
+    categoryId: "kat-schreiben",
+    title: "Absage höflich formulieren",
+    description: "Klar in der Sache, freundlich im Ton, mit Alternative.",
+    text: "Formuliere eine höfliche, klare Absage an {{Empfänger}} zum Anliegen „{{Anliegen}}“. Begründe kurz, biete wenn möglich eine Alternative an und bleib unter 120 Wörtern.",
+    placeholders: { empfaenger: { hint: "z. B. Herrn Akbulut" }, anliegen: { hint: "z. B. Fristverlängerung" } },
+    sortOrder: 20,
+  },
+  {
+    id: "prompt-pressemitteilung",
+    categoryId: "kat-schreiben",
+    title: "Pressemitteilung entwerfen",
+    description: "W-Fragen, ein Zitat, höchstens 250 Wörter.",
+    text: "Schreibe eine Pressemitteilung zu {{Anlass}}. Aufbau: Überschrift, Vorspann mit den W-Fragen, zwei Absätze, ein Zitat von {{Person}}. Höchstens 250 Wörter, sachlicher Ton.",
+    placeholders: { anlass: { hint: "z. B. Start des Wärmeplans" }, person: { hint: "z. B. der Oberbürgermeisterin" } },
+    sortOrder: 30,
+  },
+  {
+    id: "prompt-vorlage-stichpunkte",
+    categoryId: "kat-zusammenfassen",
+    title: "Vorlage in Stichpunkten zusammenfassen",
+    description: "Lange Vorlage, kurze Übersicht – mit offenen Fragen.",
+    text: "Fasse die angehängte Vorlage in {{Anzahl}} Stichpunkten für {{Zielgruppe}} zusammen. Nenne zuerst die wichtigste Entscheidung. Markiere Zahlen, die vor einer Weitergabe geprüft werden sollten, und liste offene Fragen extra auf.",
+    placeholders: { anzahl: { type: "select", options: ["3", "5", "7"], default: "5" }, zielgruppe: { hint: "z. B. den Hauptausschuss" } },
+    sortOrder: 10,
+  },
+  {
+    id: "prompt-mailverlauf",
+    categoryId: "kat-zusammenfassen",
+    title: "E-Mail-Verlauf zusammenfassen",
+    description: "Wer will was von wem? Welche Fristen laufen?",
+    text: "Fasse den angehängten E-Mail-Verlauf für {{Zielgruppe}} in {{Anzahl Punkte}} Punkten zusammen: Wer will was von wem? Welche Fristen laufen? Was ist noch offen?\nAchte besonders auf: {{Schwerpunkt}}",
+    placeholders: {
+      zielgruppe: { hint: "z. B. die Amtsleitung" },
+      "anzahl punkte": { default: "5" },
+      schwerpunkt: { label: "Was ist dir wichtig?", hint: "z. B. Kosten und Vertragsstrafen", type: "area" },
+    },
+    sortOrder: 20,
+  },
+  {
+    id: "prompt-protokoll-aufgaben",
+    categoryId: "kat-zusammenfassen",
+    title: "Aufgaben aus einem Protokoll ziehen",
+    description: "Wer macht was bis wann – fehlende Angaben markiert.",
+    text: "Lies das angehängte Protokoll und erstelle eine Aufgabenliste als Tabelle: Was ist zu tun? Wer ist zuständig? Bis wann? Kennzeichne Aufgaben ohne Zuständigkeit oder Frist mit „offen“.",
+    placeholders: {},
+    sortOrder: 30,
+  },
+  {
+    id: "prompt-einfache-sprache",
+    categoryId: "kat-einfache-sprache",
+    title: "Behördentext in Einfache Sprache",
+    description: "Kurze Sätze, keine Fachwörter, das Wichtigste zuerst.",
+    text: "Schreibe den angehängten Text in Einfacher Sprache um: kurze Sätze, ein Gedanke pro Satz, keine Fachwörter. Was die Leserinnen und Leser tun müssen, steht ganz oben. Zielgruppe: {{Zielgruppe}}.",
+    placeholders: { zielgruppe: { hint: "z. B. Haushalte in Heidhof" } },
+    sortOrder: 10,
+  },
+  {
+    id: "prompt-verstaendlichkeit",
+    categoryId: "kat-einfache-sprache",
+    title: "Text auf Verständlichkeit prüfen",
+    description: "Lange Sätze und Fachwörter finden, einfacher sagen.",
+    text: "Prüfe den folgenden Text auf Verständlichkeit für {{Zielgruppe}}. Markiere lange Sätze und Fachwörter und schlage einfachere Formulierungen vor.\n\nText:\n{{Text}}",
+    placeholders: { zielgruppe: { hint: "z. B. Eltern von Kita-Kindern" }, text: { hint: "Text hier einfügen", type: "area" } },
+    sortOrder: 20,
+  },
+  {
+    id: "prompt-tabelle-diagramm",
+    categoryId: "kat-auswerten",
+    title: "Tabelle auswerten und als Diagramm zeigen",
+    description: "Die größten Veränderungen finden und erklären.",
+    text: "Werte die angehängte Tabelle aus. Was hat sich gegenüber dem Vorjahr am stärksten verändert? Zeige die {{Anzahl}} wichtigsten Entwicklungen als Diagramm und erkläre sie in einfachen Worten für {{Zielgruppe}}.",
+    placeholders: { anzahl: { type: "select", options: ["2", "3", "5"], default: "3" }, zielgruppe: { hint: "z. B. die Landrätin" } },
+    sortOrder: 10,
+  },
+  {
+    id: "prompt-widersprueche",
+    categoryId: "kat-auswerten",
+    title: "Widersprüche zwischen Dokumenten finden",
+    description: "Zahlen, Daten und Aussagen vergleichen – mit Fundstelle.",
+    text: "Vergleiche die angehängten Dokumente. Liste jede Stelle auf, an der sich Zahlen, Daten oder Aussagen widersprechen – als Tabelle mit Fundstelle, beiden Aussagen und einer Einschätzung, welche stimmt.",
+    placeholders: {},
+    sortOrder: 20,
+  },
+  {
+    id: "prompt-fakten-quellen",
+    categoryId: "kat-recherche",
+    title: "Fakten mit Quellen prüfen",
+    description: "Websuche mit klarer Trennung: gesichert, umstritten, unklar.",
+    text: "Recherchiere im Web, was aktuell zu {{Thema}} gilt. Nenne nur Aussagen, für die du eine Quelle angeben kannst, und verlinke sie. Trenne klar: gesichert – umstritten – unklar.",
+    placeholders: { thema: { hint: "z. B. Fristen beim Führerscheinumtausch" } },
+    sortOrder: 10,
+  },
+  {
+    id: "prompt-verbessern",
+    categoryId: "kat-prompten-lernen",
+    title: "Meinen Prompt verbessern lassen",
+    description: "Freebie stellt Rückfragen und schlägt eine bessere Fassung vor.",
+    text: "Hier ist mein Prompt:\n\n{{Dein Prompt}}\n\nStelle mir zuerst drei Rückfragen, die das Ergebnis besser machen würden. Schreibe danach eine verbesserte Fassung und erkläre kurz, was du geändert hast.",
+    placeholders: { "dein prompt": { hint: "Deinen Prompt hier einfügen", type: "area" } },
+    sortOrder: 10,
+  },
+];

@@ -1,5 +1,5 @@
 import { errorResponse, HttpError, requireUser } from "@/lib/auth/session";
-import { assertSafeKey, getFile } from "@/lib/storage";
+import { assertSafeKey, getFile, isUserKey } from "@/lib/storage";
 
 const INLINE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "application/pdf", "audio/mpeg"]);
 
@@ -13,6 +13,8 @@ export async function GET(_request: Request, ctx: { params: Promise<{ key: strin
     } catch {
       throw new HttpError(400, "Ungültiger Dateipfad.");
     }
+    // Eigene Fundus-Dateien gibt es nur über /api/library/[id]/file (mit Prüfung des Schalters „Fundus“).
+    if (!isUserKey(key)) throw new HttpError(400, "Ungültiger Dateipfad.");
     const file = await getFile(key);
     if (!file) throw new HttpError(404, "Datei nicht gefunden oder bereits gelöscht.");
     const name = key.split("/").pop() ?? "datei";

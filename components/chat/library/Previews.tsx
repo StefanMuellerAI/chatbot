@@ -1,14 +1,16 @@
 "use client";
 // Vorschauen für den Fundus: Word-Seite, Excel-Tabelle, Folien und E-Mail-Verlauf.
-import { FileSpreadsheet, FileText, Mail, Paperclip, Presentation } from "lucide-react";
+import { FileSpreadsheet, FileText, FileType2, Mail, Paperclip, Presentation } from "lucide-react";
 import { Fragment, useState } from "react";
 import type { Block, Brand, ChartSpec, LibraryFileType, LibraryPreview, MailPreview, SheetPreview, Slide, SlideBullet } from "@/lib/library/types";
 import { cn } from "@/components/ui/cn";
+import { Markdown } from "@/components/chat/Markdown";
 
 export const TYPE_STYLE: Record<LibraryFileType, { label: string; color: string; Icon: typeof FileText }> = {
   word: { label: "Word", color: "#2b579a", Icon: FileText },
   excel: { label: "Excel", color: "#217346", Icon: FileSpreadsheet },
   powerpoint: { label: "PowerPoint", color: "#c43e1c", Icon: Presentation },
+  pdf: { label: "PDF", color: "#b42318", Icon: FileType2 },
   mail: { label: "E-Mail", color: "#0f6cbd", Icon: Mail },
 };
 
@@ -35,7 +37,24 @@ export function PreviewView({ preview, orgColor }: { preview: LibraryPreview; or
       return <SlidesPreview brand={preview.brand} slides={preview.slides} />;
     case "thread":
       return null;
+    case "text":
+      return <TextPreview preview={preview} />;
   }
+}
+
+// ---------------------------------------------------------------- Eigene Word- und PDF-Dateien (ausgelesener Text)
+
+function TextPreview({ preview }: { preview: Extract<LibraryPreview, { type: "text" }> }) {
+  return (
+    <div
+      data-testid={`vorschau-${preview.format}`}
+      className="mx-auto max-w-[720px] rounded-sm bg-white px-6 py-6 text-[13px] leading-relaxed text-[#1f1f1f] shadow-md ring-1 ring-black/5 sm:px-10"
+    >
+      <p className="mb-3 text-[11px] text-[#595959]">Ausgelesener Text{preview.format === "pdf" ? " aus dem PDF" : ""} – so bekommt ihn auch das Modell.</p>
+      <Markdown text={preview.markdown} />
+      {preview.truncated && <p className="mt-4 text-[11px] text-[#595959]">Vorschau gekürzt – beim Anhängen geht der ganze Text mit.</p>}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------- Word
@@ -59,7 +78,7 @@ function WordPreview({ preview }: { preview: Extract<LibraryPreview, { type: "wo
           ))}
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={brand.emblem} alt={`Signet ${brand.orgName}`} className="h-12 w-auto shrink-0" />
+        {brand.emblem && <img src={brand.emblem} alt={`Signet ${brand.orgName}`} className="h-12 w-auto shrink-0" />}
       </div>
       <dl className="mt-4 ml-auto grid w-fit max-w-full grid-cols-[auto_minmax(0,1fr)] gap-x-4 text-[11px]">
         {preview.meta.map(([k, v]) => (
@@ -272,7 +291,7 @@ function SlideCard({ slide, brand, number }: { slide: Slide; brand: Brand; numbe
       style={{ background: dark ? brand.color : slide.t === "section" ? "#f4f4f4" : "#ffffff" }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={brand.emblem} alt="" className={cn("absolute", dark ? "top-[7%] left-[5%] h-[15%]" : "top-[4%] right-[3%] h-[9%]")} />
+      {brand.emblem && <img src={brand.emblem} alt="" className={cn("absolute", dark ? "top-[7%] left-[5%] h-[15%]" : "top-[4%] right-[3%] h-[9%]")} />}
       {!dark && slide.t !== "section" && <div className="absolute inset-x-0 top-0 h-[1.2%]" style={{ background: brand.color }} />}
       {slide.t === "section" && <div className="absolute inset-y-0 left-0 w-[2.6%]" style={{ background: brand.color }} />}
       <div className="absolute inset-0 flex flex-col px-[5%] pt-[4%] pb-[7%] text-[2.2cqw] leading-snug">

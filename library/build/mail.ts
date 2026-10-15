@@ -1,5 +1,5 @@
 // E-Mails (.eml, RFC 5322) mit Outlook-typischem Zitatverlauf, Signatur und Dateianhängen.
-import type { LibraryPersonRef, MailPreview } from "@/lib/library/types";
+import type { LibraryDocType, LibraryPersonRef, MailPreview } from "@/lib/library/types";
 import type { MailSpec, ThreadSpec } from "../types";
 import { FICTION_MAIL_NOTE } from "./constants";
 import { berlinIso, dateTimeLong, plain, rfc5322Date } from "./format";
@@ -9,7 +9,7 @@ export interface MailAttachment {
   id: string;
   title: string;
   fileName: string;
-  type: "word" | "excel" | "powerpoint";
+  type: LibraryDocType;
   mime: string;
   data: Buffer;
 }

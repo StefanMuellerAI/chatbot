@@ -5,7 +5,7 @@ import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { BOOTSTRAP_STATEMENTS } from "./bootstrap";
 import * as schema from "./schema";
-import { SEED_MODELS, SEED_PRESETS } from "./seed";
+import { SEED_MODELS, SEED_PRESETS, SEED_PROMPT_CATEGORIES, SEED_PROMPTS } from "./seed";
 
 export type DB = PgDatabase<PgQueryResultHKT, typeof schema>;
 
@@ -97,6 +97,35 @@ async function seed(db: DB) {
       )
       .onConflictDoNothing();
   }
+  await seedPrompts(db);
+}
+
+/** Startbestand der Prompts: genau einmal (Markierung in settings), danach gehört alles der Kursleitung. */
+export async function seedPrompts(db: DB) {
+  const marker = await db.select({ key: schema.settings.key }).from(schema.settings).where(sql`${schema.settings.key} = 'fundus-start'`).limit(1);
+  if (marker.length) return;
+  await db
+    .insert(schema.promptCategories)
+    .values(SEED_PROMPT_CATEGORIES.map((c) => ({ id: c.id, name: c.name, sortOrder: c.sortOrder })))
+    .onConflictDoNothing();
+  await db
+    .insert(schema.prompts)
+    .values(
+      SEED_PROMPTS.map((p) => ({
+        id: p.id,
+        categoryId: p.categoryId,
+        title: p.title,
+        description: p.description,
+        text: p.text,
+        placeholders: p.placeholders,
+        sortOrder: p.sortOrder,
+      })),
+    )
+    .onConflictDoNothing();
+  await db
+    .insert(schema.settings)
+    .values({ key: "fundus-start", value: { version: 1, at: new Date().toISOString() } })
+    .onConflictDoNothing();
 }
 
 export { schema };

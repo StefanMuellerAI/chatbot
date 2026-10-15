@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
     // Der Fundus (erzeugt beim Build in .library/) wird zur Laufzeit gelesen.
     "/api/library/**": ["./.library/**"],
     "/api/chat": ["./.library/**"],
+    // Gruppenchat-Antworten lesen Fundus-Anhänge neu, wenn der Datei-Cache abgelaufen ist.
+    "/api/groupchats/**": ["./.library/**"],
+    "/api/admin/fundus/**": ["./.library/**"],
   },
   // Lokale Daten und Entwicklungsdateien gehören nie ins Funktions-Bundle.
   outputFileTracingExcludes: {

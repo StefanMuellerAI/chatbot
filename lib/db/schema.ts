@@ -286,3 +286,99 @@ export const groupChatMessages = pgTable(
   },
   (t) => [index("group_chat_messages_chat_idx").on(t.chatId, t.seq), index("group_chat_messages_version_idx").on(t.chatId, t.version)],
 );
+
+/**
+ * Eigene Inhalte der Kursleitung im Fundus (Plan: FUNDUS-PFLEGE-PLAN.md): Dokumente und E-Mail-Verläufe. Die Datei
+ * liegt in der Ablage unter `fundus/…` (dauerhaft), der ausgelesene Text hier – so überlebt er den Aufräumjob.
+ */
+export const fundusItems = pgTable(
+  "fundus_items",
+  {
+    id: text("id").primaryKey(),
+    /** document oder thread */
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    date: text("date").notNull(),
+    tags: jsonb("tags").notNull(),
+    keywords: jsonb("keywords").notNull(),
+    /** word, excel, powerpoint oder pdf (nur Dokumente). */
+    docType: text("doc_type"),
+    fileName: text("file_name"),
+    fileKey: text("file_key"),
+    mime: text("mime"),
+    size: integer("size").notNull().default(0),
+    sha256: text("sha256"),
+    text: text("text"),
+    tokens: integer("tokens").notNull().default(0),
+    preview: jsonb("preview"),
+    /** Anhang-Dokument eines Verlaufs: gehört zu ihm und geht mit ihm. */
+    threadId: text("thread_id"),
+    enabled: boolean("enabled").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("fundus_items_thread_idx").on(t.threadId)],
+);
+
+/** Mails eigener Verläufe (`id` = „<Verlauf>-<n>“). */
+export const fundusMails = pgTable(
+  "fundus_mails",
+  {
+    id: text("id").primaryKey(),
+    threadId: text("thread_id")
+      .notNull()
+      .references(() => fundusItems.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    subject: text("subject").notNull(),
+    fromName: text("from_name").notNull().default(""),
+    fromEmail: text("from_email").notNull().default(""),
+    to: jsonb("to_addresses").notNull(),
+    cc: jsonb("cc_addresses").notNull(),
+    date: timestamp("date", { withTimezone: true }),
+    messageId: text("message_id"),
+    fileName: text("file_name").notNull(),
+    fileKey: text("file_key").notNull(),
+    size: integer("size").notNull().default(0),
+    sha256: text("sha256").notNull(),
+    text: text("text").notNull(),
+    tokens: integer("tokens").notNull().default(0),
+    body: text("body").notNull().default(""),
+    /** IDs der Anhang-Dokumente (fundus_items mit thread_id). */
+    attachments: jsonb("attachments").notNull(),
+  },
+  (t) => [index("fundus_mails_thread_idx").on(t.threadId, t.position)],
+);
+
+/** Ausgeblendete mitgelieferte Einträge (die Inhalte selbst kommen aus dem Code und sind nicht änderbar). */
+export const fundusHidden = pgTable("fundus_hidden", {
+  id: text("id").primaryKey(),
+  hiddenAt: timestamp("hidden_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const promptCategories = pgTable("prompt_categories", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(100),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Prompts mit Platzhaltern ({{Name}}); `placeholders` hält die Einstellungen je Platzhalter. */
+export const prompts = pgTable(
+  "prompts",
+  {
+    id: text("id").primaryKey(),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => promptCategories.id, { onDelete: "restrict" }),
+    title: text("title").notNull(),
+    description: text("description").notNull().default(""),
+    text: text("text").notNull(),
+    placeholders: jsonb("placeholders").notNull(),
+    enabled: boolean("enabled").notNull().default(true),
+    sortOrder: integer("sort_order").notNull().default(100),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("prompts_category_idx").on(t.categoryId, t.sortOrder)],
+);

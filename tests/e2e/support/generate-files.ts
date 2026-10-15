@@ -101,7 +101,7 @@ export async function generateFiles() {
 }
 
 /** Minimales, gültiges PDF mit einer Textzeile pro Seite. */
-function pdf(pages: string[]): Buffer {
+export function pdf(pages: string[]): Buffer {
   const objects: string[] = [];
   const pageIds = pages.map((_, i) => 4 + i * 2);
   objects[1] = "<< /Type /Catalog /Pages 2 0 R >>";
@@ -125,7 +125,7 @@ function pdf(pages: string[]): Buffer {
   return Buffer.from(out, "latin1");
 }
 
-function docx(): Buffer {
+export function docx(): Buffer {
   const W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"';
   const p = (text: string, style?: string) => `<w:p>${style ? `<w:pPr><w:pStyle w:val="${style}"/></w:pPr>` : ""}<w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
   const cell = (text: string) => `<w:tc><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`;
@@ -153,7 +153,7 @@ function docx(): Buffer {
   );
 }
 
-function pptx(): Buffer {
+export function pptx(): Buffer {
   const A = 'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
   const slide = (lines: string[]) =>
     strToU8(
