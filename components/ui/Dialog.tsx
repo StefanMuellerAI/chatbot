@@ -26,7 +26,12 @@ export function Dialog({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    if (open && !el.open) el.showModal();
+    if (open && !el.open) {
+      // Über einem anderen Dialog (z. B. „Prompt ausfüllen“ über dem Fundus) nicht noch einmal weichzeichnen:
+      // zwei weichgezeichnete Hintergründe übereinander kosten Safari über eine Sekunde pro Bild.
+      el.toggleAttribute("data-stacked", Boolean(document.querySelector("dialog[open]")));
+      el.showModal();
+    }
     if (!open && el.open) el.close();
   }, [open]);
   // Wird der Dialog entfernt statt geschlossen (Aufrufer blendet ihn aus), vorher schließen: so kehrt der Fokus
