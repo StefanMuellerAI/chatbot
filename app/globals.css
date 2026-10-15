@@ -324,13 +324,10 @@ body {
   animation-delay: 0.3s;
 }
 
+/* Nur abdunkeln, nicht weichzeichnen: backdrop-filter kostet ohne Grafikkarte (Thin Clients, Remote-Desktops, WebKit
+   in der CI) bis zu einer Sekunde pro Bild – Dialoge wurden dort zäh. */
 dialog::backdrop {
   background: rgba(13, 10, 23, 0.55);
-  backdrop-filter: blur(2px);
-}
-/* Dialog über einem Dialog: der untere ist schon weichgezeichnet (siehe components/ui/Dialog.tsx). */
-dialog[data-stacked]::backdrop {
-  backdrop-filter: none;
 }
 
 /* Druckansicht (PDF-Export): nur der Gesprächsverlauf */

@@ -26,6 +26,9 @@ export const LABELS: Record<string, string> = {
   placeholders: "Platzhalter",
   move: "Reihenfolge",
   hidden: "Ausgeblendet",
+  prompts: "Prompts",
+  newCategory: "Neue Kategorie",
+  inactive: "Zunächst inaktiv",
 };
 
 const day = z

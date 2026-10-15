@@ -1,13 +1,16 @@
 "use client";
 // Prompts nach Kategorie (Reihenfolge wie im Fundus) und die Kategorien selbst.
-import { ArrowDown, ArrowUp, Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, Download, FileDown, Loader2, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/client/api";
+import { downloadText } from "@/lib/client/export";
 import type { AdminPrompt, AdminPromptCategory } from "@/lib/shared/fundus";
 import { parsePrompt } from "@/lib/shared/placeholders";
 import { FUNDUS_LIMITS } from "@/lib/shared/fundus";
 import { Button } from "@/components/ui/Button";
 import { inputClass } from "../fields";
+import { exportFileName, promptFile, promptFileText } from "@/lib/shared/prompt-import";
+import { downloadMuster, ImportDialog } from "./ImportDialog";
 import { BLANK_PROMPT, PromptDialog, type PromptDraft } from "./PromptDialog";
 import { Badge, errorText, plural } from "./shared";
 
@@ -42,7 +45,16 @@ export function PromptsPanel({
   onMessage: Message;
 }) {
   const [editing, setEditing] = useState<PromptDraft | null>(null);
+  const [importing, setImporting] = useState(false);
   const { busy, act } = useAct(reload, onMessage);
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
+  /** Export im Format der Musterdatei: eine Kategorie (ohne Feld „kategorie“) oder alle (mit). */
+  const exportPrompts = (category: AdminPromptCategory | null) => {
+    const list = category ? prompts.filter((p) => p.categoryId === category.id) : prompts;
+    const name = category?.name ?? "Alle Prompts";
+    const file = promptFile(name, list.map((p) => ({ ...p, category: category ? undefined : categoryName.get(p.categoryId) })));
+    downloadText(promptFileText(file), exportFileName(name), "application/json");
+  };
   const patch = (id: string, body: object, done?: string) => act(id, () => api("/api/admin/fundus/prompts", { method: "PATCH", json: { id, ...body }, admin: true }), done);
   return (
     <div>
@@ -50,18 +62,36 @@ export function PromptsPanel({
         <p className="text-sm text-muted">
           {plural(prompts.length, "Prompt", "Prompts")}, davon {prompts.filter((p) => p.enabled).length} aktiv. Teilnehmende sehen nur Kategorien mit aktiven Prompts.
         </p>
-        <Button size="sm" variant="primary" onClick={() => setEditing(BLANK_PROMPT)}>
-          <Plus className="h-4 w-4" /> Neuer Prompt
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" onClick={downloadMuster}>
+            <Download className="h-4 w-4" /> Muster herunterladen
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => exportPrompts(null)} disabled={prompts.length === 0}>
+            <FileDown className="h-4 w-4" /> Alle exportieren
+          </Button>
+          <Button size="sm" onClick={() => setImporting(true)}>
+            <Upload className="h-4 w-4" /> Importieren
+          </Button>
+          <Button size="sm" variant="primary" onClick={() => setEditing(BLANK_PROMPT)}>
+            <Plus className="h-4 w-4" /> Neuer Prompt
+          </Button>
+        </div>
       </div>
       <div className="space-y-4">
         {categories.map((c) => {
           const list = prompts.filter((p) => p.categoryId === c.id);
           return (
             <section key={c.id} aria-label={`Kategorie ${c.name}`}>
-              <h3 className="mb-1 text-sm font-semibold">
-                {c.name} <span className="font-normal text-muted">({list.length})</span>
-              </h3>
+              <div className="mb-1 flex items-center gap-2">
+                <h3 className="text-sm font-semibold">
+                  {c.name} <span className="font-normal text-muted">({list.length})</span>
+                </h3>
+                {list.length > 0 && (
+                  <Button size="sm" variant="ghost" aria-label={`„${c.name}“ exportieren`} title="Exportieren" onClick={() => exportPrompts(c)}>
+                    <FileDown className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
               {list.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-border px-3 py-2 text-sm text-muted">Noch keine Prompts.</p>
               ) : (
@@ -141,6 +171,18 @@ export function PromptsPanel({
           }}
           onSaved={async (message) => {
             setEditing(null);
+            await reload();
+            onMessage(message);
+          }}
+        />
+      )}
+      {importing && (
+        <ImportDialog
+          prompts={prompts}
+          categories={categories}
+          onClose={() => setImporting(false)}
+          onImported={async (message) => {
+            setImporting(false);
             await reload();
             onMessage(message);
           }}

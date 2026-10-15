@@ -424,7 +424,7 @@ Benutzernamen und ein einfaches Passwort, die zum Termin-Ende verfallen (Plan: [
 | W06 | 25 Personen einer Gruppe in drei Gruppenchats posten gleichzeitig, alle fragen ab, zwei rufen `@Freebie` | keine Fehler, keine Sperre, jeder Beitrag kommt bei allen in derselben Reihenfolge an, genau eine Antwort je Chat und Runde |
 | W07 | Zufallstest: zufällige Folgen aus 24 Teilnehmer-Aktionen (tippen, einfügen, doppelt senden, stoppen, bearbeiten, Dateien, Chats wechseln und löschen, Posteingang, neu laden, Diktat, Prompt ausfüllen und einfügen mit Sonderzeichen, Maske abbrechen, Fundus-Dokument anhängen …) mit festen Seeds | nach jedem Schritt: kein Platzhalter `{{…}}` eines ausgefüllten Prompts im Eingabefeld, Maske abbrechen ändert nichts, Frage/Antwort im Wechsel, „Stoppen“ nur bei laufender Antwort, kein Mikrofon ohne Aufnahme, keine internen Fehlertexte, höchstens ein neuer Chat; am Ende öffnet sich jeder Chat. CI: 5 Seeds × 40 Schritte, nachts 50 neue Seeds × 60 Schritte |
 | W08 | Sehr lange Chats: 420 und 500 Nachrichten, über 4,5 MB (viele Websuchen), Verlauf länger als das Kontextfenster (Fake-API) | ab 400 Nachrichten bzw. großem Verlauf ein Hinweis mit „Neuer Chat“; an der Grenze die Meldung „Dieser Chat ist zu lang geworden …“ statt eines Fehlercodes, über 4,5 MB ohne Anfrage |
-| W09 | 25 Gäste öffnen den Fundus, füllen Prompts aus und senden, während die Kursleitung Prompts speichert und eine Datei hochlädt | keine Fehler, kein 500; jeder sieht nach erneutem Öffnen den neuen Stand; ETag bleibt stimmig |
+| W09 | 25 Gäste öffnen den Fundus, füllen Prompts aus und senden, während die Kursleitung Prompts speichert, 200 Prompts importiert und eine Datei hochlädt | keine Fehler, kein 500; jeder sieht nach erneutem Öffnen den neuen Stand samt aller importierten Prompts; ETag bleibt stimmig |
 
 ### X · Live-Smoke (`freebie.stefanai.de`)
 
@@ -589,6 +589,23 @@ Angepasst wurden dafür: **Q21** (Fundus aus: keine Prompts, Pflege im Admin mit
 | FP18 | Grenzen | 500 Prompts, 50 Kategorien, 20 Platzhalter, 20 Dateien je Upload: verständliche Meldungen, nichts halb angelegt (Dokumente und Verläufe: Unit-Test) |
 | FP19 | Barrierefreiheit und Tastatur | axe ohne „serious/critical“ für Reiter, Upload-, Verlauf-, Prompt- und Kategorien-Dialog, hell und dunkel; Platzhalter-Tabelle per Tastatur; Fehler mit `aria-invalid` und `aria-describedby`; Fokus kehrt zurück |
 
+**Prompt-Bibliotheken importieren und exportieren** (Plan: [PROMPT-IMPORT-PLAN.md](PROMPT-IMPORT-PLAN.md),
+`admin-prompt-import.spec.ts`, ebenfalls im Projekt `admin`). Format, Muster, Schreibweisen, Rundlauf und Store prüfen
+Unit-Tests (`prompt-import.test.ts`, mit Zufallstest).
+
+| ID | Bereich | Prüfung |
+|---|---|---|
+| FP20 | Musterdatei | „Muster herunterladen“ (Reiter und Dialog): `freebie-prompts-muster.json`, gültiges JSON mit Anleitung und drei Beispielen; genau diese Datei importiert → 3 Prompts, im Chat mit Auswahl, Standardwert und mehrzeiligem Feld ausfüllbar |
+| FP21 | Import in vorhandene Kategorie | Prüfschritt mit Zusammenfassung, Vorschau mit hervorgehobenen Platzhaltern, Zahl im Knopf, ohne Bestätigung gesperrt; danach am Ende der Kategorie in Dateireihenfolge, aktiv, mit Einstellungen; Teilnehmende sehen sie beim nächsten Öffnen ohne Neuladen |
+| FP22 | Neue Kategorie beim Import | Name aus „name“ bzw. dem Dateinamen vorgeschlagen; vorhandener, leerer und zu langer Name gesperrt (`aria-invalid`); Abbrechen und eine Datei ohne Importierbares legen keine Kategorie an; neue Kategorie steht am Ende |
+| FP23 | Prüfschritt | Fehler (Titel leer, Text zu lang, Auswahl mit einem Wert), Hinweise (Einstellungen ohne Platzhalter, echte Daten, `[…]`, Feld „kategorie“, unbekannte Felder), Dubletten in der Kategorie und weiter oben in der Datei; Wechsel der Kategorie bewertet neu; nur Bereite werden angelegt, Meldung nennt die Übersprungenen |
+| FP24 | Kaputte Dateien | leer, nur Leerraum, kein JSON (mit Zeile und Spalte), anderes Format, neuere Version, leere Liste, Windows-1252, größer als 4 MB, 501 Einträge, umbenannte Word-Datei → je eine verständliche Meldung, nichts angelegt; danach eine gute Datei ohne Meldung |
+| FP25 | Grenzen und Gleichzeitigkeit | Kategorie verschwindet zwischen Prüfen und Importieren → 409, Dialog bleibt offen; Doppelklick legt einmal an; zwei Admin-Sitzungen importieren gleichzeitig → nichts doppelt; „Platz für noch 5 Prompts“ im Dialog (gesperrt) und in der API, nichts angelegt; genau 5 passen → 500 |
+| FP26 | Optionen | Schreibweise `[Name]` samt Einstellung unter „[THEMA]“ → echte Platzhalter (Vorschau, Maske im Chat); Bestätigung „keine echten Daten“ nötig, auch in der API; „Alle zunächst inaktiv“ → Teilnehmende sehen weder Prompts noch Kategorie |
+| FP27 | Import-API direkt | 401, 403, kaputter Body 400, zu groß 413, fremde Felder (auch im Eintrag) 400, manipulierte Einträge mit Eintragsnummer, 501 Einträge, Kategorie fehlt oder doppelt angegeben 400, verschwundene Kategorie 409, fremde Origin 403; `__proto__`/`constructor` verbiegen nichts |
+| FP28 | Barrierefreiheit und Tastatur | axe ohne „serious/critical“ für den Import-Dialog leer und mit Prüfschritt, hell und dunkel; Datei per Tastatur wählen; Zustände als Text, nicht nur Farbe; `aria-expanded` an der Vorschau; Fokus kehrt zu „Importieren“ zurück |
+| FP29 | Export | „Alle exportieren“ (mit Feld „kategorie“) und je Kategorie (ohne), Dateinamen, Reihenfolge; Export einer Kategorie in eine neue Kategorie importiert → dieselben Felder |
+
 ### PR · Prompts im Chat
 
 Der Fundus hat einen dritten Reiter „Prompts“. Mit Platzhaltern öffnet ein Prompt die Maske „Prompt ausfüllen“: jedes
@@ -612,6 +629,7 @@ nur den Startbestand (12 Prompts in 6 Kategorien) und laufen in `chat`, `mobile`
 | PR11 | Doppelklick und Tastatur | Doppelklick und doppeltes `Enter` auf „Einfügen“ fügen einmal ein; `Enter` im einzeiligen Feld → nächstes Feld, im letzten = Einfügen; `Strg`/`Cmd`+`Enter` fügt ein; im mehrzeiligen Feld macht `Enter` eine neue Zeile (auch iPad); `Esc` schließt erst die Maske, dann den Fundus; Werte bleiben beim erneuten Öffnen desselben Prompts bis zum Neuladen |
 | PR12 | Handy und Tablet (`@mobil`, `@tablet`) | Reiter erreichbar, Liste/Detail im Wechsel, Maske im Vollbild, aktives Feld nicht von der Tastatur verdeckt, kein seitliches Scrollen |
 | PR13 | Barrierefreiheit | Felder mit Beschriftung, `aria-required`, Fehler mit `aria-invalid`/`aria-describedby`; axe ohne „serious/critical“ in Reiter und Maske, hell und dunkel; Fokus kehrt ins Eingabefeld |
+| PR14 | Reservierte Platzhalternamen | `{{constructor}}` und `{{__proto__}}` bleiben Text: Hinweis im Admin-Dialog, die Maske im Chat zeigt nur die echten Felder und fügt den Rest wörtlich ein (läuft im Projekt `admin`, weil es einen Prompt anlegt) |
 
 ## 5. Abdeckungsmatrix
 
@@ -760,6 +778,13 @@ nur die aus dem Text geschätzte Ausgabe. Bei Claude kommen Eingabe und Cache gl
 | 79 | Gruppenchat-Antworten auf Vercel: der mitgelieferte Fundus fehlte im Funktions-Bundle der Route `/api/groupchats/[id]/freebie` – nach Ablauf des Datei-Caches wäre ein Fundus-Anhang dort „nicht mehr verfügbar“ gewesen | `next.config.ts` (Tracing), Y26 |
 | 80 | Dialoge, die die Seite beim Schließen entfernt statt schließt (z. B. „Vorlage bearbeiten“), gaben den Fokus nicht an den auslösenden Knopf zurück | FP19 |
 
+**Prompt-Import** (15. Oktober 2026)
+
+| # | Fehler | Abgesichert durch |
+|---|---|---|
+| 81 | Ein Platzhalter `{{constructor}}` oder `{{__proto__}}` ließ die Maske im Chat abstürzen („value.replace is not a function“): die Werte wurden in einem gewöhnlichen Objekt nachgeschlagen und trafen Eingebautes; die Einstellungen eines Platzhalters `__proto__` gingen beim Speichern verloren | PR14, FP27, Unit `prompt-import.test.ts` |
+| 82 | Dialoge waren ohne Grafikkarte zäh (WebKit in der CI, aber auch Thin Clients und Remote-Desktops): die Weichzeichnung des Hintergrunds kostete bis zu einer Sekunde pro Bild; PR09 lief in WebKit ins Zeitlimit, PR07 brauchte 84 Sekunden | Laufzeit der Chat-Tests in WebKit (PR07, PR09, PR11 jetzt 13–30 s) |
+
 **Bekannte Grenze:** Stellen viele Personen *exakt gleichzeitig* dieselbe Frage, verfehlen alle den Antwort-Cache,
 weil noch keine Antwort fertig ist. Wer einige Sekunden später fragt, bekommt den Treffer (W04).
 
@@ -804,8 +829,9 @@ liegt bei dir.
 | 13 · Grenzfälle, Phase 3 | A15/A16, C18, C23, C27–C29, E13, F11, F12, F16, F18, W07 (Zufallstest, nachts mit 50 Seeds), W08, Z18; Testhelfer `support/grenzfaelle.ts`; Fehler 62–71 (`GRENZFAELLE-PLAN.md`) | erledigt |
 | 14 · Testlücken | Code und Tests bereichsweise abgeglichen: Fehler 72–78 behoben, vier Scheinprüfungen (U03/U04, U05/Q13, T17, GC14) prüfen jetzt die Wirkung; A07, U04, U05, T17, V04 erweitert | erledigt |
 | 15 · Fundus pflegen | Bereiche FP und PR, Y22–Y26, V09, W09, X11; Q21, O01, Y21, U01–U03, W07 und X08 angepasst; `restore()` kennt den Fundus; Fehler 79–80 (`FUNDUS-PFLEGE-PLAN.md`) | erledigt |
+| 16 · Prompt-Import | FP20–FP29, PR14; FP16 und W09 erweitert; Fehler 81–82 (`PROMPT-IMPORT-PLAN.md`) | erledigt |
 
-Ergebnis: 417 E2E-Tests in 35 Dateien (plus 11 Live-Smoke-Tests, dazu nachts der Zufallstest mit 50 Seeds) und 245
+Ergebnis: 429 E2E-Tests in 36 Dateien (plus 11 Live-Smoke-Tests, dazu nachts der Zufallstest mit 50 Seeds) und 275
 Unit-Tests; die komplette Suite läuft lokal in gut 12 Minuten (3 Worker). Nach Phase 3 der Grenzfälle (14. Oktober
 2026) war sie vollständig grün, die 45 Grenzfall-Tests (Chat, Handy, Tablet) auch dreimal hintereinander; der
 Zufallstest lief vorab mit rund 60 Seeds. Der dreifache Lauf ohne Wiederholungen (948 Läufe, 13. Oktober 2026, mit den

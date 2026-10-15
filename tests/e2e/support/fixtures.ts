@@ -323,6 +323,24 @@ export class AdminApi {
   updatePrompt(p: { id: string; title: string; categoryId: string; text: string; description?: string; placeholders?: Record<string, unknown>; enabled?: boolean }) {
     return this.json("PUT", "/api/admin/fundus/prompts", p);
   }
+  /** Prompt-Bibliothek importieren (wie der Import-Dialog: geprüfte Einträge, mit Bestätigung). */
+  importPrompts(
+    prompts: { title: string; text: string; description?: string; placeholders?: Record<string, unknown>; enabled?: boolean }[],
+    target: { categoryId?: string; newCategory?: string },
+    opts: { inactive?: boolean } = {},
+  ) {
+    return this.json<{ categoryId: string | null; categoryName: string; created: number; skipped: { title: string; reason: string }[] }>(
+      "POST",
+      "/api/admin/fundus/prompts/import",
+      {
+        prompts: prompts.map((p) => ({ description: "", placeholders: {}, enabled: true, ...p })),
+        categoryId: target.categoryId ?? null,
+        newCategory: target.newCategory ?? null,
+        inactive: opts.inactive ?? false,
+        confirmed: true,
+      },
+    );
+  }
   deleteFundus(kind: "documents" | "threads" | "prompts" | "categories", id: string) {
     return this.json("DELETE", `/api/admin/fundus/${kind}?id=${encodeURIComponent(id)}`);
   }
@@ -449,8 +467,8 @@ export interface FundusOverview {
   libraryEnabled: boolean;
   documents: { id: string; source: "eigen" | "fundus"; title: string; type: string; enabled: boolean; hidden: boolean; threadId: string | null; fileName: string; tags: string[] }[];
   threads: { id: string; source: "eigen" | "fundus"; title: string; mails: number; attachments: number; enabled: boolean; hidden: boolean }[];
-  categories: { id: string; name: string; prompts: number; activePrompts: number }[];
-  prompts: { id: string; categoryId: string; title: string; description: string; text: string; placeholders: Record<string, unknown>; enabled: boolean }[];
+  categories: { id: string; name: string; sortOrder: number; prompts: number; activePrompts: number }[];
+  prompts: { id: string; categoryId: string; title: string; description: string; text: string; placeholders: Record<string, unknown>; enabled: boolean; sortOrder: number }[];
 }
 
 export interface Snapshot {

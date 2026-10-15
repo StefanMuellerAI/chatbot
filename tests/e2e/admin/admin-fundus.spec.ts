@@ -679,6 +679,7 @@ test.describe("FP · Fundus pflegen", () => {
       ["PUT", "/api/admin/fundus/prompts"],
       ["PATCH", "/api/admin/fundus/prompts"],
       ["DELETE", "/api/admin/fundus/prompts?id=x"],
+      ["POST", "/api/admin/fundus/prompts/import"],
       ["POST", "/api/admin/fundus/categories"],
       ["PUT", "/api/admin/fundus/categories"],
       ["DELETE", "/api/admin/fundus/categories?id=x"],
@@ -1010,7 +1011,7 @@ test.describe("Y · Eigene Inhalte im Chat", () => {
 
 // ---------------------------------------------------------------- W09 Last
 
-test("W09 25 Gäste öffnen den Fundus, füllen Prompts aus und senden, während die Kursleitung Prompts speichert und eine Datei hochlädt", async ({ admin, baseURL, ip }) => {
+test("W09 25 Gäste öffnen den Fundus, füllen Prompts aus und senden, während die Kursleitung Prompts speichert, 200 Prompts importiert und eine Datei hochlädt", async ({ admin, baseURL, ip }) => {
   test.slow();
   const guests: APIRequestContext[] = [];
   for (let i = 0; i < 25; i++) {
@@ -1034,8 +1035,10 @@ test("W09 25 Gäste öffnen den Fundus, füllen Prompts aus und senden, während
     statuses.push(chat.status());
     await chat.body();
   });
+  const imported = Array.from({ length: 200 }, (_, i) => ({ title: `Import ${i} ${uniq()}`, text: `Für {{Zielgruppe}} – Nummer ${i}` }));
   const adminWork = (async () => {
     for (let i = 0; i < 5; i++) await admin.createPrompt({ title: `Last ${i} ${uniq()}`, categoryId: "kat-schreiben", text: `Für {{Zielgruppe}} ${i}` });
+    expect((await admin.importPrompts(imported, { newCategory: `Last-Import ${uniq()}` })).created).toBe(200);
     await admin.addDocuments([{ name: "last.docx", data: uniqueDocx("last", "Last").buffer }]);
   })();
   await Promise.all([...guestWork, adminWork]);
@@ -1051,6 +1054,9 @@ test("W09 25 Gäste öffnen den Fundus, füllen Prompts aus und senden, während
     expect(again.status()).toBe(304);
   }
   expect(etags.size).toBe(1);
+  // Der Import ist vollständig angekommen.
+  const end = await fundusCatalog(guests[0]);
+  expect(imported.every((p) => end.prompts.some((x) => x.title === p.title))).toBe(true);
   await Promise.all(guests.map((g) => g.dispose()));
 });
 

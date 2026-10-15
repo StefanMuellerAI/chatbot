@@ -137,21 +137,12 @@ test.describe("PR · Prompts im Chat", () => {
     void chat;
   });
 
-  test("PR04 Maske: ein Feld je Platzhalter, Beschriftung, Hinweis, Standardwert, Auswahl, mehrzeilig, Live-Vorschau; Einfügen ohne Senden", async ({ chat, page, browserName }) => {
+  test("PR04 Maske: ein Feld je Platzhalter, Beschriftung, Hinweis, Standardwert, Auswahl, mehrzeilig, Live-Vorschau; Einfügen ohne Senden", async ({ chat, page }) => {
     const tab = new PromptsTab(page);
     const mask = new PromptMask(page);
     await tab.open();
     await tab.choose(ID.mail);
     await expect(mask.dialog).toBeVisible();
-    // Über dem Fundus wird nicht noch einmal weichgezeichnet – zwei weichgezeichnete Hintergründe übereinander
-    // brauchen in Safari über eine Sekunde pro Bild.
-    await expect(mask.dialog).toHaveAttribute("data-stacked");
-    await expect(tab.dialog).not.toHaveAttribute("data-stacked");
-    if (browserName !== "firefox") {
-      const blur = (d: typeof mask.dialog) => d.evaluate((el) => getComputedStyle(el, "::backdrop").backdropFilter);
-      expect(await blur(mask.dialog)).toBe("none");
-      expect(await blur(tab.dialog)).toBe("blur(2px)");
-    }
     await expect(mask.dialog).toContainText("Bitte alle Felder ausfüllen.");
     const labels = await mask.dialog.locator("label").allInnerTexts();
     expect(labels).toEqual(["Zielgruppe", "Anzahl Punkte", "Was ist dir wichtig?"]);
@@ -251,8 +242,6 @@ test.describe("PR · Prompts im Chat", () => {
   });
 
   test("PR07 Entwurf: Hinweis, Ersetzen und Anfügen; unverändert eingefügt gilt nicht als Entwurf; Bearbeiten einer Nachricht; Abbrechen ändert nichts", async ({ chat, page }) => {
-    // Fünfmal Fundus und Maske, dazu eine Antwort: in WebKit (CI) knapp an 60 Sekunden, daher das längere Budget.
-    test.slow();
     const tab = new PromptsTab(page);
     const mask = new PromptMask(page);
     const id = uniq();
